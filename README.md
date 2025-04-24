@@ -16,4 +16,25 @@ Current status:
 - [ ] automatically deduce the fastq file naming pattern,
 - [ ] automatically deduce compression (gz, bz2) or the lack-of,
 - [ ] extend to multiplexed datasets,
-- [ ] draft of the second section of the pipeline (work at the study scale)
+- [ ] draft of the second section of the pipeline (work at the study scale),
+- [ ] deduce reference database from primers
+
+List of common name pattern for paired-end fastq files:
+- `_L001_R{1,2}_001.fastq.gz` (MiSeq)
+- `_L001_R{1,2}.fastq.gz`
+- `_[1-9]_{1,2}.fastq.gz`
+- `_[1-9]_{1,2}_.*.fastq.gz`
+- `_L001_.*_R{1,2}.fastq.bz2` (variant of `_L001_R{1,2}.fastq.gz`)
+- `_L005_R{1,2}.fastq.gz` (lane can be greater than 1!)
+- `_L001_R{1,2}_002.fastq.bz2` (the last segment is supposed to always be 001!)
+- `_R{1,2}.fastq.gz`
+- `_{1,2}.fastq.gz`
+
+- note: `fastq` might be `fq`, and there could be no compression
+  (`.(fastq|fq)(.gz|.bz2)?`)
+
+List of dependencies that could trigger a complete or partial re-run:
+- new versions of vsearch, cutadapt, and swarm,
+- new versions of external python scripts,
+- new version of the reference database,
+- new set of fastq files
