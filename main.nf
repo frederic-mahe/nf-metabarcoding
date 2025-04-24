@@ -71,6 +71,9 @@ process merge_fastq_pairs {
 }
 
 
+// refactoring:
+// extract function reverse_complement_sequence
+
 process trim_primers {
     // search forward primer in both normal and revcomp: now all reads
     // are in the same orientation. Matching leftmost is the default.
@@ -179,6 +182,11 @@ process dereplicate_fasta {
     '''
 }
 
+
+// refactoring:
+// breakdown into two functions
+// - clusterize_sample
+// - list_per_sample_clusters
 
 process list_local_clusters {
     // retain only clusters with more than 2 reads
