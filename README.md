@@ -38,3 +38,4 @@ List of dependencies that could trigger a complete or partial re-run:
 - new versions of external python scripts,
 - new version of the reference database,
 - new set of fastq files
+- allow users to force a global or partial re-run
