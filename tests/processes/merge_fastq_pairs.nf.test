@@ -5,7 +5,7 @@ nextflow_process {
     process "merge_fastq_pairs"
 
     test("merges overlapping paired-end reads") {
-        // COVERAGE: spec #1, #3
+        // COVERAGE: [S01], [S03]
         when {
             process {
                 """
@@ -26,7 +26,7 @@ nextflow_process {
     }
 
     test("non-overlapping pairs do not merge (parallel pipeline)") {
-        // COVERAGE: spec #5 — blocked on spec clarification (N<->A round-trip)
+        // COVERAGE: [S04] — blocked on D01 (N<->A round-trip)
         when {
             process {
                 """
