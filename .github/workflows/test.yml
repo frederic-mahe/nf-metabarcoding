@@ -41,8 +41,8 @@ jobs:
       - name: Generate test fixtures
         run: bash tests/data/generate.sh
 
-      - name: Run nf-test (excluding pending tests)
-        run: nf-test test --tag '!pending' --verbose
+      - name: Run nf-test (CI-tagged tests only; pending tests excluded)
+        run: nf-test test --tag ci --verbose
 
   coverage-gate:
     runs-on: ubuntu-latest

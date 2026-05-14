@@ -5,6 +5,7 @@ nextflow_pipeline {
 
     test("runs end-to-end on the paired_merge_ok fixtures") {
         // COVERAGE: [S01], [S03], [S10], [S11], [S12]
+        tag "ci"
         when {
             params {
                 fastq_folder  = "tests/data"

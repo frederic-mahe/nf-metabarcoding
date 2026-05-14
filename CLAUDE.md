@@ -49,8 +49,9 @@ The TDD cycle for this repo:
    so the `[Sxx]` ID maps to a test file. Status starts as `red`.
 3. Write a **failing** test under `tests/processes/<process>.nf.test`
    or `tests/main.nf.test`. Tag it with a comment of the form
-   `// COVERAGE: [Sxx]` (one or more IDs, comma-separated). Pending
-   tests use `tag "pending"` — see [`tests/README.md`](tests/README.md).
+   `// COVERAGE: [Sxx]` (one or more IDs, comma-separated). Stable
+   tests carry `tag "ci"`, pending tests carry `tag "pending"` — see
+   [`tests/README.md`](tests/README.md).
 4. Implement (or fix) the workflow code until the test passes.
 5. Run `nf-test test` locally. The coverage gate
    (`bash tests/coverage-gate.sh`) verifies that every `[Sxx]` in
@@ -83,7 +84,7 @@ branch-creation rights:
 - check modified bash files with `shellcheck` and fix reported issues
 - check modified python files with `flake8` and fix reported issues
 - a refactor is "done" when:
-  - `nf-test test --tag '!pending'` passes
+  - `nf-test test --tag ci` passes
   - `bash tests/coverage-gate.sh` passes
   - `shellcheck` / `flake8` report nothing on touched files
   - `tests/COVERAGE.md` reflects any spec changes in the same commit

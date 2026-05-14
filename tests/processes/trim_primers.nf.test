@@ -23,6 +23,7 @@ nextflow_process {
 
     test("trims forward and reverse primers from merged reads") {
         // COVERAGE: [S01]
+        tag "ci"
         when {
             process {
                 """

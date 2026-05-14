@@ -41,6 +41,7 @@ nextflow_process {
 
     test("dereplicates and drops ee values") {
         // COVERAGE: [S01]
+        tag "ci"
         when {
             process {
                 """

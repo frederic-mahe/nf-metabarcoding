@@ -41,6 +41,7 @@ nextflow_process {
 
     test("emits one .qual line per unique sequence, keeping the lowest ee") {
         // COVERAGE: [S01]
+        tag "ci"
         when {
             process {
                 """

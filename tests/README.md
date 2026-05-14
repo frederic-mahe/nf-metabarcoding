@@ -18,8 +18,8 @@ documented in [`../CLAUDE.md`](../CLAUDE.md).
 # generate fixtures (one-time, or whenever generate.sh changes)
 bash tests/data/generate.sh
 
-# run all non-pending tests (this is what CI runs)
-nf-test test --tag '!pending'
+# run only the CI-tagged tests (this is what CI runs)
+nf-test test --tag ci
 
 # run absolutely everything, including red TDD-phase tests
 nf-test test
@@ -62,10 +62,18 @@ Fixtures should be **as small as possible** — a handful of reads is
 usually enough to exercise a behaviour. Extend
 `tests/data/generate.sh` instead of committing binary files.
 
-## Pending-test idiom
+## Tagging convention
 
-When a test is written ahead of the implementation (the red phase of
-TDD) **or** is blocked on a `Dxx` decision, tag it as `pending`:
+`nf-test`'s `--tag` filter is **include-only** — there is no built-in
+"exclude tag X" mode — so we explicitly opt tests into CI:
+
+- **`tag "ci"`** — the test is expected to pass on every commit. CI
+  runs `nf-test test --tag ci`, so only these tests gate the build.
+- **`tag "pending"`** — the test is ahead of the implementation
+  (red TDD phase) **or** is blocked on a `Dxx` decision. Pending
+  tests never run in CI.
+
+Example pending test:
 
 ```groovy
 test("describes the eventual behaviour") {
@@ -79,10 +87,9 @@ test("describes the eventual behaviour") {
 }
 ```
 
-CI runs `nf-test test --tag '!pending'`, so pending tests do not
-break the build. Developers see the red by running plain
-`nf-test test` locally.
-
-Once the implementation lands, remove the `tag "pending"` line and
-fill in the real assertions in the same commit that flips the
+Once the implementation lands, swap `tag "pending"` for `tag "ci"`
+and fill in the real assertions in the same commit that flips the
 COVERAGE row from `red` to `done`.
+
+Developers see the full picture (CI tests + reds) by running plain
+`nf-test test` locally.

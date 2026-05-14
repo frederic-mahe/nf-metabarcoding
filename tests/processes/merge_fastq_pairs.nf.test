@@ -6,6 +6,7 @@ nextflow_process {
 
     test("merges overlapping paired-end reads") {
         // COVERAGE: [S01], [S03]
+        tag "ci"
         when {
             process {
                 """

@@ -50,6 +50,7 @@ nextflow_process {
 
     test("keeps only clusters with more than 2 reads") {
         // COVERAGE: [S17]
+        tag "ci"
         when {
             process {
                 """

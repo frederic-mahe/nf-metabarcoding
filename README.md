@@ -62,8 +62,8 @@ supported file-name patterns and parameters.
 ## How to test
 
 ```bash
-# run all non-pending tests
-nf-test test --tag '!pending'
+# run the CI-tagged tests (pending tests excluded)
+nf-test test --tag ci
 
 # run a single test file
 nf-test test tests/processes/merge_fastq_pairs.nf.test

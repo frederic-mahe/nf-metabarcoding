@@ -32,6 +32,7 @@ nextflow_process {
 
     test("converts trimmed fastq to fasta with SHA1 labels and ee values") {
         // COVERAGE: [S01]
+        tag "ci"
         when {
             process {
                 """
