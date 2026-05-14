@@ -1,0 +1,56 @@
+name: tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  nf-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Nextflow
+        uses: nf-core/setup-nextflow@v2
+
+      - name: Install nf-test
+        run: |
+          curl -fsSL https://code.askimed.com/install/nf-test | bash
+          sudo mv nf-test /usr/local/bin/
+
+      - name: Set up bioinformatics tools
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: nfmb
+          create-args: >-
+            -c bioconda -c conda-forge
+            vsearch
+            cutadapt
+            swarm
+
+      - name: Generate test fixtures
+        run: bash tests/data/generate.sh
+
+      - name: Run nf-test
+        run: nf-test test --verbose
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck on tracked shell scripts
+        run: |
+          mapfile -t scripts < <(git ls-files '*.sh')
+          if [ "${#scripts[@]}" -gt 0 ]; then
+            shellcheck "${scripts[@]}"
+          fi
