@@ -1,0 +1,23 @@
+nextflow_process {
+
+    name "extract_expected_error_values"
+    script "main.nf"
+    process "extract_expected_error_values"
+
+    test("emits one .qual line per unique sequence, keeping the lowest ee") {
+        when {
+            process {
+                """
+                input[0] = "sample_ok"
+                input[1] = file("\${projectDir}/tests/data/paired_merge_ok_1.fastq.gz")
+                """
+            }
+        }
+        then {
+            assert process.success
+            // TODO: assert column layout is <SHA1> <ee> <length>
+            // TODO: assert duplicate SHA1s are collapsed to the lowest ee
+            // TODO: assert sort order matches the spec (length asc, id asc, ee asc)
+        }
+    }
+}

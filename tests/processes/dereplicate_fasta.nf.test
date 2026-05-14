@@ -1,0 +1,23 @@
+nextflow_process {
+
+    name "dereplicate_fasta"
+    script "main.nf"
+    process "dereplicate_fasta"
+
+    test("dereplicates and drops ee values") {
+        when {
+            process {
+                """
+                input[0] = "sample_ok"
+                input[1] = file("\${projectDir}/tests/data/paired_merge_ok_1.fastq.gz")
+                """
+            }
+        }
+        then {
+            assert process.success
+            // TODO: assert headers carry `size=N` (--sizeout)
+            // TODO: assert `ee=` is absent (--xee)
+            // TODO: assert duplicate sequences are collapsed
+        }
+    }
+}

@@ -1,0 +1,23 @@
+nextflow_process {
+
+    name "list_local_clusters"
+    script "main.nf"
+    process "list_local_clusters"
+
+    test("keeps only clusters with more than 2 reads") {
+        when {
+            process {
+                """
+                input[0] = "sample_ok"
+                input[1] = file("\${projectDir}/tests/data/paired_merge_ok_1.fastq.gz")
+                """
+            }
+        }
+        then {
+            assert process.success
+            // TODO: assert every row in the .stats output has column 2 > 2
+            // TODO: assert clusters with <=2 reads are absent
+            // TODO: confirm the --fastidious flag is not used (per process comment)
+        }
+    }
+}

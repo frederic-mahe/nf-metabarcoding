@@ -1,0 +1,23 @@
+nextflow_process {
+
+    name "convert_fastq_to_fasta"
+    script "main.nf"
+    process "convert_fastq_to_fasta"
+
+    test("converts trimmed fastq to fasta with SHA1 labels and ee values") {
+        when {
+            process {
+                """
+                input[0] = "sample_ok"
+                input[1] = file("\${projectDir}/tests/data/paired_merge_ok_1.fastq.gz")
+                """
+            }
+        }
+        then {
+            assert process.success
+            // TODO: assert sequence IDs are 40-char SHA1 hex strings
+            // TODO: assert each header contains an `ee=` field
+            // TODO: assert fasta_width=0 (sequences on a single line)
+        }
+    }
+}
