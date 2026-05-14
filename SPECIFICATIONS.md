@@ -36,6 +36,7 @@
 
 - read a config file or use command-line parameters
 - run locally or on HPC with slurm
+- run local or containerized applications (vsearch, swarm, cutadapt)
 - empty input samples must travel through and appear in the occurrence
   table
 - accept a directory, or a list of directories (absolute or relative
