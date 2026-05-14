@@ -8,45 +8,6 @@ params.fastq_encoding = 33
 params.threads = 4
 
 
-process generate_test_data_urls {
-    output:
-    path "test_data_urls.list"
-
-    shell:
-    '''
-    #!/bin/bash
-
-    URL="https://github.com/frederic-mahe/BIO9905MERG1_vsearch_swarm_pipeline/raw/main/data"
-
-    (echo "${URL}/MD5SUM"
-     for SAMPLE in {B,L}{010..100..10} ; do
-         for READ in 1 2 ; do
-             echo "${URL}/${SAMPLE}_1_${READ}.fastq.gz"
-         done
-     done
-    ) > test_data_urls.list
-    '''
-}
-
-
-process download_list_of_urls {
-    publishDir params.fastq_folder
-
-    input:
-    path "urls"
-
-    output:
-    path "*.fastq.gz"
-
-    shell:
-    '''
-    #!/bin/bash
-
-    wget --continue --quiet --input-file="!{urls}"
-    '''
-}
-
-
 process merge_fastq_pairs {
     input:
     tuple val(sampleId), path(fastq_pair)
@@ -219,10 +180,6 @@ process list_local_clusters {
 
 
 workflow {
-    // collect test data
-    generate_test_data_urls |
-        download_list_of_urls
-
     // merge, trim, convert
     ch_filtered_fasta = channel.fromFilePairs(params.fastq_folder + params.fastq_pattern) |
         merge_fastq_pairs |
