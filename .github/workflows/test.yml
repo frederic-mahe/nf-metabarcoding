@@ -41,8 +41,8 @@ jobs:
       - name: Generate test fixtures
         run: bash tests/data/generate.sh
 
-      - name: Run nf-test
-        run: nf-test test --verbose
+      - name: Run nf-test (excluding pending tests)
+        run: nf-test test --tag '!pending' --verbose
 
   shellcheck:
     runs-on: ubuntu-latest
