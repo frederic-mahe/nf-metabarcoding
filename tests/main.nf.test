@@ -1,0 +1,37 @@
+nextflow_workflow {
+
+    name "nf-metabarcoding workflow"
+    script "main.nf"
+    workflow "main"
+
+    test("runs end-to-end on the paired_merge_ok fixtures") {
+        // COVERAGE: spec #1, #3, #4, #11, #12, #13
+        when {
+            params {
+                fastq_folder  = "tests/data"
+                fastq_pattern = "/paired_merge_ok_{1,2}.fastq.gz"
+                threads       = 1
+            }
+        }
+        then {
+            assert workflow.success
+            // TODO: assert per-sample artefacts exist (.fas, .qual, .stats)
+            // TODO: assert each .stats row has > 2 reads
+        }
+    }
+
+    test("empty input samples travel through to the occurrence table") {
+        // COVERAGE: spec #10 — currently failing; pipeline does not yet
+        // route empty samples through to the final table.
+        when {
+            params {
+                fastq_folder  = "tests/data"
+                fastq_pattern = "/empty_{1,2}.fastq.gz"
+                threads       = 1
+            }
+        }
+        then {
+            assert false : "pending: empty-sample passthrough not yet implemented"
+        }
+    }
+}
