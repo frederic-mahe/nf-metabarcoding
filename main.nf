@@ -230,9 +230,11 @@ workflow {
         convert_fastq_to_fasta
 
     // set aside EE values
-    extract_expected_error_values(ch_filtered_fasta)
+    ch_filtered_fasta |
+        extract_expected_error_values
 
     // dereplicate and clusterize
-    dereplicate_fasta(ch_filtered_fasta) |
+    ch_filtered_fasta |
+        dereplicate_fasta |
         list_local_clusters
 }
