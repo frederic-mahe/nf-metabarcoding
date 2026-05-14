@@ -30,10 +30,10 @@ process generate_test_data_urls {
 
 
 process download_list_of_urls {
+    publishDir params.fastq_folder
+
     input:
     path "urls"
-
-    publishDir params.fastq_folder
 
     output:
     path "*.fastq.gz"
@@ -137,11 +137,11 @@ process convert_fastq_to_fasta {
 process extract_expected_error_values {
     // extract ee for future quality filtering (keep the lowest
     // observed expected error value for each unique sequence)
+    publishDir params.fastq_folder
+
     input:
     val sampleId
     path filtered_fasta
-
-    publishDir params.fastq_folder
 
     output:
     val sampleId
@@ -160,11 +160,11 @@ process extract_expected_error_values {
 
 process dereplicate_fasta {
     // dereplicate and discard expected error values (ee)
+    publishDir params.fastq_folder
+
     input:
     val sampleId
     path filtered_fasta
-
-    publishDir params.fastq_folder
 
     output:
     val sampleId
@@ -191,11 +191,11 @@ process dereplicate_fasta {
 process list_local_clusters {
     // retain only clusters with more than 2 reads
     // (do not use the fastidious option here)
+    publishDir params.fastq_folder
+
     input:
     val sampleId
     path dereplicated_fasta
-
-    publishDir params.fastq_folder
 
     output:
     val sampleId
