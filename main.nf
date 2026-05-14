@@ -50,9 +50,7 @@ process trim_primers {
     '''
     #!/bin/bash
 
-    nucleotides="acgturykmbdhvswACGTURYKMBDHVSW"
-    complements="tgcaayrmkvhdbswTGCAAYRMKVHDBSW"
-    reverse_primer_revcomp=$(tr "${nucleotides}" "${complements}" <<< !{params.reverse_primer} | rev)
+    reverse_primer_revcomp=$(reverse_complement.sh !{params.reverse_primer})
 
     MIN_F=$(( !{params.forward_primer.length()} * 2 / 3 ))  # match is >= 2/3 of primer length
     MIN_R=$(( !{params.reverse_primer.length()} * 2 / 3 ))
@@ -112,7 +110,7 @@ process extract_expected_error_values {
     '''
     length_of_sequence_IDs=40
     paste - - < !{filtered_fasta} | \
-        awk 'BEGIN {FS = "[>;=\t]"} {print $2, $4, length($NF)}' | \
+        extract_ee.awk | \
         sort --key=3,3n --key=1,1d --key=2,2n | \
         uniq --check-chars=${length_of_sequence_IDs} > !{sampleId}.qual
     '''
@@ -174,7 +172,7 @@ process list_local_clusters {
         --output-file /dev/null \
         --statistics-file - \
         !{dereplicated_fasta} | \
-        awk 'BEGIN {FS = OFS = "\t"} $2 > 2' > !{sampleId}.stats
+        filter_swarm_stats.awk > !{sampleId}.stats
     '''
 }
 
