@@ -15,9 +15,13 @@ cd "${DATA_DIR}"
 FORWARD_PRIMER="CCAGCACCCGCGGTAATTCC"
 REVERSE_PRIMER_RC="TTGATCAAGAACGAAAGT"
 
-# Reverse complement a DNA string.
-rc() {
-    tr 'ACGTacgt' 'TGCAtgca' <<< "${1}" | rev
+reverse_complement() {
+    # reverse-complement a DNA/RNA IUPAC string
+    # Note: N and I are their own complements, no need to include them
+    local -r nucleotides="acgturykmbdhvswACGTURYKMBDHVSW"
+    local -r complements="tgcaayrmkvhdbswTGCAAYRMKVHDBSW"
+
+    tr "${nucleotides}" "${complements}" <<< "${1}" | rev
 }
 
 # Build a quality string of N copies of 'I' (Phred 40).
@@ -65,7 +69,7 @@ emit_paired() {
         i=$((i + 1))
         local fwd="${A:0:${READ_LEN}}"
         local rev_src="${A: -${READ_LEN}}"
-        local rev; rev="$(rc "${rev_src}")"
+        local rev; rev="$(reverse_complement "${rev_src}")"
         write_record "${r1}" "read_${i} 1:N:0:1" "${fwd}"
         write_record "${r2}" "read_${i} 2:N:0:1" "${rev}"
     done
@@ -93,7 +97,7 @@ emit_uncompressed() {
         i=$((i + 1))
         local fwd="${A:0:${READ_LEN}}"
         local rev_src="${A: -${READ_LEN}}"
-        local rev; rev="$(rc "${rev_src}")"
+        local rev; rev="$(reverse_complement "${rev_src}")"
         write_record "${r1}" "read_${i} 1:N:0:1" "${fwd}"
         write_record "${r2}" "read_${i} 2:N:0:1" "${rev}"
     done
