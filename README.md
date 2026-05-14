@@ -1,10 +1,11 @@
-# fred-metabarcoding-pipeline-nextflow
+# A swarm-based metabarcoding pipeline
 
-Fred's metabarcoding pipeline with Nextflow
+nf-metabarcoding is a fast and scalable eDNA workflow
 
 This is a first attempt at converting to
-[Nextflow](https://www.nextflow.io/) the pipeline I use for my own
-metabarcoding projects.
+[Nextflow](https://www.nextflow.io/) the [pipeline I
+use](https://github.com/frederic-mahe/fred-metabarcoding-pipeline) for
+my own metabarcoding projects.
 
 Current status:
 - [x] draft of the first section of the pipeline (process individual samples),
