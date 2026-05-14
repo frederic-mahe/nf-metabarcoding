@@ -44,6 +44,13 @@ jobs:
       - name: Run nf-test (excluding pending tests)
         run: nf-test test --tag '!pending' --verbose
 
+  coverage-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit spec <-> test mapping
+        run: bash tests/coverage-gate.sh
+
   shellcheck:
     runs-on: ubuntu-latest
     steps:
