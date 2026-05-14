@@ -8,3 +8,8 @@ tests/data/*.fastq.bz2
 tests/data/*.fq
 tests/data/*.fq.gz
 .nf-test.log
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
