@@ -32,9 +32,6 @@ process merge_fastq_pairs {
 }
 
 
-// refactoring:
-// extract function reverse_complement_sequence
-
 process trim_primers {
     // search forward primer in both normal and revcomp: now all reads
     // are in the same orientation. Matching leftmost is the default.
