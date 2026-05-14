@@ -37,9 +37,10 @@ declared_ids="$(grep --only-matching --extended-regexp '\[S[0-9]+\]' "${SPEC_FIL
 # IDs referenced in COVERAGE.md
 covered_ids="$(grep --only-matching --extended-regexp '\[S[0-9]+\]' "${COVERAGE_FILE}" | sort --unique)"
 
-# IDs referenced from tests
+# IDs referenced from tests (nf-test, bats, and pytest sources)
 test_ids="$(grep --recursive --no-filename --only-matching --extended-regexp \
-    '\[S[0-9]+\]' "${TESTS_DIR}" --include='*.nf.test' 2>/dev/null | sort --unique || true)"
+    --include='*.nf.test' --include='*.bats' --include='test_*.py' \
+    '\[S[0-9]+\]' "${TESTS_DIR}" 2>/dev/null | sort --unique || true)"
 
 status=0
 

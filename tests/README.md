@@ -1,16 +1,28 @@
 # Tests
 
-This workflow uses [nf-test](https://www.nf-test.com/) for both
-process-level and workflow-level tests. The full TDD cycle is
-documented in [`../CLAUDE.md`](../CLAUDE.md).
+Three test runners cover three layers of the workflow:
+
+| Layer                              | Runner    | Lives in           | Speed       |
+|------------------------------------|-----------|--------------------|-------------|
+| Workflow + process integration     | nf-test   | `tests/*.nf.test`  | seconds     |
+| `bin/*.sh` and `bin/*.awk` units   | bats      | `tests/bin/`       | milliseconds|
+| `bin/*.py` units                   | pytest    | `tests/python/`    | milliseconds|
+
+All three reference the same `[Sxx]` IDs from
+[`../SPECIFICATIONS.md`](../SPECIFICATIONS.md), and the coverage gate
+audits all three. The full TDD cycle is documented in
+[`../CLAUDE.md`](../CLAUDE.md).
 
 ## Prerequisites
 
 - `nextflow >= 23.04.0`
 - `nf-test` (install with `curl -fsSL https://code.askimed.com/install/nf-test | bash`)
+- `bats` (install with `apt-get install bats` or from
+  [bats-core](https://github.com/bats-core/bats-core))
+- `python >= 3.10` with `pytest` (and `flake8` for lint)
 - `bash >= 4`
 - `vsearch`, `cutadapt`, `swarm` available on `PATH` (or run with a
-  container profile)
+  container profile) — only required for nf-test
 
 ## Running the tests
 
@@ -18,16 +30,22 @@ documented in [`../CLAUDE.md`](../CLAUDE.md).
 # generate fixtures (one-time, or whenever generate.sh changes)
 bash tests/data/generate.sh
 
-# run only the CI-tagged tests (this is what CI runs)
+# nf-test: only the CI-tagged tests (this is what CI runs)
 nf-test test --tag ci
 
-# run absolutely everything, including red TDD-phase tests
+# nf-test: everything, including red TDD-phase tests
 nf-test test
 
-# run a single test
+# nf-test: a single test
 nf-test test tests/processes/merge_fastq_pairs.nf.test
 
-# audit the spec <-> test mapping
+# bats: unit tests for bin/ shell + awk helpers
+bats tests/bin/
+
+# pytest: unit tests for bin/ python helpers
+pytest
+
+# audit the spec <-> test mapping (covers all three runners)
 bash tests/coverage-gate.sh
 ```
 
@@ -37,13 +55,34 @@ bash tests/coverage-gate.sh
 tests/
   README.md         <- this file
   COVERAGE.md       <- [Sxx] -> test mapping
-  coverage-gate.sh  <- audit script
-  main.nf.test      <- workflow-level smoke test
+  coverage-gate.sh  <- audit script (scans .nf.test, .bats, test_*.py)
+  main.nf.test      <- nf-test, workflow-level smoke test
   processes/        <- one .nf.test per process in main.nf
+  bin/              <- bats unit tests for bin/*.sh and bin/*.awk
+  python/           <- pytest unit tests for bin/*.py (conftest.py
+                       adds bin/ to sys.path)
   data/
     README.md       <- description of each fixture
     generate.sh     <- reproducible fixture generation
 ```
+
+## When to pick which runner
+
+- **nf-test** for anything that needs nextflow's channel topology,
+  process wiring, or `vsearch`/`cutadapt`/`swarm`. One nf-test per
+  spec `[Sxx]` at minimum; the workflow-level test in
+  `tests/main.nf.test` covers integration.
+- **bats** for shell and awk helpers in `bin/`. Use it for fast
+  feedback on argument handling, edge cases, and stdout shape —
+  things you don't want to spin up a nextflow process to check.
+- **pytest** for python helpers in `bin/`. Importable modules are
+  preferred (faster, more debuggable); CLI-only scripts can be
+  exercised via `subprocess.run`. See `tests/python/test_harness.py`
+  for both patterns.
+
+A helper covered by bats or pytest should still be reached by at
+least one nf-test, so a regression in how nextflow invokes it isn't
+silently missed.
 
 ## Writing a new test
 

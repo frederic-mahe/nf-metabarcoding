@@ -47,11 +47,16 @@ The TDD cycle for this repo:
    tests cannot be written against an undefined behaviour.
 2. Add or update the row in [`tests/COVERAGE.md`](tests/COVERAGE.md)
    so the `[Sxx]` ID maps to a test file. Status starts as `red`.
-3. Write a **failing** test under `tests/processes/<process>.nf.test`
-   or `tests/main.nf.test`. Tag it with a comment of the form
-   `// COVERAGE: [Sxx]` (one or more IDs, comma-separated). Stable
-   tests carry `tag "ci"`, pending tests carry `tag "pending"` — see
-   [`tests/README.md`](tests/README.md).
+3. Write a **failing** test. Pick the runner that fits the layer:
+   - `tests/processes/<process>.nf.test` or `tests/main.nf.test` for
+     nextflow integration (nf-test). Stable tests carry `tag "ci"`,
+     pending tests carry `tag "pending"`.
+   - `tests/bin/<helper>.bats` for `bin/*.sh` / `bin/*.awk`.
+   - `tests/python/test_<helper>.py` for `bin/*.py` (pytest;
+     `conftest.py` already puts `bin/` on `sys.path`).
+   Tag every test with a `// COVERAGE: [Sxx]` (nf-test/bats) or
+   `# COVERAGE: [Sxx]` (pytest) comment so the coverage gate can
+   audit the link. See [`tests/README.md`](tests/README.md).
 4. Implement (or fix) the workflow code until the test passes.
 5. Run `nf-test test` locally. The coverage gate
    (`bash tests/coverage-gate.sh`) verifies that every `[Sxx]` in
@@ -85,6 +90,8 @@ branch-creation rights:
 - check modified python files with `flake8` and fix reported issues
 - a refactor is "done" when:
   - `nf-test test --tag ci` passes
+  - `bats tests/bin/` passes (if `bin/*.sh` or `bin/*.awk` was touched)
+  - `pytest` passes (if `bin/*.py` was touched)
   - `bash tests/coverage-gate.sh` passes
   - `shellcheck` / `flake8` report nothing on touched files
   - `tests/COVERAGE.md` reflects any spec changes in the same commit
