@@ -4,17 +4,29 @@ nextflow_process {
     script "main.nf"
     process "trim_primers"
 
+    setup {
+        run("merge_fastq_pairs") {
+            script "main.nf"
+            process {
+                """
+                input[0] = tuple(
+                    "sample_ok",
+                    [
+                        file("\${projectDir}/tests/data/paired_merge_ok_1.fastq.gz"),
+                        file("\${projectDir}/tests/data/paired_merge_ok_2.fastq.gz")
+                    ]
+                )
+                """
+            }
+        }
+    }
+
     test("trims forward and reverse primers from merged reads") {
-        // COVERAGE: per-process; relies on the fixed merged_fastq
-        // produced by merge_fastq_pairs from paired_merge_ok.
         when {
             process {
                 """
-                // input[0] = sampleId, input[1] = merged fastq path
-                input[0] = "sample_ok"
-                input[1] = file("\${projectDir}/tests/data/paired_merge_ok_1.fastq.gz")
-                // NOTE: using the raw R1 as a placeholder until a true merged
-                // fixture is committed or produced by a setup{} block.
+                input[0] = merge_fastq_pairs.out[0]
+                input[1] = merge_fastq_pairs.out[1]
                 """
             }
         }

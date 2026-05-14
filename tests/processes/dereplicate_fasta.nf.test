@@ -4,12 +4,47 @@ nextflow_process {
     script "main.nf"
     process "dereplicate_fasta"
 
+    setup {
+        run("merge_fastq_pairs") {
+            script "main.nf"
+            process {
+                """
+                input[0] = tuple(
+                    "sample_ok",
+                    [
+                        file("\${projectDir}/tests/data/paired_merge_ok_1.fastq.gz"),
+                        file("\${projectDir}/tests/data/paired_merge_ok_2.fastq.gz")
+                    ]
+                )
+                """
+            }
+        }
+        run("trim_primers") {
+            script "main.nf"
+            process {
+                """
+                input[0] = merge_fastq_pairs.out[0]
+                input[1] = merge_fastq_pairs.out[1]
+                """
+            }
+        }
+        run("convert_fastq_to_fasta") {
+            script "main.nf"
+            process {
+                """
+                input[0] = trim_primers.out[0]
+                input[1] = trim_primers.out[1]
+                """
+            }
+        }
+    }
+
     test("dereplicates and drops ee values") {
         when {
             process {
                 """
-                input[0] = "sample_ok"
-                input[1] = file("\${projectDir}/tests/data/paired_merge_ok_1.fastq.gz")
+                input[0] = convert_fastq_to_fasta.out[0]
+                input[1] = convert_fastq_to_fasta.out[1]
                 """
             }
         }

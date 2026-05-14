@@ -1,8 +1,7 @@
-nextflow_workflow {
+nextflow_pipeline {
 
     name "nf-metabarcoding workflow"
     script "main.nf"
-    workflow "main"
 
     test("runs end-to-end on the paired_merge_ok fixtures") {
         // COVERAGE: spec #1, #3, #4, #11, #12, #13

@@ -7,3 +7,4 @@ tests/data/*.fastq.gz
 tests/data/*.fastq.bz2
 tests/data/*.fq
 tests/data/*.fq.gz
+.nf-test.log
