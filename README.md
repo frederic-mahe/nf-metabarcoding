@@ -7,6 +7,11 @@ pipeline](https://github.com/frederic-mahe/fred-metabarcoding-pipeline)
 to [Nextflow](https://www.nextflow.io/). Its modular structure allows
 for meta-studies grouping several independent datasets.
 
+The pipeline aims to produce single-nucleotide resolution clustering
+results, equivalent to Amplicon Sequence Variants (ASVs). Clustering
+results, chimera detection results, and taxonomic assignment results
+are grouped in a ready-to-use occurrence table.
+
 
 ## Project layout
 
