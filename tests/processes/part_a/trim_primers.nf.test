@@ -33,12 +33,25 @@ nextflow_process {
                 """
                 input[0] = merge_fastq_pairs.out[0]
                 input[1] = merge_fastq_pairs.out[1]
+                input[2] = 0
                 """
             }
         }
         then {
             assert process.success
-            // TODO: assert primers absent from the trimmed output
+
+            // every sequence line should be shorter than the 98-bp merged
+            // input (20-bp forward + 18-bp reverse primer removed)
+            def lines = path(process.out[1].get(0)).readLines()
+            def seqs = []
+            for (int i = 1; i < lines.size(); i += 4) {
+                seqs.add(lines[i])
+            }
+            assert seqs.size() > 0 : "expected at least one trimmed read"
+            seqs.each { seq ->
+                assert seq.length() < 98 : "expected length < 98 after trimming, got ${seq.length()}: ${seq}"
+            }
+
             // TODO: assert read count preserved (or `--max-n 0` discards expected)
         }
     }

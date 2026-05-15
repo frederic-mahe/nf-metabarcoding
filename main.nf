@@ -36,9 +36,13 @@ process merge_fastq_pairs {
 process trim_primers {
     // search forward primer in both normal and revcomp: now all reads
     // are in the same orientation. Matching leftmost is the default.
+    // max_n is a caller-supplied input so the same process can serve
+    // merged reads (max_n=0) and the [S04] unmerged-pair path (max_n
+    // = size of the N-join insert).
     input:
     val sampleId
     path merged_fastq
+    val max_n
 
     output:
     val sampleId
@@ -48,18 +52,32 @@ process trim_primers {
     '''
     #!/bin/bash
 
+    readonly MIN_LENGTH=32
+    readonly ERROR_RATE=0.1
+
     reverse_primer_revcomp=$(reverse_complement.sh !{params.reverse_primer})
 
     MIN_F=$(( !{params.forward_primer.length()} * 2 / 3 ))  # match is >= 2/3 of primer length
     MIN_R=$(( !{params.reverse_primer.length()} * 2 / 3 ))
     cutadapt \
+        --cores=!{params.threads} \
+        --minimum-length "${MIN_LENGTH}" \
+        --error-rate "${ERROR_RATE}" \
         --revcomp \
+        --rename="{id}" \
         --front "!{params.forward_primer};rightmost" \
-        --overlap "${MIN_F}" !{merged_fastq} | \
+        --overlap "${MIN_F}" \
+        --discard-untrimmed \
+        !{merged_fastq} | \
         cutadapt \
+            --cores=!{params.threads} \
+            --minimum-length "${MIN_LENGTH}" \
+            --error-rate "${ERROR_RATE}" \
             --adapter "${reverse_primer_revcomp}" \
             --overlap "${MIN_R}" \
-            --max-n 0 - > trimmed_fastq
+            --discard-untrimmed \
+            --max-n "!{max_n}" \
+            - > trimmed_fastq
     '''
 }
 
@@ -182,11 +200,15 @@ workflow {
     assert params.reverse_primer : "--reverse_primer must be set (no default)"
     assert params.fastq_folder   : "--fastq_folder must be set (no default)"
 
-    // merge, trim, convert
-    ch_filtered_fasta = channel.fromFilePairs(params.fastq_folder + params.fastq_pattern) |
-        merge_fastq_pairs |
-        trim_primers |
-        convert_fastq_to_fasta
+    // discover pairs and merge
+    merge_fastq_pairs(channel.fromFilePairs(params.fastq_folder + params.fastq_pattern))
+
+    // trim primers (max_n=0 for merged reads; the [S04] unmerged-pair
+    // path will pass the N-join insert size when implemented)
+    trim_primers(merge_fastq_pairs.out[0], merge_fastq_pairs.out[1], 0)
+
+    // convert to fasta with SHA1 + ee, then fan out
+    ch_filtered_fasta = trim_primers.out | convert_fastq_to_fasta
 
     // set aside EE values
     ch_filtered_fasta |
