@@ -1,10 +1,11 @@
 # A swarm-based metabarcoding pipeline
 
-`nf-metabarcoding` is a fast and scalable eDNA workflow built around
-[swarm](https://github.com/torognes/swarm). It is a first attempt at
-converting the [reference
+`nf-metabarcoding` is a fast, user-friendly, and scalable eDNA
+workflow built around [swarm](https://github.com/torognes/swarm). It
+is a first attempt at converting the [reference
 pipeline](https://github.com/frederic-mahe/fred-metabarcoding-pipeline)
-to [Nextflow](https://www.nextflow.io/).
+to [Nextflow](https://www.nextflow.io/). Its modular structure allows
+for meta-studies grouping several independent datasets.
 
 
 ## Project layout
