@@ -30,8 +30,11 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
        swarm). See `../fred-metabarcoding-pipeline/` for the reference
        implementation
     2. **Part B** — dereplicated fasta files → occurrence table
-       (vsearch, swarm, and python scripts)
-    3. **Part C** — taxonomic assignment: update the occurrence table
+       (vsearch, swarm, and python scripts). See
+       `../fred-metabarcoding-pipeline/` for the reference
+       implementation
+    3. **Part C** — taxonomic assignment (stampa or sintax): update
+       the occurrence table
   - **Pass when:** running the full pipeline on a paired-end fixture
     produces, in order, per-sample `.fas` (Part A), an occurrence
     table (Part B), and a taxonomy-annotated occurrence table (Part C)
@@ -45,7 +48,7 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
 - `[S04]` when processing paired-end fastq files, reads that can be
   merged are processed normally; reads that cannot be merged follow a
   parallel pipeline (joined with Ns, Ns converted to As when passed
-  to swarm, then converted back)
+  to swarm, then converted back), yielding a second occurrence table
   - **Blocked by:** [`DECISIONS.md`](DECISIONS.md) — N↔A round-trip
     rules need to be defined to avoid rewriting legitimate As
 - `[S05]` unmerged-pair clusters appear in the occurrence table with a
@@ -68,7 +71,7 @@ isolation.
 - **Part B → Part C**
   - one occurrence table (see schema below)
 - **Part C output**
-  - the occurrence table with taxonomy columns appended (no rows
+  - the occurrence table with taxonomy column updated (no rows
     added or removed)
 
 
@@ -81,9 +84,9 @@ isolation.
   - rows: one per cluster; empty samples (`[S08]`) contribute a
     zero-filled column
 - **two-table mode** (`--split-occurrence-table`)
-  - `occurrences.tsv` (long format): `cluster_id`, `sampleId`,
+  - `occurrences.tsv` (long format): `clusterId`, `sampleId`,
     `abundance`
-  - `clusters.tsv`: `cluster_id`, `sequence`, `abundance_total`,
+  - `clusters.tsv`: `clusterId`, `sequence`, `abundance_total`,
     `taxonomy`
 
 
@@ -100,7 +103,7 @@ isolation.
   - Not part of automated CI; covered by a `-profile docker` /
     `-profile singularity` manual smoke test.
 - `[S09]` empty input samples must travel through and appear in the
-  occurrence table
+  occurrence table (but not in the two-table mode long-format)
   - **Pass when:** an empty fastq pair produces a row in the
     occurrence table with `abundance = 0` for that sample (and no
     error)
