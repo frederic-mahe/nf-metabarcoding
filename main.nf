@@ -10,7 +10,7 @@ params.threads = 4
 
 
 process merge_fastq_pairs {
-    publishDir path: { params.fastq_folder }, pattern: "*.log",
+    publishDir path: { params.fastq_folder }, mode: 'link', pattern: "*.log",
         enabled: params.fastq_folder != null
 
     input:
@@ -44,7 +44,7 @@ process trim_primers {
     // max_n is a caller-supplied input so the same process can serve
     // merged reads (max_n=0) and the [S04] unmerged-pair path (max_n
     // = size of the N-join insert).
-    publishDir path: { params.fastq_folder }, pattern: "*.log",
+    publishDir path: { params.fastq_folder }, mode: 'link', pattern: "*.log",
         enabled: params.fastq_folder != null
 
     input:
@@ -124,7 +124,7 @@ process convert_fastq_to_fasta {
 process extract_expected_error_values {
     // extract ee for future quality filtering (keep the lowest
     // observed expected error value for each unique sequence)
-    publishDir params.fastq_folder
+    publishDir params.fastq_folder, mode: 'link'
 
     input:
     val sampleId
@@ -146,7 +146,7 @@ process extract_expected_error_values {
 
 process dereplicate_fasta {
     // dereplicate and discard expected error values (ee)
-    publishDir params.fastq_folder
+    publishDir params.fastq_folder, mode: 'link'
 
     input:
     val sampleId
@@ -180,7 +180,7 @@ process dereplicate_fasta {
 process list_local_clusters {
     // retain only clusters with more than 2 reads
     // (do not use the fastidious option here)
-    publishDir params.fastq_folder
+    publishDir params.fastq_folder, mode: 'link'
 
     input:
     val sampleId
