@@ -30,12 +30,23 @@ tests/
 
 ## Prerequisites
 
-- `nextflow >= 23.04.0`
+Required to run the workflow:
+
+- `nextflow >= 25.04.0`
 - `bash >= 4`
 - `vsearch`, `cutadapt`, `swarm` available on `PATH` (or run with a
   container profile)
-- `nf-test` to run the test suite (install with
+
+Required to run the test suite and the linters:
+
+- `nf-test >= 0.9.0` (install with
   `curl -fsSL https://code.askimed.com/install/nf-test | bash`)
+- `bats >= 1.10` (install with `apt-get install bats` or from
+  [bats-core](https://github.com/bats-core/bats-core)) — for
+  `tests/bin/*.bats`
+- `python >= 3.10` with `pytest` — for `tests/python/test_*.py`
+- `flake8` — lints `bin/*.py`
+- `shellcheck` — lints `bin/*.sh`
 
 
 ## How to run
@@ -75,6 +86,36 @@ bash tests/coverage-gate.sh
 
 See [`tests/README.md`](tests/README.md) for the TDD workflow and the
 pending-test convention.
+
+
+## Cleaning up after a run
+
+`cleanup = true` in [`nextflow.config`](nextflow.config) removes
+per-task `work/` directories on success, but each runner leaves some
+state behind:
+
+```bash
+# nextflow runs (in the project root or wherever you launched from)
+rm -rf work/ .nextflow.log* .nextflow/
+
+# published outputs land in --fastq_folder; remove them from the
+# bundled fixture dir after demo runs
+rm -f tests/data/*.fas tests/data/*.qual tests/data/*.stats
+
+# nf-test runs
+rm -rf .nf-test/ .nf-test.log
+
+# pytest cache
+rm -rf .pytest_cache/ tests/python/__pycache__/
+```
+
+
+## Releasing
+
+The version number lives in two files that must be kept in sync:
+[`nextflow.config`](nextflow.config) (`manifest.version`) and
+[`CITATION.cff`](CITATION.cff) (`version:`). When bumping, update
+both and also refresh `CITATION.cff`'s `date-released`.
 
 
 ## Status
