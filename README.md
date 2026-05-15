@@ -78,7 +78,7 @@ supported file-name patterns and parameters.
 nf-test test --tag ci
 
 # run a single test file
-nf-test test tests/processes/merge_fastq_pairs.nf.test
+nf-test test tests/processes/part_a/merge_fastq_pairs.nf.test
 
 # audit spec <-> test coverage
 bash tests/coverage-gate.sh

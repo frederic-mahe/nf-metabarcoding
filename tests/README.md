@@ -37,7 +37,7 @@ nf-test test --tag ci
 nf-test test
 
 # nf-test: a single test
-nf-test test tests/processes/merge_fastq_pairs.nf.test
+nf-test test tests/processes/part_a/merge_fastq_pairs.nf.test
 
 # bats: unit tests for bin/ shell + awk helpers
 bats tests/bin/
@@ -57,7 +57,10 @@ tests/
   COVERAGE.md       <- [Sxx] -> test mapping
   coverage-gate.sh  <- audit script (scans .nf.test, .bats, test_*.py)
   main.nf.test      <- nf-test, workflow-level smoke test
-  processes/        <- one .nf.test per process in main.nf
+  processes/
+    part_a/         <- one .nf.test per Part A process in main.nf
+                       (Part B/C subdirs will be added when those
+                       parts of the workflow land)
   bin/              <- bats unit tests for bin/*.sh and bin/*.awk
   python/           <- pytest unit tests for bin/*.py (conftest.py
                        adds bin/ to sys.path)
@@ -92,8 +95,9 @@ silently missed.
    [`../DECISIONS.md`](../DECISIONS.md) and stop.
 2. Add (or update) the row in [`COVERAGE.md`](COVERAGE.md). Status
    starts as `red`.
-3. Write a failing test under `tests/processes/` or `tests/`.
-   Tag it with `// COVERAGE: [Sxx]` (one or more IDs).
+3. Write a failing test under `tests/processes/<part>/` (Part A, B,
+   or C) or `tests/`. Tag it with `// COVERAGE: [Sxx]` (one or more
+   IDs).
 4. Implement (or fix) the workflow code until the test passes.
 5. Move the COVERAGE row from `red` to `done` in the same commit.
 

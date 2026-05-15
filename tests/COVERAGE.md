@@ -23,8 +23,8 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S00]`| TDD discipline (meta)                                                      | `tests/coverage-gate.sh`                        | done    | —          |
 | `[S01]`| three-part workflow (fastq→fasta, fasta→occurrence, taxonomic assignment)  | `tests/main.nf.test`                            | red     | —          |
 | `[S02]`| each part can be run separately or all at once                             | `tests/main.nf.test`                            | TODO    | —          |
-| `[S03]`| paired-end or single-end, compressed (gz/bz2) or uncompressed input        | `tests/processes/merge_fastq_pairs.nf.test`, `tests/main.nf.test` | red | — |
-| `[S04]`| unmerged paired reads → parallel pipeline (N-join, N↔A round-trip)         | `tests/processes/merge_fastq_pairs.nf.test`     | blocked | D01        |
+| `[S03]`| paired-end or single-end, compressed (gz/bz2) or uncompressed input        | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/main.nf.test` | red | — |
+| `[S04]`| unmerged paired reads → parallel pipeline (N-join, N↔A round-trip)         | `tests/processes/part_a/merge_fastq_pairs.nf.test`     | blocked | D01        |
 | `[S05]`| unmerged clusters appear in occurrence table with per-sample marker        | —                                               | blocked | D01, D02   |
 
 
@@ -43,7 +43,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S14]`| collision policy for same-named samples                                    | —                                               | blocked | D03        |
 | `[S15]`| export single occurrence table *or* two-part (long + metadata) table       | `tests/main.nf.test`                            | TODO    | —          |
 | `[S16]`| expect demultiplexed fastq files                                           | —                                               | n/a     | —          |
-| `[S17]`| per-cluster minimum-read threshold (> 2 reads)                             | `tests/processes/list_local_clusters.nf.test`   | red     | —          |
+| `[S17]`| per-cluster minimum-read threshold (> 2 reads)                             | `tests/processes/part_a/list_local_clusters.nf.test`   | red     | —          |
 | `[S18]`| required params (forward/reverse_primer, fastq_folder) must be supplied    | `tests/main.nf.test`                            | done    | —          |
 
 
@@ -51,9 +51,9 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 
 | Process in `main.nf`            | Test file                                              | Covers       | Status |
 |---------------------------------|--------------------------------------------------------|--------------|--------|
-| `merge_fastq_pairs`             | `tests/processes/merge_fastq_pairs.nf.test`            | S01, S03, S04| red    |
-| `trim_primers`                  | `tests/processes/trim_primers.nf.test`                 | S01          | red    |
-| `convert_fastq_to_fasta`        | `tests/processes/convert_fastq_to_fasta.nf.test`       | S01          | red    |
-| `extract_expected_error_values` | `tests/processes/extract_expected_error_values.nf.test`| S01          | red    |
-| `dereplicate_fasta`             | `tests/processes/dereplicate_fasta.nf.test`            | S01          | red    |
-| `list_local_clusters`           | `tests/processes/list_local_clusters.nf.test`          | S17          | red    |
+| `merge_fastq_pairs`             | `tests/processes/part_a/merge_fastq_pairs.nf.test`            | S01, S03, S04| red    |
+| `trim_primers`                  | `tests/processes/part_a/trim_primers.nf.test`                 | S01          | red    |
+| `convert_fastq_to_fasta`        | `tests/processes/part_a/convert_fastq_to_fasta.nf.test`       | S01          | red    |
+| `extract_expected_error_values` | `tests/processes/part_a/extract_expected_error_values.nf.test`| S01          | red    |
+| `dereplicate_fasta`             | `tests/processes/part_a/dereplicate_fasta.nf.test`            | S01          | red    |
+| `list_local_clusters`           | `tests/processes/part_a/list_local_clusters.nf.test`          | S17          | red    |
