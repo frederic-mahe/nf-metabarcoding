@@ -10,12 +10,16 @@ params.threads = 4
 
 
 process merge_fastq_pairs {
+    publishDir path: { params.fastq_folder }, pattern: "*.log",
+        enabled: params.fastq_folder != null
+
     input:
     tuple val(sampleId), path(fastq_pair)
 
     output:
     val sampleId
     path "merged_fastq"
+    path "${sampleId}_merging.log"
 
     shell:
     '''
@@ -28,6 +32,7 @@ process merge_fastq_pairs {
         --fastq_ascii !{params.fastq_encoding} \
         --fastq_allowmergestagger \
         --quiet \
+        --log !{sampleId}_merging.log \
         --fastqout merged_fastq
     '''
 }
@@ -39,6 +44,9 @@ process trim_primers {
     // max_n is a caller-supplied input so the same process can serve
     // merged reads (max_n=0) and the [S04] unmerged-pair path (max_n
     // = size of the N-join insert).
+    publishDir path: { params.fastq_folder }, pattern: "*.log",
+        enabled: params.fastq_folder != null
+
     input:
     val sampleId
     path merged_fastq
@@ -47,6 +55,7 @@ process trim_primers {
     output:
     val sampleId
     path "trimmed_fastq"
+    path "${sampleId}_trimming.log"
 
     shell:
     '''
@@ -59,25 +68,27 @@ process trim_primers {
 
     MIN_F=$(( !{params.forward_primer.length()} * 2 / 3 ))  # match is >= 2/3 of primer length
     MIN_R=$(( !{params.reverse_primer.length()} * 2 / 3 ))
-    cutadapt \
-        --cores=!{params.threads} \
-        --minimum-length "${MIN_LENGTH}" \
-        --error-rate "${ERROR_RATE}" \
-        --revcomp \
-        --rename="{id}" \
-        --front "!{params.forward_primer};rightmost" \
-        --overlap "${MIN_F}" \
-        --discard-untrimmed \
-        !{merged_fastq} | \
+    {
         cutadapt \
             --cores=!{params.threads} \
             --minimum-length "${MIN_LENGTH}" \
             --error-rate "${ERROR_RATE}" \
-            --adapter "${reverse_primer_revcomp}" \
-            --overlap "${MIN_R}" \
+            --revcomp \
+            --rename="{id}" \
+            --front "!{params.forward_primer};rightmost" \
+            --overlap "${MIN_F}" \
             --discard-untrimmed \
-            --max-n "!{max_n}" \
-            - > trimmed_fastq
+            !{merged_fastq} | \
+            cutadapt \
+                --cores=!{params.threads} \
+                --minimum-length "${MIN_LENGTH}" \
+                --error-rate "${ERROR_RATE}" \
+                --adapter "${reverse_primer_revcomp}" \
+                --overlap "${MIN_R}" \
+                --discard-untrimmed \
+                --max-n "!{max_n}" \
+                - > trimmed_fastq
+    } 2> !{sampleId}_trimming.log
     '''
 }
 
@@ -144,6 +155,7 @@ process dereplicate_fasta {
     output:
     val sampleId
     path "${sampleId}.fas"
+    path "${sampleId}_dereplicating.log"
 
     shell:
     '''
@@ -151,6 +163,7 @@ process dereplicate_fasta {
         --derep_fulllength !{filtered_fasta} \
         --sizeout \
         --quiet \
+        --log !{sampleId}_dereplicating.log \
         --fasta_width 0 \
         --xee \
         --xlength \
@@ -176,6 +189,7 @@ process list_local_clusters {
     output:
     val sampleId
     path "${sampleId}.stats"
+    path "${sampleId}_clustering.log"
 
     shell:
     '''
@@ -185,7 +199,7 @@ process list_local_clusters {
         --threads !{params.threads} \
         --differences 1 \
         --usearch-abundance \
-        --log /dev/null \
+        --log !{sampleId}_clustering.log \
         --output-file /dev/null \
         --statistics-file - \
         !{dereplicated_fasta} | \
@@ -208,14 +222,16 @@ workflow {
     trim_primers(merge_fastq_pairs.out[0], merge_fastq_pairs.out[1], 0)
 
     // convert to fasta with SHA1 + ee, then fan out
-    ch_filtered_fasta = trim_primers.out | convert_fastq_to_fasta
+    convert_fastq_to_fasta(trim_primers.out[0], trim_primers.out[1])
 
     // set aside EE values
-    ch_filtered_fasta |
-        extract_expected_error_values
+    extract_expected_error_values(
+        convert_fastq_to_fasta.out[0], convert_fastq_to_fasta.out[1]
+    )
 
     // dereplicate and clusterize
-    ch_filtered_fasta |
-        dereplicate_fasta |
-        list_local_clusters
+    dereplicate_fasta(
+        convert_fastq_to_fasta.out[0], convert_fastq_to_fasta.out[1]
+    )
+    list_local_clusters(dereplicate_fasta.out[0], dereplicate_fasta.out[1])
 }

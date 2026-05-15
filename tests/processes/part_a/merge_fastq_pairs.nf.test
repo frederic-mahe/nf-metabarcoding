@@ -26,6 +26,30 @@ nextflow_process {
         }
     }
 
+    test("emits a per-sample merging log") {
+        // COVERAGE: [S19]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "sample_ok",
+                    [
+                        file("\${projectDir}/tests/data/paired_merge_ok_1.fastq.gz"),
+                        file("\${projectDir}/tests/data/paired_merge_ok_2.fastq.gz")
+                    ]
+                )
+                """
+            }
+        }
+        then {
+            assert process.success
+            def logPath = process.out[2].get(0)
+            assert logPath.endsWith("sample_ok_merging.log") : "unexpected log path: ${logPath}"
+            assert path(logPath).readLines().size() > 0 : "expected non-empty merging log"
+        }
+    }
+
     test("non-overlapping pairs do not merge (parallel pipeline)") {
         // COVERAGE: [S04] — blocked on D01 (N<->A round-trip).
         // Tagged "pending" so CI skips it; run `nf-test test` locally

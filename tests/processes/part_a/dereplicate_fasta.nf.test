@@ -63,4 +63,28 @@ nextflow_process {
             // TODO: assert duplicate sequences are collapsed
         }
     }
+
+    test("emits a per-sample dereplicating log") {
+        // COVERAGE: [S19]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "tests/data"
+            }
+            process {
+                """
+                input[0] = convert_fastq_to_fasta.out[0]
+                input[1] = convert_fastq_to_fasta.out[1]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def logPath = process.out[2].get(0)
+            assert logPath.endsWith("sample_ok_dereplicating.log") : "unexpected log path: ${logPath}"
+            assert path(logPath).readLines().size() > 0 : "expected non-empty dereplicating log"
+        }
+    }
 }

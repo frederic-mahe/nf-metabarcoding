@@ -55,4 +55,28 @@ nextflow_process {
             // TODO: assert read count preserved (or `--max-n 0` discards expected)
         }
     }
+
+    test("emits a per-sample trimming log") {
+        // COVERAGE: [S19]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+            }
+            process {
+                """
+                input[0] = merge_fastq_pairs.out[0]
+                input[1] = merge_fastq_pairs.out[1]
+                input[2] = 0
+                """
+            }
+        }
+        then {
+            assert process.success
+            def logPath = process.out[2].get(0)
+            assert logPath.endsWith("sample_ok_trimming.log") : "unexpected log path: ${logPath}"
+            assert path(logPath).readLines().size() > 0 : "expected non-empty trimming log"
+        }
+    }
 }

@@ -143,6 +143,14 @@ isolation.
     the stderr/log identifies the missing parameter; supplying the
     parameter via either `-params-file` or `--key value` lets the
     run proceed
+- `[S19]` each Part A step emits a per-sample log file alongside its
+  data output, published to `params.fastq_folder`:
+    - merging       → `<sampleId>_merging.log`
+    - trimming      → `<sampleId>_trimming.log`
+    - dereplicating → `<sampleId>_dereplicating.log`
+    - clustering    → `<sampleId>_clustering.log`
+  - **Pass when:** running Part A on any sample produces all four
+    log files in `params.fastq_folder`, each non-empty
 
 
 ## Common fastq file-name patterns
