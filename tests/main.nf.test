@@ -4,19 +4,27 @@ nextflow_pipeline {
     script "main.nf"
 
     test("runs end-to-end on the paired_merge_ok fixtures") {
-        // COVERAGE: [S01], [S03], [S10], [S11], [S12]
+        // COVERAGE: [S01], [S03], [S10], [S11], [S12], [S19]
         tag "ci"
         when {
             params {
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
-                fastq_folder   = "tests/data"
+                fastq_folder   = "${projectDir}/tests/data"
                 fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
                 threads        = 1
             }
         }
         then {
             assert workflow.success
+            // [S19] per-step logs land in params.fastq_folder
+            def folder = "${projectDir}/tests/data"
+            def sampleId = "paired_merge_ok"
+            ["merging", "trimming", "dereplicating", "clustering"].each { step ->
+                def log = file("${folder}/${sampleId}_${step}.log")
+                assert log.exists()       : "missing ${step} log: ${log}"
+                assert log.size() > 0     : "empty ${step} log: ${log}"
+            }
             // TODO: assert per-sample artefacts exist (.fas, .qual, .stats)
             // TODO: assert each .stats row has > 2 reads
         }
@@ -48,7 +56,7 @@ nextflow_pipeline {
             params {
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
-                fastq_folder   = "tests/data"
+                fastq_folder   = "${projectDir}/tests/data"
                 fastq_pattern  = "/empty_{1,2}.fastq.gz"
                 threads        = 1
             }

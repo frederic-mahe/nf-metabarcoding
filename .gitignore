@@ -7,6 +7,11 @@ tests/data/*.fastq.gz
 tests/data/*.fastq.bz2
 tests/data/*.fq
 tests/data/*.fq.gz
+# pipeline artefacts left in tests/data by workflow-level nf-test runs
+tests/data/*.log
+tests/data/*.fas
+tests/data/*.qual
+tests/data/*.stats
 .nf-test.log
 
 # python
