@@ -1,11 +1,12 @@
 #!/usr/bin/env nextflow
 
-params.forward_primer = "CCAGCASCYGCGGTAATTCC"
-params.reverse_primer = "ACTTTCGTTCTTGATYRA"  // should be TYRATCAAGAACGAAAGT
-params.fastq_folder = "data"
+// optional (project defaults)
 params.fastq_pattern = "/*_1_{1,2}.fastq.gz"
 params.fastq_encoding = 33
 params.threads = 4
+
+// forward_primer, reverse_primer, fastq_folder are required and have
+// no default; the workflow asserts them at startup (see [S18]).
 
 
 process merge_fastq_pairs {
@@ -176,6 +177,11 @@ process list_local_clusters {
 
 
 workflow {
+    // required parameters (no default — supply via CLI or project config)
+    assert params.forward_primer : "--forward_primer must be set (no default)"
+    assert params.reverse_primer : "--reverse_primer must be set (no default)"
+    assert params.fastq_folder   : "--fastq_folder must be set (no default)"
+
     // merge, trim, convert
     ch_filtered_fasta = channel.fromFilePairs(params.fastq_folder + params.fastq_pattern) |
         merge_fastq_pairs |

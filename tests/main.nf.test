@@ -8,15 +8,34 @@ nextflow_pipeline {
         tag "ci"
         when {
             params {
-                fastq_folder  = "tests/data"
-                fastq_pattern = "/paired_merge_ok_{1,2}.fastq.gz"
-                threads       = 1
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                threads        = 1
             }
         }
         then {
             assert workflow.success
             // TODO: assert per-sample artefacts exist (.fas, .qual, .stats)
             // TODO: assert each .stats row has > 2 reads
+        }
+    }
+
+    test("aborts when a required parameter is missing") {
+        // COVERAGE: [S18]
+        tag "ci"
+        when {
+            params {
+                fastq_folder  = "tests/data"
+                fastq_pattern = "/paired_merge_ok_{1,2}.fastq.gz"
+                threads       = 1
+                // forward_primer is deliberately not set
+            }
+        }
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.errorReport).toString().contains("forward_primer")
         }
     }
 
@@ -27,9 +46,11 @@ nextflow_pipeline {
         tag "pending"
         when {
             params {
-                fastq_folder  = "tests/data"
-                fastq_pattern = "/empty_{1,2}.fastq.gz"
-                threads       = 1
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "tests/data"
+                fastq_pattern  = "/empty_{1,2}.fastq.gz"
+                threads        = 1
             }
         }
         then {

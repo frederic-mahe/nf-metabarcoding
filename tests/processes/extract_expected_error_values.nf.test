@@ -43,6 +43,11 @@ nextflow_process {
         // COVERAGE: [S01]
         tag "ci"
         when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "tests/data"
+            }
             process {
                 """
                 input[0] = convert_fastq_to_fasta.out[0]

@@ -44,6 +44,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S15]`| export single occurrence table *or* two-part (long + metadata) table       | `tests/main.nf.test`                            | TODO    | —          |
 | `[S16]`| expect demultiplexed fastq files                                           | —                                               | n/a     | —          |
 | `[S17]`| per-cluster minimum-read threshold (> 2 reads)                             | `tests/processes/list_local_clusters.nf.test`   | red     | —          |
+| `[S18]`| required params (forward/reverse_primer, fastq_folder) must be supplied    | `tests/main.nf.test`                            | done    | —          |
 
 
 ## Per-process tests

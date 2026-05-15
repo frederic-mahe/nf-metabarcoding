@@ -25,6 +25,10 @@ nextflow_process {
         // COVERAGE: [S01]
         tag "ci"
         when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+            }
             process {
                 """
                 input[0] = merge_fastq_pairs.out[0]

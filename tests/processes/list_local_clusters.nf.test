@@ -52,6 +52,11 @@ nextflow_process {
         // COVERAGE: [S17]
         tag "ci"
         when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "tests/data"
+            }
             process {
                 """
                 input[0] = dereplicate_fasta.out[0]

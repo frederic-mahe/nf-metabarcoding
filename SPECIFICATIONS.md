@@ -134,6 +134,15 @@ isolation.
 - `[S17]` per-cluster minimum-read threshold defaults to > 2 reads
   - **Pass when:** `list_local_clusters` emits no row with
     `reads <= 2` on a fixture that contains a singleton cluster
+- `[S18]` required parameters (`forward_primer`, `reverse_primer`,
+  `fastq_folder`) have no default and must be supplied via CLI or
+  project config; the workflow aborts at startup with a message
+  naming the missing parameter
+  - **Pass when:** running the workflow without `--forward_primer`
+    (or `--reverse_primer`, or `--fastq_folder`) exits non-zero and
+    the stderr/log identifies the missing parameter; supplying the
+    parameter via either `-params-file` or `--key value` lets the
+    run proceed
 
 
 ## Common fastq file-name patterns
