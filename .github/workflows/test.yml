@@ -34,9 +34,9 @@ jobs:
           environment-name: nfmb
           create-args: >-
             -c bioconda -c conda-forge
-            vsearch
-            cutadapt
-            swarm
+            vsearch>=2.31
+            cutadapt>=5
+            swarm>=3
 
       - name: Generate test fixtures
         run: bash tests/data/generate.sh
