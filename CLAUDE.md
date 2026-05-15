@@ -48,9 +48,9 @@ The TDD cycle for this repo:
 2. Add or update the row in [`tests/COVERAGE.md`](tests/COVERAGE.md)
    so the `[Sxx]` ID maps to a test file. Status starts as `red`.
 3. Write a **failing** test. Pick the runner that fits the layer:
-   - `tests/processes/<process>.nf.test` or `tests/main.nf.test` for
-     nextflow integration (nf-test). Stable tests carry `tag "ci"`,
-     pending tests carry `tag "pending"`.
+   - `tests/processes/<part>/<process>.nf.test` (Part A/B/C) or
+     `tests/main.nf.test` for nextflow integration (nf-test). Stable
+     tests carry `tag "ci"`, pending tests carry `tag "pending"`.
    - `tests/bin/<helper>.bats` for `bin/*.sh` / `bin/*.awk`.
    - `tests/python/test_<helper>.py` for `bin/*.py` (pytest;
      `conftest.py` already puts `bin/` on `sys.path`).
