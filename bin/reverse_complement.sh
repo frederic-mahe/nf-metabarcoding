@@ -15,8 +15,10 @@ set -euo pipefail
 readonly NUCLEOTIDES="acgturykmbdhvswACGTURYKMBDHVSW"
 readonly COMPLEMENTS="tgcaayrmkvhdbswTGCAAYRMKVHDBSW"
 
-if [[ "$#" -gt 0 ]]; then
+if [[ "$#" -gt 0 ]] ; then
+    # argument form
     tr "${NUCLEOTIDES}" "${COMPLEMENTS}" <<< "${1}" | rev
 else
+    # stdin form
     tr "${NUCLEOTIDES}" "${COMPLEMENTS}" | rev
 fi
