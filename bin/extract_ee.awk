@@ -2,22 +2,23 @@
 #
 # extract_ee.awk
 #
-# Convert paired FASTA header/sequence lines (as produced by
-# `paste - -` over a vsearch `--eeout` fasta) into a three-column TSV:
+# Read a vsearch fasta where headers carry both `ee=` (from --eeout)
+# and `length=` (from --lengthout), and emit a three-column TSV:
 #   <SHA1>  <ee>  <length>
 #
-# Input record layout (after paste):
-#   >SHA1;ee=<float>\t<sequence>
+# Header layout:
+#   >SHA1;ee=<float>;length=<int>
 #
-# Field separator splits on '>', ';', '=', and TAB:
+# Field separator splits on '>', ';', and '=':
 #   $1 = "" (before '>')
 #   $2 = SHA1
 #   $3 = "ee" (literal key)
 #   $4 = ee value
-#   $NF = sequence
+#   $5 = "length" (literal key)
+#   $6 = length value
 #
 # Output is space-separated to match the existing downstream
 # `sort` / `uniq` invocations.
 
-BEGIN { FS = "[>;=\t]" }
-{ print $2, $4, length($NF) }
+BEGIN { FS = "[>;=]" }
+/^>/ { print $2, $4, $6 }

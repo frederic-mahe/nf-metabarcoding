@@ -52,7 +52,18 @@ nextflow_process {
         }
         then {
             assert process.success
-            // TODO: assert column layout is <SHA1> <ee> <length>
+
+            // column layout: <SHA1> <ee> <length>, space-separated
+            def lines = path(process.out[1].get(0)).readLines()
+            assert lines.size() > 0 : "expected at least one .qual line"
+            lines.each { line ->
+                def cols = line.split(' ')
+                assert cols.size() == 3 : "expected 3 columns, got: ${line}"
+                assert cols[0] ==~ /[0-9a-f]{40}/ : "expected 40-char SHA1 hex in column 1: ${line}"
+                assert cols[1] ==~ /[0-9.]+/      : "expected ee float in column 2: ${line}"
+                assert cols[2] ==~ /\d+/          : "expected integer length in column 3: ${line}"
+            }
+
             // TODO: assert duplicate SHA1s are collapsed to the lowest ee
             // TODO: assert sort order matches the spec (length asc, id asc, ee asc)
         }

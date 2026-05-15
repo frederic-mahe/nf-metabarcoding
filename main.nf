@@ -84,6 +84,7 @@ process convert_fastq_to_fasta {
         --fastq_ascii !{params.fastq_encoding} \
         --quiet \
         --eeout \
+        --lengthout \
         --fasta_width 0 \
         --fastaout - > filtered_fasta
     '''
@@ -106,8 +107,7 @@ process extract_expected_error_values {
     shell:
     '''
     length_of_sequence_IDs=40
-    paste - - < !{filtered_fasta} | \
-        extract_ee.awk | \
+    extract_ee.awk !{filtered_fasta} | \
         sort --key=3,3n --key=1,1d --key=2,2n | \
         uniq --check-chars=${length_of_sequence_IDs} > !{sampleId}.qual
     '''
@@ -134,6 +134,7 @@ process dereplicate_fasta {
         --quiet \
         --fasta_width 0 \
         --xee \
+        --xlength \
         --output - > !{sampleId}.fas
     '''
 }
