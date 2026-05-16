@@ -47,6 +47,61 @@ nextflow_pipeline {
         }
     }
 
+    test("--no_trimming true skips the trim_primers step") {
+        // COVERAGE: [S20]
+        // The trim_primers process must not appear in the workflow
+        // trace. We check workflow.stdout (which lists every process
+        // run) rather than the absence of paired_merge_ok_trimming.log
+        // — `tests/data/` is shared across cases, so other tests in
+        // this file may have just published that log there.
+        tag "ci"
+        when {
+            params {
+                forward_primer = ""
+                reverse_primer = ""
+                no_trimming    = true
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def out = workflow.stdout.toString()
+            assert !out.contains("trim_primers") :
+                "trim_primers should not run when --no_trimming is set, got: ${out}"
+            // the other Part A processes still run
+            ["merge_fastq_pairs", "convert_fastq_to_fasta",
+             "dereplicate_fasta", "list_local_clusters"].each { proc ->
+                assert out.contains(proc) :
+                    "expected ${proc} to run, got: ${out}"
+            }
+        }
+    }
+
+    test("--no_trimming true with primers set aborts") {
+        // COVERAGE: [S20]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                no_trimming    = true
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("forward_primer") || msg.contains("reverse_primer") :
+                "expected error to name the conflicting primer parameter, got: ${msg}"
+            assert msg.contains("no_trimming") :
+                "expected error to mention --no_trimming, got: ${msg}"
+        }
+    }
+
     test("empty input samples travel through to the occurrence table") {
         // COVERAGE: [S09] — pending until empty-sample passthrough lands.
         // Tagged "pending" so CI (`nf-test test --tag '!pending'`) skips

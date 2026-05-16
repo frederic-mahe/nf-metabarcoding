@@ -137,7 +137,8 @@ isolation.
 - `[S18]` required parameters (`forward_primer`, `reverse_primer`,
   `fastq_folder`) have no default and must be supplied via CLI or
   project config; the workflow aborts at startup with a message
-  naming the missing parameter
+  naming the missing parameter. `forward_primer` and `reverse_primer`
+  are not required when `--no_trimming` is set (see `[S20]`).
   - **Pass when:** running the workflow without `--forward_primer`
     (or `--reverse_primer`, or `--fastq_folder`) exits non-zero and
     the stderr/log identifies the missing parameter; supplying the
@@ -146,11 +147,30 @@ isolation.
 - `[S19]` each Part A step emits a per-sample log file alongside its
   data output, published to `params.fastq_folder`:
     - merging       → `<sampleId>_merging.log`
-    - trimming      → `<sampleId>_trimming.log`
+    - trimming      → `<sampleId>_trimming.log` (only when the
+      trimming step runs — see `[S20]`)
     - dereplicating → `<sampleId>_dereplicating.log`
     - clustering    → `<sampleId>_clustering.log`
   - **Pass when:** running Part A on any sample produces all four
-    log files in `params.fastq_folder`, each non-empty
+    log files in `params.fastq_folder`, each non-empty (three when
+    `--no_trimming` is set: no `_trimming.log`)
+- `[S20]` `--no_trimming` toggle (default: `false`) skips the primer
+  trimming step. The toggle and the primer parameters are mutually
+  exclusive:
+  - when `--no_trimming` is `true`, `forward_primer` and
+    `reverse_primer` must be empty (not set on the CLI or in the
+    config). The minimum-length and max-N filters that the trimming
+    step used to enforce are taken over by
+    `convert_fastq_to_fasta` (vsearch `--fastq_minlen 32`,
+    `--fastq_maxns <caller-supplied>`).
+  - when `--no_trimming` is `false` (the default),
+    `forward_primer` and `reverse_primer` are required (see
+    `[S18]`).
+  - **Pass when:** (a) running with `--no_trimming true` and empty
+    primers succeeds and does **not** publish a `_trimming.log`;
+    (b) running with `--no_trimming true` together with a non-empty
+    `forward_primer` or `reverse_primer` exits non-zero and the
+    error names the conflicting parameter.
 
 
 ## Common fastq file-name patterns

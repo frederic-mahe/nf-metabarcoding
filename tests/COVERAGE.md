@@ -46,6 +46,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S17]`| per-cluster minimum-read threshold (> 2 reads)                             | `tests/processes/part_a/list_local_clusters.nf.test`   | red     | —          |
 | `[S18]`| required params (forward/reverse_primer, fastq_folder) must be supplied    | `tests/main.nf.test`                            | done    | —          |
 | `[S19]`| Part A steps emit per-sample `<sampleId>_<step>.log` files                 | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/trim_primers.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_a/list_local_clusters.nf.test` | done | — |
+| `[S20]`| `--no_trimming` toggle skips primer trimming; mutually exclusive w/ primers| `tests/main.nf.test`                            | red     | —          |
 
 
 ## Per-process tests

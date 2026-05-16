@@ -4,9 +4,12 @@
 params.fastq_pattern = "/*_1_{1,2}.fastq.gz"
 params.fastq_encoding = 33
 params.threads = 4
+params.no_trimming = false
 
 // forward_primer, reverse_primer, fastq_folder are required and have
 // no default; the workflow asserts them at startup (see [S18]).
+// [S20]: when params.no_trimming is true, forward_primer and
+// reverse_primer must be empty and the trim_primers step is skipped.
 
 
 process merge_fastq_pairs {
@@ -41,16 +44,14 @@ process merge_fastq_pairs {
 process trim_primers {
     // search forward primer in both normal and revcomp: now all reads
     // are in the same orientation. Matching leftmost is the default.
-    // max_n is a caller-supplied input so the same process can serve
-    // merged reads (max_n=0) and the [S04] unmerged-pair path (max_n
-    // = size of the N-join insert).
+    // Length and N-count filtering are delegated to
+    // convert_fastq_to_fasta (vsearch --fastq_minlen / --fastq_maxns).
     publishDir path: { params.fastq_folder }, mode: 'link', pattern: "*.log",
         enabled: params.fastq_folder != null
 
     input:
     val sampleId
     path merged_fastq
-    val max_n
 
     output:
     val sampleId
@@ -61,7 +62,6 @@ process trim_primers {
     '''
     #!/bin/bash
 
-    readonly MIN_LENGTH=32
     readonly ERROR_RATE=0.1
 
     reverse_primer_revcomp=$(reverse_complement.sh !{params.reverse_primer})
@@ -71,7 +71,6 @@ process trim_primers {
     {
         cutadapt \
             --cores=!{params.threads} \
-            --minimum-length "${MIN_LENGTH}" \
             --error-rate "${ERROR_RATE}" \
             --revcomp \
             --rename="{id}" \
@@ -81,12 +80,10 @@ process trim_primers {
             !{merged_fastq} | \
             cutadapt \
                 --cores=!{params.threads} \
-                --minimum-length "${MIN_LENGTH}" \
                 --error-rate "${ERROR_RATE}" \
                 --adapter "${reverse_primer_revcomp}" \
                 --overlap "${MIN_R}" \
                 --discard-untrimmed \
-                --max-n "!{max_n}" \
                 - > trimmed_fastq
     } 2> !{sampleId}_trimming.log
     '''
@@ -94,11 +91,15 @@ process trim_primers {
 
 
 process convert_fastq_to_fasta {
-    // use SHA1 values as sequence names,
-    // compute expected error values (ee)
+    // use SHA1 values as sequence names, compute expected error
+    // values (ee), and apply the minimum-length / max-N filters.
+    // max_n is a caller-supplied input so the same process can serve
+    // merged reads (max_n=0) and the [S04] unmerged-pair path (max_n
+    // = size of the N-join insert).
     input:
     val sampleId
     path trimmed_fastq
+    val max_n
 
     output:
     val sampleId
@@ -108,8 +109,12 @@ process convert_fastq_to_fasta {
     '''
     #!/bin/bash
 
+    readonly MIN_LENGTH=32
+
     vsearch \
         --fastq_filter !{trimmed_fastq} \
+        --fastq_minlen "${MIN_LENGTH}" \
+        --fastq_maxns !{max_n} \
         --relabel_sha1 \
         --fastq_ascii !{params.fastq_encoding} \
         --quiet \
@@ -210,19 +215,36 @@ process list_local_clusters {
 
 workflow {
     // required parameters (no default — supply via CLI or project config)
-    assert params.forward_primer : "--forward_primer must be set (no default)"
-    assert params.reverse_primer : "--reverse_primer must be set (no default)"
-    assert params.fastq_folder   : "--fastq_folder must be set (no default)"
+    assert params.fastq_folder : "--fastq_folder must be set (no default)"
+
+    // [S18]/[S20]: primers and --no_trimming are mutually exclusive
+    if ( params.no_trimming ) {
+        assert !params.forward_primer : "--forward_primer must be empty when --no_trimming is set"
+        assert !params.reverse_primer : "--reverse_primer must be empty when --no_trimming is set"
+    } else {
+        assert params.forward_primer : "--forward_primer must be set (no default)"
+        assert params.reverse_primer : "--reverse_primer must be set (no default)"
+    }
 
     // discover pairs and merge
     merge_fastq_pairs(channel.fromFilePairs(params.fastq_folder + params.fastq_pattern))
 
-    // trim primers (max_n=0 for merged reads; the [S04] unmerged-pair
-    // path will pass the N-join insert size when implemented)
-    trim_primers(merge_fastq_pairs.out[0], merge_fastq_pairs.out[1], 0)
+    // trim primers (skipped when --no_trimming is set)
+    def sampleId_ch
+    def fastq_ch
+    if ( params.no_trimming ) {
+        sampleId_ch = merge_fastq_pairs.out[0]
+        fastq_ch    = merge_fastq_pairs.out[1]
+    } else {
+        trim_primers(merge_fastq_pairs.out[0], merge_fastq_pairs.out[1])
+        sampleId_ch = trim_primers.out[0]
+        fastq_ch    = trim_primers.out[1]
+    }
 
-    // convert to fasta with SHA1 + ee, then fan out
-    convert_fastq_to_fasta(trim_primers.out[0], trim_primers.out[1])
+    // convert to fasta with SHA1 + ee, apply min-length / max-N
+    // filters (max_n=0 for merged reads; the [S04] unmerged-pair
+    // path will pass the N-join insert size when implemented)
+    convert_fastq_to_fasta(sampleId_ch, fastq_ch, 0)
 
     // set aside EE values
     extract_expected_error_values(
