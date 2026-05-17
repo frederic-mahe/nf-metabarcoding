@@ -11,7 +11,6 @@ __date__ = "2021/03/19"
 __version__ = "$Revision: 1.2"
 
 import argparse
-import copy
 import operator
 import os
 import re
@@ -209,10 +208,11 @@ def add_abundance_values(
     Add abundance values and sort (deal with a rare case).
     """
     print("PROGRESS: sorting each cluster", file=sys.stderr)
-    new_clusters_with_abundance = copy.deepcopy(new_clusters)  # suboptimal
-    for i, super_cluster in enumerate(new_clusters):
+    new_clusters_with_abundance: list[dict[str, list[tuple[str, int]]]] = []
+    for super_cluster in new_clusters:
+        super_with_abundance: dict[str, list[tuple[str, int]]] = {}
         for cluster in super_cluster:
-            swarm = list()
+            swarm: list[tuple[str, int]] = []
             for amplicon in super_cluster[cluster]:
                 index = int(amplicon[0:2], 16)
                 abundance = swarms[index][amplicon]
@@ -238,12 +238,13 @@ def add_abundance_values(
             #                 swarm[0], swarm[j] = swarm[j], swarm[0]
             #                 break
 
-            # check if the seed changed after sorting (rare case)
+            # the dict is keyed on the post-sort top amplicon; this
+            # matches the legacy behaviour (which deepcopied then
+            # `del [cluster]` + `[new_seed] = swarm` when the seed
+            # changed) while avoiding the deepcopy entirely
             new_seed = swarm[0][0]
-            if new_seed != cluster:
-                del new_clusters_with_abundance[i][cluster]
-                cluster = new_seed
-            new_clusters_with_abundance[i][cluster] = swarm
+            super_with_abundance[new_seed] = swarm
+        new_clusters_with_abundance.append(super_with_abundance)
 
     return new_clusters_with_abundance
 
