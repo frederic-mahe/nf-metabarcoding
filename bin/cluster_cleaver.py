@@ -11,11 +11,15 @@ __date__ = "2021/03/19"
 __version__ = "$Revision: 1.2"
 
 import argparse
+import logging
 import operator
 import os
 import re
 import sys
 from typing import Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 # *************************************************************************** #
@@ -36,7 +40,7 @@ def per_sample_stats_parse(
     previous_sample = None
 
     with open(per_sample_stats_file, "r") as stats_file:
-        print("PROGRESS: parsing per-sample stats", file=sys.stderr)
+        logger.info("parsing per-sample stats")
         for line in stats_file:
             line = line.strip().split(separator)
             sample, cloud, mass, seed, seed_abundance = line[0:5]
@@ -75,7 +79,7 @@ def stats_parse(
     # 3 - consequently, a global seed cannot have an abundance smaller
     # than the threshold value.
     with open(global_stats_file, "r") as stats_file:
-        print("PROGRESS: parsing stats", file=sys.stderr)
+        logger.info("parsing stats")
         for line in stats_file:
             line = line.strip().split(separator)
             cloud, mass, seed, seed_abundance, singletons = line[0:5]
@@ -116,7 +120,7 @@ def swarms_parse(
     number_of_seeds = len(seeds_set)
 
     with open(swarms_file, "r") as swarms_file:
-        print("PROGRESS: parsing swarms", file=sys.stderr)
+        logger.info("parsing swarms")
         for line in swarms_file:
             line = line.strip()
             amplicons = re.split(separator, line)[0::2]
@@ -153,7 +157,7 @@ def struct_parse(
     new_clusters = list()
 
     with open(struct_file, "r") as struct_file:
-        print("PROGRESS: parsing struct", file=sys.stderr)
+        logger.info("parsing struct")
         for line in struct_file:
             line = line.strip()
             father, son, diffs, cluster_id, steps = line.split(separator)
@@ -207,7 +211,7 @@ def add_abundance_values(
     """
     Add abundance values and sort (deal with a rare case).
     """
-    print("PROGRESS: sorting each cluster", file=sys.stderr)
+    logger.info("sorting each cluster")
     new_clusters_with_abundance: list[dict[str, list[tuple[str, int]]]] = []
     for super_cluster in new_clusters:
         super_with_abundance: dict[str, list[tuple[str, int]]] = {}
@@ -256,7 +260,7 @@ def per_cluster_stats(
     """
     Compute per-cluster stats.
     """
-    print("PROGRESS: computing per-cluster stats", file=sys.stderr)
+    logger.info("computing per-cluster stats")
     new_stats = list()
     for super_cluster in new_clusters_with_abundance:
         for cluster in super_cluster:
@@ -301,7 +305,7 @@ def per_cluster_swarms(
     """
     Compute per-cluster swarms.
     """
-    print("PROGRESS: computing per-cluster swarms", file=sys.stderr)
+    logger.info("computing per-cluster swarms")
     with open(out_swarms_file, "w") as new_swarms_file:
         for super_cluster in new_clusters_with_abundance:
             for cluster in super_cluster:
@@ -329,7 +333,7 @@ def fasta_parse(
     index = None
     separator = ";size="
     with open(fasta_file, "r") as fasta_file:
-        print("PROGRESS: parsing fasta file", file=sys.stderr)
+        logger.info("parsing fasta file")
         for line in fasta_file:
             if line.startswith(">"):
                 amplicon, abundance = line.strip(">;\n").split(separator)
@@ -432,6 +436,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     """
     break clusters and output updated rep, stats and swarms files.
     """
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s: %(message)s",
+        stream=sys.stderr,
+    )
+
     # capture arguments
     args = parse_args(argv)
     global_stats_file = args.global_stats_file
