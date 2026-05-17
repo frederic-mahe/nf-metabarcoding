@@ -30,12 +30,12 @@ logger = logging.getLogger(__name__)
 
 def per_sample_stats_parse(
     per_sample_stats_file: str, percentage: float,
-) -> tuple[float, list[dict[str, int]]]:
+) -> tuple[float, dict[str, int]]:
     """
     Map samples, OTU seeds and stats.
     """
     separator = "\t"
-    per_sample_stats = [dict() for i in range(0, 256)]
+    per_sample_stats: dict[str, int] = {}
     number_of_samples = 0
     previous_sample = None
 
@@ -44,19 +44,17 @@ def per_sample_stats_parse(
         for line in stats_file:
             line = line.strip().split(separator)
             sample, cloud, mass, seed, seed_abundance = line[0:5]
-            index = int(seed[0:2], 16)
-            if seed in per_sample_stats[index]:
-                per_sample_stats[index][seed] += 1
+            if seed in per_sample_stats:
+                per_sample_stats[seed] += 1
             else:
-                per_sample_stats[index][seed] = 1
+                per_sample_stats[seed] = 1
             if sample != previous_sample:
                 previous_sample = sample
                 number_of_samples += 1
 
     # keep only local seeds present in at least "percentage" of samples
     threshold = percentage * number_of_samples
-    seeds = [{k: v for k, v in per_sample_stats[i].items() if v >= threshold}
-             for i in range(0, 256)]
+    seeds = {k: v for k, v in per_sample_stats.items() if v >= threshold}
 
     return threshold, seeds
 
@@ -64,7 +62,7 @@ def per_sample_stats_parse(
 def stats_parse(
     global_stats_file: str,
     threshold: float,
-    seeds: list[dict[str, int]],
+    seeds: dict[str, int],
 ) -> None:
     """
     Find and eliminate global seeds.
@@ -92,18 +90,17 @@ def stats_parse(
             # and with enough reads to be hosting a secondary seed
             # that passes our threshold
             if int(cloud) > 1 and int(mass) >= 2 * threshold + int(singletons):
-                index = int(seed[0:2], 16)
                 # eliminate global seeds from the list of seeds
-                if seed in seeds[index]:
-                    del seeds[index][seed]
+                if seed in seeds:
+                    del seeds[seed]
 
     return None
 
 
 def swarms_parse(
     swarms_file: str,
-    seeds: list[dict[str, int]],
-) -> tuple[list[dict[str, int]], list[dict[str, str]]]:
+    seeds: dict[str, int],
+) -> tuple[dict[str, int], dict[str, str]]:
     """
     Map amplicons and abundance values. Only keep clusters with local seeds.
     """
@@ -114,9 +111,9 @@ def swarms_parse(
     # through the "swarms" file to get a full list of clusters that
     # can be cleaved.
     separator = "_|;size=|;? "  # parsing of abundance annotations
-    swarms = [dict() for i in range(0, 256)]
-    global_seeds = [dict() for i in range(0, 256)]
-    seeds_set = {k for d in seeds for k in d.keys()}
+    swarms: dict[str, int] = {}
+    global_seeds: dict[str, str] = {}
+    seeds_set = set(seeds.keys())
     number_of_seeds = len(seeds_set)
 
     with open(swarms_file, "r") as swarms_file:
@@ -130,11 +127,9 @@ def swarms_parse(
             if common:
                 number_of_seeds -= len(common)
                 for amplicon, abundance in zip(amplicons, abundances):
-                    index = int(amplicon[0:2], 16)
-                    swarms[index][amplicon] = int(abundance)
+                    swarms[amplicon] = int(abundance)
                 for amplicon in common:
-                    index = int(amplicon[0:2], 16)
-                    global_seeds[index][amplicon] = seed
+                    global_seeds[amplicon] = seed
             if number_of_seeds == 0:
                 break
 
@@ -143,18 +138,18 @@ def swarms_parse(
 
 def struct_parse(
     struct_file: str,
-    seeds: list[dict[str, int]],
-    global_seeds: list[dict[str, str]],
+    seeds: dict[str, int],
+    global_seeds: dict[str, str],
 ) -> list[dict[str, set[str]]]:
     """
     carve out sub-clusters.
     """
     separator = "\t"
-    global_seeds_set = {v for d in global_seeds for v in d.values()}
-    number_of_seeds = sum([len(d) for d in seeds])
+    global_seeds_set = set(global_seeds.values())
+    number_of_seeds = len(seeds)
     previous_cluster_id = 0
-    clusters = dict()
-    new_clusters = list()
+    clusters: dict[str, set[str]] = {}
+    new_clusters: list[dict[str, set[str]]] = []
 
     with open(struct_file, "r") as struct_file:
         logger.info("parsing struct")
@@ -170,9 +165,9 @@ def struct_parse(
                 global_seed = father
                 has_a_local_seed = (True if global_seed in global_seeds_set
                                     else False)
-                clusters = dict()
+                clusters = {}
                 if has_a_local_seed:
-                    clusters[global_seed] = set([global_seed])
+                    clusters[global_seed] = {global_seed}
 
             # stop parsing the file as soon as possible
             if number_of_seeds == 0:
@@ -183,10 +178,9 @@ def struct_parse(
                 continue
 
             # detect local seeds
-            index = int(son[0:2], 16)
-            if son in seeds[index]:
+            if son in seeds:
                 number_of_seeds -= 1
-                clusters[son] = set([son])
+                clusters[son] = {son}
                 continue
 
             # populate cluster (assuming a father-son link)
@@ -206,7 +200,7 @@ def struct_parse(
 
 def add_abundance_values(
     new_clusters: list[dict[str, set[str]]],
-    swarms: list[dict[str, int]],
+    swarms: dict[str, int],
 ) -> list[dict[str, list[tuple[str, int]]]]:
     """
     Add abundance values and sort (deal with a rare case).
@@ -218,8 +212,7 @@ def add_abundance_values(
         for cluster in super_cluster:
             swarm: list[tuple[str, int]] = []
             for amplicon in super_cluster[cluster]:
-                index = int(amplicon[0:2], 16)
-                abundance = swarms[index][amplicon]
+                abundance = swarms[amplicon]
                 swarm.append((amplicon, abundance))
             # sort amplicons by decreasing abundance value and by
             # name (fix a rare bug: a tie leading to wrong seed
@@ -324,34 +317,30 @@ def fasta_parse(
     Get seed sequences, update abundances.
     """
     # create a dict of target amplicons and abundances
-    fasta = [dict() for i in range(0, 256)]
+    fasta: dict[str, list] = {}
     for t in new_stats:
-        index = int(t[2][0:2], 16)
-        fasta[index][t[2]] = [t[1]]
+        fasta[t[2]] = [t[1]]
     min_abundance = min([t[3] for t in new_stats])
     # filter the fasta file
-    index = None
     separator = ";size="
     with open(fasta_file, "r") as fasta_file:
         logger.info("parsing fasta file")
         for line in fasta_file:
             if line.startswith(">"):
                 amplicon, abundance = line.strip(">;\n").split(separator)
-                index = int(amplicon[0:2], 16)
                 if int(abundance) < min_abundance:
                     break  # no need to read more lines
             else:
-                if amplicon in fasta[index]:
-                    fasta[index][amplicon].append(line.strip())
+                if amplicon in fasta:
+                    fasta[amplicon].append(line.strip())
 
     with open(out_fasta_file, "w") as new_representatives_file:
         for t in new_stats:
             amplicon = t[2]
-            index = int(amplicon[0:2], 16)
             try:
-                abundance, sequence = fasta[index][amplicon]
+                abundance, sequence = fasta[amplicon]
             except ValueError:
-                print(amplicon, fasta[index][amplicon], min_abundance)
+                print(amplicon, fasta[amplicon], min_abundance)
                 sys.exit(-1)
             print(">" + amplicon + separator + str(abundance)
                   + "\n" + sequence, sep="", file=new_representatives_file)
