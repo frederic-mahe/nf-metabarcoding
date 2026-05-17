@@ -273,6 +273,38 @@ def test_discover_uses_user_pattern_to_pair_non_canonical_names(
     assert result == [Sample(sample_id="study42", r1=r1, r2=r2)]
 
 
+def test_user_pattern_without_star_uses_literal_prefix_as_sample_id(
+    tmp_path: Path,
+) -> None:
+    # When the user pattern has no `*` in the prefix (e.g. the legacy
+    # `params.fastq_pattern` of an end-to-end test that pins discovery
+    # to a single named pair), the literal prefix minus trailing
+    # separators is the sample ID — mirroring the historic
+    # channel.fromFilePairs key-extraction behaviour.
+    r1 = _make_fastq(tmp_path, "paired_merge_ok_1.fastq.gz")
+    r2 = _make_fastq(tmp_path, "paired_merge_ok_2.fastq.gz")
+
+    result = discover(
+        [tmp_path], extra_pattern="paired_merge_ok_{1,2}.fastq.gz"
+    )
+
+    assert result == [Sample(sample_id="paired_merge_ok", r1=r1, r2=r2)]
+
+
+def test_user_pattern_strips_legacy_leading_slash(tmp_path: Path) -> None:
+    # `params.fastq_pattern` used to be concatenated onto fastq_folder
+    # for fromFilePairs, so values commonly start with `/`. Treat the
+    # input as a basename glob regardless.
+    r1 = _make_fastq(tmp_path, "paired_merge_ok_1.fastq.gz")
+    r2 = _make_fastq(tmp_path, "paired_merge_ok_2.fastq.gz")
+
+    result = discover(
+        [tmp_path], extra_pattern="/paired_merge_ok_{1,2}.fastq.gz"
+    )
+
+    assert result == [Sample(sample_id="paired_merge_ok", r1=r1, r2=r2)]
+
+
 def test_user_pattern_takes_precedence_over_canonical_table(
     tmp_path: Path,
 ) -> None:

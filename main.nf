@@ -213,6 +213,36 @@ process list_local_clusters {
 }
 
 
+process discover_inputs {
+    // Walk every folder listed in params.fastq_folder (a single path
+    // or a comma-separated list) and emit a TSV:
+    //     sample_id<TAB>r1<TAB>r2   (r2 empty for single-end samples)
+    // bin/discover_fastq.py is the single source of truth for the
+    // canonical paired-end pattern table ([S11]); params.fastq_pattern,
+    // when set, is the user override checked before that table.
+
+    output:
+    path "samples.tsv"
+
+    script:
+    def folders = (params.fastq_folder instanceof List)
+        ? params.fastq_folder
+        : params.fastq_folder
+            .toString()
+            .split(',')
+            .collect { it.trim() }
+            .findAll { it }
+    def folder_args = folders.collect { "'${it}'" }.join(' ')
+    def extra_arg = (params.fastq_pattern
+        && !params.fastq_pattern.toString().isEmpty())
+            ? "--extra-pattern '${params.fastq_pattern}'"
+            : ""
+    """
+    discover_fastq.py ${extra_arg} ${folder_args} > samples.tsv
+    """
+}
+
+
 workflow {
     // required parameters (no default — supply via CLI or project config)
     assert params.fastq_folder : "--fastq_folder must be set (no default)"
@@ -226,26 +256,30 @@ workflow {
         assert params.reverse_primer : "--reverse_primer must be set (no default)"
     }
 
-    // [S21]: collect every fastq file in fastq_folder. Files that
-    // match --fastq_pattern form pairs (merged by merge_fastq_pairs);
-    // anything else is processed as an unpaired single-end sample
-    // that skips the merging step.
-    def paired_ch = channel.fromFilePairs(params.fastq_folder + params.fastq_pattern)
-    def paired_paths = paired_ch
-        .flatMap { id, pair -> pair }
-        .collect()
-        .ifEmpty([])
-        .map { it as Set }
+    // [S10]/[S11]/[S12]/[S21]: pattern-driven discovery. Pairs go
+    // through merge_fastq_pairs; single-end files skip the merging
+    // step.
+    discover_inputs()
 
-    def unpaired_ch = channel
-        .fromPath(params.fastq_folder + "/*.{fastq,fq}{,.gz,.bz2}")
-        .combine(paired_paths)
-        .filter { p, paired -> !paired.contains(p) }
-        .map { p, paired ->
-            def name = p.getFileName().toString()
-            def sampleId = name.replaceFirst(/\.(fastq|fq)(\.(gz|bz2))?$/, '')
-            tuple(sampleId, p)
+    def branched = discover_inputs.out
+        .splitCsv(sep: '\t')
+        .map { row ->
+            def sample = row[0]
+            def r1 = file(row[1])
+            def r2 = (row.size() > 2 && row[2]) ? file(row[2]) : null
+            tuple(sample, r1, r2)
         }
+        .branch { _sample, _r1, r2 ->
+            paired:   r2 != null
+            unpaired: r2 == null
+        }
+
+    def paired_ch = branched.paired.map { sample, r1, r2 ->
+        tuple(sample, [r1, r2])
+    }
+    def unpaired_ch = branched.unpaired.map { sample, r1, _r2 ->
+        tuple(sample, r1)
+    }
 
     // discover pairs and merge
     merge_fastq_pairs(paired_ch)

@@ -136,9 +136,18 @@ def _user_pattern_to_entry(glob: str) -> PatternEntry:
 
     The glob must contain exactly one ``{<r1>,<r2>}`` brace token
     (commonly ``{1,2}`` or ``{R1,R2}``); this is the R1/R2
-    discriminator. The first ``*`` before the discriminator becomes
-    the sample-ID capture group.
+    discriminator. A ``*`` in the prefix is the sample-ID capture
+    group. If no ``*`` is present, the literal prefix (with trailing
+    `_`/`.`/`-` separators stripped) is used as the sample ID —
+    mirrors the legacy `channel.fromFilePairs` behaviour.
     """
+    # The legacy `params.fastq_pattern` had a leading `/` because it
+    # was concatenated to `params.fastq_folder` for fromFilePairs.
+    # Strip it so the rest of this function treats the input as a
+    # plain basename glob.
+    if glob.startswith("/"):
+        glob = glob[1:]
+
     brace = re.search(r"\{([^,{}]+),([^,{}]+)\}", glob)
     if brace is None:
         raise ValueError(
@@ -168,20 +177,29 @@ def _user_pattern_to_entry(glob: str) -> PatternEntry:
     prefix_re = _translate(prefix, capture_sample=True)
     suffix_re = _translate(suffix, capture_sample=False)
 
-    if not sample_taken:
-        # No `*` in the prefix — anchor sample to the empty match so
-        # the named group exists and ``derive_sample_id`` still works.
-        prefix_re = "(?P<sample>)" + prefix_re
+    if sample_taken:
+        # Re-quote braces so str.format leaves them alone in literals.
+        tpl_prefix = prefix.replace("{", "{{").replace("}", "}}")
+        tpl_suffix = suffix.replace("{", "{{").replace("}", "}}")
+        # First `*` becomes the {sample} format slot; remaining `*` are
+        # rare and translate to literal `*` characters in the R2 name.
+        tpl_prefix_filled = tpl_prefix.replace("*", "{sample}", 1)
+        r2_template = f"{tpl_prefix_filled}{r2_token}{tpl_suffix}"
+    else:
+        # No `*` in the prefix — the literal prefix (minus trailing
+        # `_`/`.`/`-`) IS the sample ID. Inject a fixed named group so
+        # the rest of the discover() machinery is uniform.
+        sample_value = re.sub(r"[_.\-]+$", "", prefix)
+        tail_seps = prefix[len(sample_value):]
+        prefix_re = (
+            f"(?P<sample>{re.escape(sample_value)}){re.escape(tail_seps)}"
+        )
+        # R2 template is fully static (no captured groups to fill).
+        r2_template = prefix + r2_token + suffix
+        # Escape any `{` `}` so str.format treats them literally.
+        r2_template = r2_template.replace("{", "{{").replace("}", "}}")
 
     r1_regex = re.compile(f"^{prefix_re}{re.escape(r1_token)}{suffix_re}$")
-    # Re-quote braces so str.format leaves them alone in the literal text.
-    template_prefix = prefix.replace("{", "{{").replace("}", "}}")
-    template_suffix = suffix.replace("{", "{{").replace("}", "}}")
-    # The sample-ID `*` placeholder becomes a {sample} format slot; any
-    # other `*` characters become `*` literals (rare in practice).
-    template_prefix_filled = template_prefix.replace("*", "{sample}", 1)
-    r2_template = f"{template_prefix_filled}{r2_token}{template_suffix}"
-
     return PatternEntry(name="user", regex=r1_regex, r2_template=r2_template)
 
 

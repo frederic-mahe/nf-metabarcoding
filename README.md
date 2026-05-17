@@ -60,20 +60,53 @@ Required to run the test suite and the linters:
 # generate test fixtures (one-time)
 bash tests/data/generate.sh
 
-# run on the bundled fixtures
+# run on the bundled fixtures (paired_merge_ok matches canonical row 7
+# — no --fastq_pattern needed)
 nextflow run main.nf \
     --fastq_folder  tests/data \
-    --fastq_pattern '/paired_merge_ok_{1,2}.fastq.gz' \
     --threads       1
 
-# run on your own data
+# run on your own data — auto-detect via the canonical pattern table
 nextflow run main.nf \
-    --fastq_folder  /path/to/fastq_dir \
-    --fastq_pattern '/*_R{1,2}_001.fastq.gz'
+    --fastq_folder  /path/to/fastq_dir
+
+# multiple folders (comma-separated)
+nextflow run main.nf \
+    --fastq_folder  /data/run17,/data/run18
 ```
 
-See [`SPECIFICATIONS.md`](SPECIFICATIONS.md) for the full list of
-supported file-name patterns and parameters.
+### Input discovery
+
+The pipeline globs every fastq file in the listed folders (`*.fastq`,
+`*.fq`, with optional `.gz` / `.bz2`) and identifies paired-end pairs
+using the canonical pattern table documented in
+[`SPECIFICATIONS.md`](SPECIFICATIONS.md). Files that match no
+paired-end pattern (or whose R2 partner is missing) are processed as
+single-end samples that skip the merging step.
+
+### Adding a custom pattern (`--fastq_pattern`)
+
+If your file names don't match any canonical row, supply your own
+glob via `--fastq_pattern`. Format: a shell-style glob containing the
+literal token `{1,2}` (or `{R1,R2}`) that marks the R1/R2
+discriminator. A `*` before the discriminator captures the sample ID.
+
+```bash
+# study42-mateA.fastq.gz + study42-mateB.fastq.gz → sample "study42"
+nextflow run main.nf \
+    --fastq_folder  /data/run17 \
+    --fastq_pattern '*-mate{A,B}.fastq.gz'
+
+# fixed prefix, no '*': the literal prefix (minus trailing _/./-)
+# becomes the sample ID
+nextflow run main.nf \
+    --fastq_folder  tests/data \
+    --fastq_pattern 'paired_merge_ok_{1,2}.fastq.gz'
+```
+
+User patterns take precedence over the canonical table; supported
+glob meta-characters are limited to `*` (any chars) and the `{R1,R2}`
+brace token — anything else is matched literally.
 
 
 ## How to test
@@ -134,7 +167,6 @@ both and also refresh `CITATION.cff`'s `date-released`.
 ### Partial / in progress
 - Workflow-level smoke test (currently `red` on `[S01]`, `[S03]`,
   `[S09]`)
-- Auto-detection of fastq naming patterns (`[S11]`, `[S12]`)
 - Empty-sample passthrough (`[S09]`)
 
 ### Planned

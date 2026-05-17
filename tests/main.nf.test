@@ -139,6 +139,59 @@ nextflow_pipeline {
         }
     }
 
+    test("discovers a MiSeq-style paired sample via the canonical pattern table") {
+        // COVERAGE: [S11], [S12]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data/miseq"
+                fastq_pattern  = ""  // rely purely on the canonical table
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            // Sample ID derives from canonical pattern row 1
+            // (`_L00[1-9]_R1_00[1-9]\.<ext>`).
+            def folder = "${projectDir}/tests/data/miseq"
+            def sampleId = "SampleX_S1"
+            ["merging", "trimming", "dereplicating", "clustering"].each { step ->
+                def log = file("${folder}/${sampleId}_${step}.log")
+                assert log.exists()   : "missing ${step} log: ${log}"
+                assert log.size() > 0 : "empty ${step} log: ${log}"
+            }
+        }
+    }
+
+    test("walks a comma-separated list of fastq folders") {
+        // COVERAGE: [S10]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data/miseq,${projectDir}/tests/data/unpaired_only"
+                fastq_pattern  = ""
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            // Both samples — one paired (miseq), one single-end
+            // (unpaired_only) — appear in the trace.
+            def out = workflow.stdout.toString()
+            assert out.contains("merge_fastq_pairs") :
+                "expected merge_fastq_pairs to run on the MiSeq pair, got: ${out}"
+            // Per-sample log probes
+            assert file("${projectDir}/tests/data/miseq/SampleX_S1_merging.log").exists()
+            assert file("${projectDir}/tests/data/unpaired_only/unpaired_sample_dereplicating.log").exists()
+            assert !file("${projectDir}/tests/data/unpaired_only/unpaired_sample_merging.log").exists() :
+                "single-end sample must not produce a merging log"
+        }
+    }
+
     test("empty input samples travel through to the occurrence table") {
         // COVERAGE: [S09] — pending until empty-sample passthrough lands.
         // Tagged "pending" so CI (`nf-test test --tag '!pending'`) skips

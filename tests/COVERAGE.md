@@ -36,9 +36,9 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S07]`| runs locally or on HPC (slurm)                                             | —                                               | n/a     | —          |
 | `[S08]`| runs local *or* containerized applications                                 | —                                               | n/a     | —          |
 | `[S09]`| empty input samples travel through and appear in the occurrence table      | `tests/main.nf.test`                            | red     | —          |
-| `[S10]`| accept a directory or a list of directories (absolute or relative)         | `tests/python/test_discover_fastq.py`, `tests/main.nf.test` | red | —          |
-| `[S11]`| auto-discover fastq files using common name patterns                       | `tests/python/test_discover_fastq.py`, `tests/main.nf.test` | red | —          |
-| `[S12]`| auto-deduce sample names from fastq file names                             | `tests/python/test_discover_fastq.py`, `tests/main.nf.test` | red | —          |
+| `[S10]`| accept a directory or a list of directories (absolute or relative)         | `tests/python/test_discover_fastq.py`, `tests/bin/discover_fastq.bats`, `tests/main.nf.test` | done | —          |
+| `[S11]`| auto-discover fastq files using common name patterns                       | `tests/python/test_discover_fastq.py`, `tests/bin/discover_fastq.bats`, `tests/main.nf.test` | done | —          |
+| `[S12]`| auto-deduce sample names from fastq file names                             | `tests/python/test_discover_fastq.py`, `tests/bin/discover_fastq.bats`, `tests/main.nf.test` | done | —          |
 | `[S13]`| warn if two or more samples share a name                                   | `tests/main.nf.test`                            | TODO    | —          |
 | `[S14]`| collision policy for same-named samples                                    | —                                               | blocked | D03        |
 | `[S15]`| export single occurrence table *or* two-part (long + metadata) table       | `tests/main.nf.test`                            | TODO    | —          |
