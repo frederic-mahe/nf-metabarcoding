@@ -102,6 +102,43 @@ nextflow_pipeline {
         }
     }
 
+    test("unpaired fastq files are processed by skipping the merging step") {
+        // COVERAGE: [S21]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data/unpaired_only"
+                fastq_pattern  = "/*_{1,2}.fastq.gz"  // matches nothing in this dir
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def out = workflow.stdout.toString()
+            assert !out.contains("merge_fastq_pairs") :
+                "merge_fastq_pairs must not run when no paired files are present, got: ${out}"
+            // downstream Part A processes still run on the unpaired sample
+            ["trim_primers",
+             "filter_and_convert_to_fasta",
+             "dereplicate_fasta",
+             "list_local_clusters"].each { proc ->
+                assert out.contains(proc) :
+                    "expected ${proc} to run on the unpaired sample, got: ${out}"
+            }
+            // per-sample artefacts and the [S19] logs land in fastq_folder
+            def folder = "${projectDir}/tests/data/unpaired_only"
+            def sampleId = "unpaired_sample"
+            assert file("${folder}/${sampleId}.fas").exists()         : "missing .fas"
+            assert file("${folder}/${sampleId}_trimming.log").exists() : "missing trimming log"
+            assert file("${folder}/${sampleId}_dereplicating.log").exists() : "missing dereplicating log"
+            assert file("${folder}/${sampleId}_clustering.log").exists() : "missing clustering log"
+            assert !file("${folder}/${sampleId}_merging.log").exists() :
+                "merging log should not exist for an unpaired sample"
+        }
+    }
+
     test("empty input samples travel through to the occurrence table") {
         // COVERAGE: [S09] — pending until empty-sample passthrough lands.
         // Tagged "pending" so CI (`nf-test test --tag '!pending'`) skips

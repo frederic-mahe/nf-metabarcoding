@@ -18,6 +18,7 @@ this workflow.
 | `single_end.fastq.gz`                                     | #3                          | single-end input                                           |
 | `uncompressed_1.fastq` / `uncompressed_2.fastq`           | #4                          | uncompressed input                                         |
 | `empty_1.fastq.gz` / `empty_2.fastq.gz`                   | #10                         | empty input samples must travel through                    |
+| `unpaired_only/unpaired_sample.fastq.gz`                  | `[S21]`                     | unpaired fastq file in an isolated dir; skips merging step |
 
 Numbers refer to rows in [`../COVERAGE.md`](../COVERAGE.md).
 

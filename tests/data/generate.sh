@@ -126,10 +126,27 @@ emit_empty() {
     : | gzip > "empty_2.fastq.gz"
 }
 
+emit_unpaired_only() {
+    # An isolated directory containing a single full-length single-end
+    # fastq file: name does not match any paired-end pattern, so the
+    # workflow must route it through the unpaired branch ([S21]).
+    local -r dir="unpaired_only"
+    mkdir -p "${dir}"
+    local -r out="${dir}/unpaired_sample.fastq"
+    : > "${out}"
+    local i=0
+    for A in "${AMPLICONS_OK[@]}"; do
+        i=$((i + 1))
+        write_record "${out}" "read_${i}" "${A}"
+    done
+    gzip --force "${out}"
+}
+
 emit_paired "paired_merge_ok"   "${AMPLICONS_OK[@]}"
 emit_paired "paired_merge_fail" "${AMPLICONS_LONG[@]}"
 emit_single
 emit_uncompressed
 emit_empty
+emit_unpaired_only
 
 echo "Wrote fixtures to ${DATA_DIR}"

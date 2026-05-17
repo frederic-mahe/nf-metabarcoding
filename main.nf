@@ -226,17 +226,48 @@ workflow {
         assert params.reverse_primer : "--reverse_primer must be set (no default)"
     }
 
+    // [S21]: collect every fastq file in fastq_folder. Files that
+    // match --fastq_pattern form pairs (merged by merge_fastq_pairs);
+    // anything else is processed as an unpaired single-end sample
+    // that skips the merging step.
+    def paired_ch = channel.fromFilePairs(params.fastq_folder + params.fastq_pattern)
+    def paired_paths = paired_ch
+        .flatMap { id, pair -> pair }
+        .collect()
+        .ifEmpty([])
+        .map { it as Set }
+
+    def unpaired_ch = channel
+        .fromPath(params.fastq_folder + "/*.{fastq,fq}{,.gz,.bz2}")
+        .combine(paired_paths)
+        .filter { p, paired -> !paired.contains(p) }
+        .map { p, paired ->
+            def name = p.getFileName().toString()
+            def sampleId = name.replaceFirst(/\.(fastq|fq)(\.(gz|bz2))?$/, '')
+            tuple(sampleId, p)
+        }
+
     // discover pairs and merge
-    merge_fastq_pairs(channel.fromFilePairs(params.fastq_folder + params.fastq_pattern))
+    merge_fastq_pairs(paired_ch)
+
+    // re-pair merge outputs into tuples, mix with unpaired files,
+    // then split back into two synchronised channels for downstream
+    def to_process = merge_fastq_pairs.out[0]
+        .merge(merge_fastq_pairs.out[1])
+        .mix(unpaired_ch)
+        .multiMap { id, f ->
+            id:   id
+            file: f
+        }
 
     // trim primers (skipped when --no_trimming is set)
     def sampleId_ch
     def fastq_ch
     if ( params.no_trimming ) {
-        sampleId_ch = merge_fastq_pairs.out[0]
-        fastq_ch    = merge_fastq_pairs.out[1]
+        sampleId_ch = to_process.id
+        fastq_ch    = to_process.file
     } else {
-        trim_primers(merge_fastq_pairs.out[0], merge_fastq_pairs.out[1])
+        trim_primers(to_process.id, to_process.file)
         sampleId_ch = trim_primers.out[0]
         fastq_ch    = trim_primers.out[1]
     }

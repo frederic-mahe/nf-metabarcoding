@@ -171,6 +171,16 @@ isolation.
     (b) running with `--no_trimming true` together with a non-empty
     `forward_primer` or `reverse_primer` exits non-zero and the
     error names the conflicting parameter.
+- `[S21]` Part A collects every fastq file in the listed directories;
+  files that are **not in a pair** (do not match a known paired-end
+  name pattern from the table below, nor the user-provided
+  `--fastq_pattern`) are processed as single-end samples by skipping
+  the `merge_fastq_pairs` step. Their sample ID is derived by stripping
+  the `.(fastq|fq)(.gz|.bz2)?` extension from the file name.
+  - **Pass when:** running Part A on a directory containing only an
+    unpaired fastq file produces the expected per-sample artefacts
+    (`<sampleId>.fas`, `_dereplicating.log`, `_clustering.log`) and
+    the workflow trace does **not** mention `merge_fastq_pairs`.
 
 
 ## Common fastq file-name patterns
