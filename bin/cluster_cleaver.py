@@ -4,6 +4,8 @@
    break swarm clusters, using sample distribution data
 """
 
+from __future__ import annotations
+
 __author__ = "Frédéric Mahé <frederic.mahe@cirad.fr>"
 __date__ = "2021/03/19"
 __version__ = "$Revision: 1.2"
@@ -21,41 +23,6 @@ import operator
 #                                  Functions                                  #
 #                                                                             #
 # *************************************************************************** #
-
-if __name__ == '__main__':
-    """
-    Parse arguments from command line.
-    """
-    parser = argparse.ArgumentParser(
-        description="break swarm clusters, using sample distribution data.")
-
-    parser.add_argument("--global_stats",
-                        dest="global_stats_file",
-                        required=True,
-                        help="cluster statistics")
-
-    parser.add_argument("--per_sample_stats",
-                        dest="per_sample_stats_file",
-                        required=True,
-                        help="per-sample cluster statistics")
-
-    parser.add_argument("--fasta",
-                        dest="fasta_file",
-                        required=True,
-                        help="amplicon sequences")
-
-    parser.add_argument("--struct",
-                        dest="struct_file",
-                        required=True,
-                        help="internal structure of clusters")
-
-    parser.add_argument("--swarms",
-                        dest="swarms_file",
-                        required=True,
-                        help="list of amplicons per cluster")
-
-    ARGS = parser.parse_args()
-
 
 def per_sample_stats_parse(per_sample_stats_file, percentage):
     """
@@ -364,23 +331,59 @@ def fasta_parse(fasta_file, new_stats, swarm_parameters):
     return None
 
 
-def main():
+def parse_args(argv=None):
+    """
+    Parse arguments from command line.
+    """
+    parser = argparse.ArgumentParser(
+        description="break swarm clusters, using sample distribution data.")
+
+    parser.add_argument("--global_stats",
+                        dest="global_stats_file",
+                        required=True,
+                        help="cluster statistics")
+
+    parser.add_argument("--per_sample_stats",
+                        dest="per_sample_stats_file",
+                        required=True,
+                        help="per-sample cluster statistics")
+
+    parser.add_argument("--fasta",
+                        dest="fasta_file",
+                        required=True,
+                        help="amplicon sequences")
+
+    parser.add_argument("--struct",
+                        dest="struct_file",
+                        required=True,
+                        help="internal structure of clusters")
+
+    parser.add_argument("--swarms",
+                        dest="swarms_file",
+                        required=True,
+                        help="list of amplicons per cluster")
+
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
     """
     break clusters and output updated rep, stats and swarms files.
     """
     # capture arguments
-    global_stats_file = ARGS.global_stats_file
-    per_sample_stats_file = ARGS.per_sample_stats_file
-    struct_file = ARGS.struct_file
-    swarms_file = ARGS.swarms_file
-    fasta_file = ARGS.fasta_file
+    args = parse_args(argv)
+    global_stats_file = args.global_stats_file
+    per_sample_stats_file = args.per_sample_stats_file
+    struct_file = args.struct_file
+    swarms_file = args.swarms_file
+    fasta_file = args.fasta_file
 
     # fastidious or not?
     if "_1f." in swarms_file and "_1f." in struct_file:
         swarm_parameters = "1f"
     else:
         swarm_parameters = "1"
-    
+
     # cleaving threshold (keystone parameter)
     PERCENTAGE = 0.05
 
@@ -401,7 +404,7 @@ def main():
     per_cluster_swarms(swarms_file, new_clusters_with_abundance)
     fasta_parse(fasta_file, new_stats, swarm_parameters)
 
-    return
+    return 0
 
 
 # *************************************************************************** #
@@ -411,7 +414,4 @@ def main():
 # *************************************************************************** #
 
 if __name__ == '__main__':
-
-    main()
-
-sys.exit(0)
+    sys.exit(main())
