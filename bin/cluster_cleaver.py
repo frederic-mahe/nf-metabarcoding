@@ -10,12 +10,13 @@ __author__ = "Frédéric Mahé <frederic.mahe@cirad.fr>"
 __date__ = "2021/03/19"
 __version__ = "$Revision: 1.2"
 
+import argparse
+import copy
+import operator
 import os
 import re
 import sys
-import copy
-import argparse
-import operator
+from typing import Optional
 
 
 # *************************************************************************** #
@@ -24,7 +25,9 @@ import operator
 #                                                                             #
 # *************************************************************************** #
 
-def per_sample_stats_parse(per_sample_stats_file, percentage):
+def per_sample_stats_parse(
+    per_sample_stats_file: str, percentage: float,
+) -> tuple[float, list[dict[str, int]]]:
     """
     Map samples, OTU seeds and stats.
     """
@@ -55,7 +58,11 @@ def per_sample_stats_parse(per_sample_stats_file, percentage):
     return threshold, seeds
 
 
-def stats_parse(global_stats_file, threshold, seeds):
+def stats_parse(
+    global_stats_file: str,
+    threshold: float,
+    seeds: list[dict[str, int]],
+) -> None:
     """
     Find and eliminate global seeds.
     """
@@ -90,7 +97,10 @@ def stats_parse(global_stats_file, threshold, seeds):
     return None
 
 
-def swarms_parse(swarms_file, seeds):
+def swarms_parse(
+    swarms_file: str,
+    seeds: list[dict[str, int]],
+) -> tuple[list[dict[str, int]], list[dict[str, str]]]:
     """
     Map amplicons and abundance values. Only keep clusters with local seeds.
     """
@@ -128,7 +138,11 @@ def swarms_parse(swarms_file, seeds):
     return swarms, global_seeds
 
 
-def struct_parse(struct_file, seeds, global_seeds):
+def struct_parse(
+    struct_file: str,
+    seeds: list[dict[str, int]],
+    global_seeds: list[dict[str, str]],
+) -> list[dict[str, set[str]]]:
     """
     carve out sub-clusters.
     """
@@ -187,7 +201,10 @@ def struct_parse(struct_file, seeds, global_seeds):
     return new_clusters
 
 
-def add_abundance_values(new_clusters, swarms):
+def add_abundance_values(
+    new_clusters: list[dict[str, set[str]]],
+    swarms: list[dict[str, int]],
+) -> list[dict[str, list[tuple[str, int]]]]:
     """
     Add abundance values and sort (deal with a rare case).
     """
@@ -203,7 +220,7 @@ def add_abundance_values(new_clusters, swarms):
             # sort amplicons by decreasing abundance value and by
             # name (fix a rare bug: a tie leading to wrong seed
             # selection)
-            swarm.sort(key = lambda x: (-x[1], x[0]))
+            swarm.sort(key=lambda x: (-x[1], x[0]))
 
             # # make sure original seed stays first if its a tie (does not work) [2025-09-08 lun.]
             # new_seed = swarm[0][0]
@@ -231,7 +248,10 @@ def add_abundance_values(new_clusters, swarms):
     return new_clusters_with_abundance
 
 
-def per_cluster_stats(global_stats_file, new_clusters_with_abundance):
+def per_cluster_stats(
+    global_stats_file: str,
+    new_clusters_with_abundance: list[dict[str, list[tuple[str, int]]]],
+) -> list[tuple[int, int, str, int, int, str, str]]:
     """
     Compute per-cluster stats.
     """
@@ -273,7 +293,10 @@ def per_cluster_stats(global_stats_file, new_clusters_with_abundance):
     return new_stats
 
 
-def per_cluster_swarms(swarms_file, new_clusters_with_abundance):
+def per_cluster_swarms(
+    swarms_file: str,
+    new_clusters_with_abundance: list[dict[str, list[tuple[str, int]]]],
+) -> None:
     """
     Compute per-cluster swarms.
     """
@@ -287,7 +310,11 @@ def per_cluster_swarms(swarms_file, new_clusters_with_abundance):
     return None
 
 
-def fasta_parse(fasta_file, new_stats, swarm_parameters):
+def fasta_parse(
+    fasta_file: str,
+    new_stats: list[tuple[int, int, str, int, int, str, str]],
+    swarm_parameters: str,
+) -> None:
     """
     Get seed sequences, update abundances.
     """
@@ -331,7 +358,7 @@ def fasta_parse(fasta_file, new_stats, swarm_parameters):
     return None
 
 
-def parse_args(argv=None):
+def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     """
     Parse arguments from command line.
     """
@@ -366,7 +393,7 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
-def main(argv=None):
+def main(argv: Optional[list[str]] = None) -> int:
     """
     break clusters and output updated rep, stats and swarms files.
     """
