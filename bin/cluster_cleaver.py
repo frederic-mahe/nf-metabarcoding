@@ -219,19 +219,22 @@ def add_abundance_values(
             # selection)
             swarm.sort(key=lambda x: (-x[1], x[0]))
 
-            # # make sure original seed stays first if its a tie (does not work) [2025-09-08 lun.]
+            # # make sure original seed stays first if its a tie
+            # # (does not work) [2025-09-08 lun.]
             # new_seed = swarm[0][0]
             # new_abundance = swarm[0][1]
             # index = int(new_seed[0:2], 16)
             # is_a_local_seed = new_seed in swarms[index]
-            # # if not a local_seed, search for one in the entries with the same abundance
+            # # if not a local_seed, search for one in the entries
+            # # with the same abundance
             # if not is_a_local_seed:
             #     # find first that is a local seed
             #     for a_tuple in swarm[1:]:
             #         if a_tuple[1] == new_abundance:
             #             candidate = a_tuple[0]
             #             if candidate in swarms[int(candidate[0:2], 16)]:
-            #                 j = [a_seed[0] for a_seed in swarm].index(candidate)
+            #                 j = [a_seed[0] for a_seed in swarm].index(
+            #                     candidate)
             #                 swarm[0], swarm[j] = swarm[j], swarm[0]
             #                 break
 
@@ -302,7 +305,8 @@ def per_cluster_swarms(
     with open(out_swarms_file, "w") as new_swarms_file:
         for super_cluster in new_clusters_with_abundance:
             for cluster in super_cluster:
-                print(*[t[0] + ";size=" + str(t[1]) for t in super_cluster[cluster]],
+                print(*[t[0] + ";size=" + str(t[1])
+                        for t in super_cluster[cluster]],
                       sep=" ", file=new_swarms_file)
 
     return None
@@ -416,7 +420,8 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
                         default=None,
                         help="output path for the cleaved cluster "
                              "representatives FASTA (default: "
-                             "<basename of --fasta>_<1|1f>_representatives.fas2)")
+                             "<basename of --fasta>_<1|1f>"
+                             "_representatives.fas2)")
 
     return parser.parse_args(argv)
 
