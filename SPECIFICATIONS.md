@@ -198,6 +198,27 @@ isolation.
     unpaired fastq file produces the expected per-sample artefacts
     (`<sampleId>.fas`, `_dereplicating.log`, `_clustering.log`) and
     the workflow trace does **not** mention `merge_fastq_pairs`.
+- `[S22]` Part B's first step re-cleaves global swarm clusters by
+  detecting alternative ("sub-") seeds that appear in a configurable
+  fraction of samples (default 5 %, exposed as `--percentage`). For
+  each global cluster that contains at least one sub-seed, the
+  cluster is partitioned along the internal-structure father-son
+  tree so each sub-seed inherits its reachable amplicons; clusters
+  that contain no sub-seed are **not** re-emitted (the legacy
+  pipeline concatenates the original and the cleaved triples
+  downstream). The step consumes the four swarm outputs
+  (`--seeds`, `--statistics-file`, `--internal-structure`,
+  `--output-file`) plus a concatenated per-sample stats file, and
+  emits an augmented `(stats, swarms, representatives)` triple. The
+  fastidious flag used by the upstream swarm run is propagated to
+  this step (default: `--fastidious`) so the representatives output
+  filename matches the swarm parameters.
+  - **Pass when:** golden-file characterization tests for
+    `bin/cluster_cleaver.py` reproduce the byte-exact output of the
+    legacy `tmp/OTU_cleaver.py` on a fixture covering: (a) a cluster
+    that splits on a sub-seed, (b) a cluster that does not split,
+    (c) a candidate sub-seed below the per-sample-presence threshold,
+    (d) a sort tie within a sub-cluster.
 
 
 ## Common fastq file-name patterns
