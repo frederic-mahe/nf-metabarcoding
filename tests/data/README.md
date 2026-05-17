@@ -19,6 +19,7 @@ this workflow.
 | `uncompressed_1.fastq` / `uncompressed_2.fastq`           | #4                          | uncompressed input                                         |
 | `empty_1.fastq.gz` / `empty_2.fastq.gz`                   | #10                         | empty input samples must travel through                    |
 | `unpaired_only/unpaired_sample.fastq.gz`                  | `[S21]`                     | unpaired fastq file in an isolated dir; skips merging step |
+| `miseq/SampleX_S1_L001_R{1,2}_001.fastq.gz`               | `[S11]`, `[S12]`            | MiSeq-style paired fixture (canonical pattern row 1)       |
 
 Numbers refer to rows in [`../COVERAGE.md`](../COVERAGE.md).
 

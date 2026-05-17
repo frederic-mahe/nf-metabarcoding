@@ -97,6 +97,14 @@ branch-creation rights:
   - `tests/COVERAGE.md` reflects any spec changes in the same commit
 
 
+### Python conventions
+
+- type-hint every function in `bin/*.py` (parameters and return).
+  `from __future__ import annotations` is preferred so forward
+  references work uniformly. Modules that already exist set the bar:
+  match their style for `list[Path]`, `Optional[...]`, etc.
+
+
 ### Bash conventions
 
 - declare one variable per line — do not group declarations such as

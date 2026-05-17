@@ -108,16 +108,32 @@ isolation.
     occurrence table with `abundance = 0` for that sample (and no
     error)
 - `[S10]` accepts a directory, or a list of directories (absolute or
-  relative paths)
-  - **Pass when:** `--fastq_folder a,b,c` or repeated `--fastq_folder`
-    arguments are all walked
-- `[S11]` searches listed directories automatically using the common
-  fastq name patterns listed below
-  - **Pass when:** for each pattern in the table, the matching fixture
-    is discovered without an explicit `--fastq_pattern`
-- `[S12]` automatically deduces sample names from fastq file names
-  - **Pass when:** the sample-name derivation strips the matched
-    pattern suffix and is idempotent across compression variants
+  relative paths). `--fastq_folder` accepts a single path or a
+  comma-separated list (`--fastq_folder a,b,c`); a `nextflow.config`
+  may instead supply a Groovy list (`fastq_folder = ['a', 'b']`).
+  - **Pass when:** every fastq file in every listed folder is
+    discovered; identical inputs spread across two folders produce
+    identical artefacts to the single-folder run.
+- `[S11]` builds the input list by globbing every fastq file
+  (`*.fastq`, `*.fq`, with optional `.gz` / `.bz2`) in the listed
+  directories, then identifies paired-end pairs by matching the R1
+  basename against the canonical pattern table below. Users may
+  prepend a custom pattern via `--fastq_pattern` (a glob containing
+  the `{1,2}` brace token that marks the R1/R2 discriminator —
+  e.g. `*_run17_{1,2}.fastq.gz`); custom patterns take precedence
+  over the canonical list.
+  - **Pass when:** for each row of the canonical table, an R1 fixture
+    is paired with its R2; an R1 fixture matching `--fastq_pattern`
+    but not any canonical pattern is also paired correctly.
+- `[S12]` derives the sample ID for a paired-end pair from the R1
+  basename by stripping the **first matching pattern** suffix (the
+  same pattern table that drives `[S11]`). Single-end files derive
+  their sample ID by stripping the `.(fastq|fq)(.gz|.bz2)?`
+  extension (`[S21]`).
+  - **Pass when:** for every row of the canonical table, the test
+    `R1 filename → expected sample ID` produces the documented value;
+    sample IDs are stable across compression variants of the same
+    base name.
 - `[S13]` warns if two or more samples share a derived name
   - **Pass when:** running with two same-named inputs prints a warning
     to stderr and continues (does not abort)
@@ -171,12 +187,13 @@ isolation.
     (b) running with `--no_trimming true` together with a non-empty
     `forward_primer` or `reverse_primer` exits non-zero and the
     error names the conflicting parameter.
-- `[S21]` Part A collects every fastq file in the listed directories;
-  files that are **not in a pair** (do not match a known paired-end
-  name pattern from the table below, nor the user-provided
-  `--fastq_pattern`) are processed as single-end samples by skipping
-  the `merge_fastq_pairs` step. Their sample ID is derived by stripping
-  the `.(fastq|fq)(.gz|.bz2)?` extension from the file name.
+- `[S21]` Part A collects every fastq file in the listed directories
+  (`[S10]`/`[S11]`); a file whose R1 basename does not match any
+  canonical pattern row nor the user-provided `--fastq_pattern`, or
+  whose paired R2 partner is missing, is processed as a single-end
+  sample by skipping `merge_fastq_pairs`. Single-end sample IDs come
+  from stripping the `.(fastq|fq)(.gz|.bz2)?` extension; paired-end
+  sample IDs are derived per `[S12]`.
   - **Pass when:** running Part A on a directory containing only an
     unpaired fastq file produces the expected per-sample artefacts
     (`<sampleId>.fas`, `_dereplicating.log`, `_clustering.log`) and
@@ -185,22 +202,42 @@ isolation.
 
 ## Common fastq file-name patterns
 
-The pattern detector recognises (paired-end shown; single-end drops
-the `_{1,2}` segment):
+The pattern detector walks this table top-to-bottom and uses the
+first row that matches the R1 basename. `<ext>` stands for
+`(fastq|fq)(\.(gz|bz2))?`.
 
-| Pattern                                  | Source                          |
-|------------------------------------------|---------------------------------|
-| `_L001_R{1,2}_001.fastq.gz`              | MiSeq default                   |
-| `_L001_R{1,2}.fastq.gz`                  | MiSeq variant                   |
-| `_[1-9]_{1,2}.fastq.gz`                  | numeric-lane variant            |
-| `_[1-9]_{1,2}_.*.fastq.gz`               | numeric-lane with tail          |
-| `_L001_.*_R{1,2}.fastq.bz2`              | bz2 variant of `_L001_R{1,2}…`  |
-| `_L005_R{1,2}.fastq.gz`                  | non-default lane number         |
-| `_L001_R{1,2}_002.fastq.bz2`             | non-default trailing segment    |
-| `_R{1,2}.fastq.gz`                       | minimal R1/R2                   |
-| `_{1,2}.fastq.gz`                        | minimal 1/2                     |
+| #  | R1 pattern (anchored to end of basename) | Source / variants                                  |
+|----|------------------------------------------|----------------------------------------------------|
+| 1  | `_L00[1-9]_R1_00[1-9]\.<ext>`            | MiSeq default (e.g. `_L001_R1_001.fastq.gz`)       |
+| 2  | `_L00[1-9]_.*_R1\.<ext>`                 | MiSeq with extra middle segment                    |
+| 3  | `_L00[1-9]_R1\.<ext>`                    | MiSeq variant without trailing `_001`              |
+| 4  | `[._][1-9]_1_.*\.<ext>`                  | numeric-lane with tail (e.g. `_1_1_junk.fastq.gz`) |
+| 5  | `[._][1-9]_1\.<ext>`                     | numeric-lane (e.g. `_1_1.fastq.gz`)                |
+| 6  | `[._]R1\.<ext>`                          | minimal `R1` (e.g. `_R1.fastq.gz`, `.R1.fastq.gz`) |
+| 7  | `[._]1\.<ext>`                           | minimal `1` (e.g. `_1.fastq.gz`, `.1.fastq.gz`)    |
 
-- `fastq` may also be `fq`
-- compression may be absent: full extension is
-  `.(fastq|fq)(.gz|.bz2)?`
-- this table is the **single source of truth**; README links here
+The R2 file name is derived by replacing the R1 discriminator with
+its R2 counterpart (`R1`→`R2`, `_1_`→`_2_`, etc.) within the matched
+span. The sample ID is the R1 basename **with the matched span and
+everything after it stripped** — e.g. `A_L001_R1_001.fastq.gz` → `A`.
+
+- `fastq` may also be `fq`; compression may be absent
+- this table is the **single source of truth**; both the pattern
+  matcher in `bin/discover_fastq.py` and the user-facing docs in
+  [`README.md`](README.md) consult it
+
+### Custom user pattern (`--fastq_pattern`)
+
+`--fastq_pattern` lets users add a pattern when their file names
+don't fit any canonical row. Format: a shell-style glob containing
+the literal token `{1,2}` (the R1/R2 discriminator). The portion
+before `{1,2}` is the sample-ID-bearing prefix; the portion after is
+the suffix. Examples:
+
+| `--fastq_pattern` glob               | Matches R1                       | Sample ID for `myrun_demoX_1.fq.gz` |
+|--------------------------------------|----------------------------------|--------------------------------------|
+| `*_{1,2}.fq.gz`                      | `*_1.fq.gz`                      | `myrun_demoX`                        |
+| `*_run17_{1,2}.fastq.gz`             | `*_run17_1.fastq.gz`             | prefix before `_run17_`              |
+
+A custom pattern is checked **before** the canonical table; if it
+matches an R1 file, the canonical table is bypassed for that file.

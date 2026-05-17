@@ -142,11 +142,37 @@ emit_unpaired_only() {
     gzip --force "${out}"
 }
 
+emit_miseq_pair() {
+    # A MiSeq-style paired-end fixture exercising canonical pattern
+    # row 1 (`_L00[1-9]_R1_00[1-9]\.<ext>`). The sample ID derived
+    # from the R1 basename is `SampleX_S1`.
+    local -r dir="miseq"
+    mkdir -p "${dir}"
+    local -r r1="${dir}/SampleX_S1_L001_R1_001.fastq"
+    local -r r2="${dir}/SampleX_S1_L001_R2_001.fastq"
+    : > "${r1}"
+    : > "${r2}"
+    local i=0
+    for A in "${AMPLICONS_OK[@]}"; do
+        i=$((i + 1))
+        local fwd
+        local rev_src
+        local rev
+        fwd="${A:0:${READ_LEN}}"
+        rev_src="${A: -${READ_LEN}}"
+        rev="$(reverse_complement "${rev_src}")"
+        write_record "${r1}" "read_${i} 1:N:0:1" "${fwd}"
+        write_record "${r2}" "read_${i} 2:N:0:1" "${rev}"
+    done
+    gzip --force "${r1}" "${r2}"
+}
+
 emit_paired "paired_merge_ok"   "${AMPLICONS_OK[@]}"
 emit_paired "paired_merge_fail" "${AMPLICONS_LONG[@]}"
 emit_single
 emit_uncompressed
 emit_empty
 emit_unpaired_only
+emit_miseq_pair
 
 echo "Wrote fixtures to ${DATA_DIR}"
