@@ -399,6 +399,16 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
                              "in at least this fraction of samples "
                              "(default: 0.05, the legacy keystone value)")
 
+    parser.add_argument("--fastidious",
+                        dest="fastidious",
+                        action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help="upstream swarm run used --fastidious; sets "
+                             "the representatives output filename suffix "
+                             "to '_1f_representatives.fas2' "
+                             "(default: True, matches the legacy "
+                             "pipeline). Use --no-fastidious for '_1_'.")
+
     return parser.parse_args(argv)
 
 
@@ -414,11 +424,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     swarms_file = args.swarms_file
     fasta_file = args.fasta_file
 
-    # fastidious or not?
-    if "_1f." in swarms_file and "_1f." in struct_file:
-        swarm_parameters = "1f"
-    else:
-        swarm_parameters = "1"
+    # fastidious or not? (explicit flag, default True — see [S22])
+    swarm_parameters = "1f" if args.fastidious else "1"
 
     # cleaving threshold (keystone parameter)
     percentage = args.percentage

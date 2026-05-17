@@ -277,27 +277,33 @@ def _write_inputs(
     return paths
 
 
-def _run_cleaver(inputs: dict[str, Path], *, cwd: Path) -> None:
-    """Invoke ``bin/cluster_cleaver.py`` exactly like the shell driver."""
-    subprocess.run(
-        [
-            "python3",
-            str(SCRIPT),
-            "--global_stats", str(inputs["stats"]),
-            "--per_sample_stats", str(inputs["per_sample"]),
-            "--fasta", str(inputs["fasta"]),
-            "--struct", str(inputs["struct"]),
-            "--swarms", str(inputs["swarms"]),
-        ],
-        cwd=cwd,
-        check=True,
-    )
+def _run_cleaver(
+    inputs: dict[str, Path], *, cwd: Path, fastidious: bool = True,
+) -> None:
+    """Invoke ``bin/cluster_cleaver.py``.
+
+    The script defaults to ``--fastidious`` (the legacy pipeline always
+    runs swarm with ``--fastidious``). Pass ``fastidious=False`` to
+    exercise the ``_1_`` filename branch.
+    """
+    cmd = [
+        "python3",
+        str(SCRIPT),
+        "--global_stats", str(inputs["stats"]),
+        "--per_sample_stats", str(inputs["per_sample"]),
+        "--fasta", str(inputs["fasta"]),
+        "--struct", str(inputs["struct"]),
+        "--swarms", str(inputs["swarms"]),
+    ]
+    if not fastidious:
+        cmd.append("--no-fastidious")
+    subprocess.run(cmd, cwd=cwd, check=True)
 
 
 # ---------- tests ----------------------------------------------------------
 
-def test_cleaver_fastidious_paths(tmp_path: Path) -> None:
-    """End-to-end golden test, fastidious filename layout (``_1f.``)."""
+def test_cleaver_fastidious_default(tmp_path: Path) -> None:
+    """End-to-end golden test: default --fastidious yields '_1f_' suffix."""
     inputs = _write_inputs(tmp_path, swarm_parameters="1f")
     _run_cleaver(inputs, cwd=tmp_path)
 
@@ -308,16 +314,21 @@ def test_cleaver_fastidious_paths(tmp_path: Path) -> None:
     ).read_text() == EXPECTED_FAS2
 
 
-def test_cleaver_non_fastidious_paths(tmp_path: Path) -> None:
-    """Same logic, but filenames lack ``_1f.``; FASTA output uses ``_1_``."""
-    inputs = _write_inputs(tmp_path, swarm_parameters="")
-    _run_cleaver(inputs, cwd=tmp_path)
+def test_cleaver_no_fastidious_flag(tmp_path: Path) -> None:
+    """Passing --no-fastidious selects the '_1_' representative suffix.
 
-    assert (tmp_path / "cleaver.stats2").read_text() == EXPECTED_STATS2
-    assert (tmp_path / "cleaver.swarms2").read_text() == EXPECTED_SWARMS2
+    The choice is now driven by the explicit flag (default True), not
+    by ``_1f.`` appearing in the input filenames — so the stats and
+    swarms files retain their original names even when the flag flips.
+    """
+    inputs = _write_inputs(tmp_path, swarm_parameters="1f")
+    _run_cleaver(inputs, cwd=tmp_path, fastidious=False)
+
+    assert (tmp_path / "cleaver_1f.stats2").read_text() == EXPECTED_STATS2
+    assert (tmp_path / "cleaver_1f.swarms2").read_text() == EXPECTED_SWARMS2
     assert (
         tmp_path / "cleaver_1_representatives.fas2"
     ).read_text() == EXPECTED_FAS2
-    # The fastidious-suffix variant must NOT exist when both filenames
-    # lack ``_1f.`` — guards the filename-sniffing branch in ``main()``.
+    # The fastidious-suffix variant must NOT exist when --no-fastidious
+    # is passed — guards the flag-driven branch in ``main()``.
     assert not (tmp_path / "cleaver_1f_representatives.fas2").exists()
