@@ -390,6 +390,15 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
                         required=True,
                         help="list of amplicons per cluster")
 
+    parser.add_argument("--percentage",
+                        dest="percentage",
+                        type=float,
+                        default=0.05,
+                        help="cleaving threshold: a sub-seed candidate "
+                             "must appear as a per-sample cluster seed "
+                             "in at least this fraction of samples "
+                             "(default: 0.05, the legacy keystone value)")
+
     return parser.parse_args(argv)
 
 
@@ -412,11 +421,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         swarm_parameters = "1"
 
     # cleaving threshold (keystone parameter)
-    PERCENTAGE = 0.05
+    percentage = args.percentage
 
     # Parse input files
     threshold, seeds = per_sample_stats_parse(per_sample_stats_file,
-                                              PERCENTAGE)
+                                              percentage)
     stats_parse(global_stats_file, threshold, seeds)
     swarms, global_seeds = swarms_parse(swarms_file, seeds)
     new_clusters = struct_parse(struct_file, seeds, global_seeds)
