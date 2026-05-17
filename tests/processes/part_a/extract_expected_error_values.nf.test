@@ -28,7 +28,7 @@ nextflow_process {
                 """
             }
         }
-        run("convert_fastq_to_fasta") {
+        run("filter_and_convert_to_fasta") {
             script "main.nf"
             process {
                 """
@@ -51,8 +51,8 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = convert_fastq_to_fasta.out[0]
-                input[1] = convert_fastq_to_fasta.out[1]
+                input[0] = filter_and_convert_to_fasta.out[0]
+                input[1] = filter_and_convert_to_fasta.out[1]
                 """
             }
         }

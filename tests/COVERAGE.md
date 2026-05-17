@@ -55,7 +55,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 |---------------------------------|--------------------------------------------------------|--------------|--------|
 | `merge_fastq_pairs`             | `tests/processes/part_a/merge_fastq_pairs.nf.test`            | S01, S03, S04| red    |
 | `trim_primers`                  | `tests/processes/part_a/trim_primers.nf.test`                 | S01          | red    |
-| `convert_fastq_to_fasta`        | `tests/processes/part_a/convert_fastq_to_fasta.nf.test`       | S01          | red    |
+| `filter_and_convert_to_fasta`   | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`  | S01          | red    |
 | `extract_expected_error_values` | `tests/processes/part_a/extract_expected_error_values.nf.test`| S01          | red    |
 | `dereplicate_fasta`             | `tests/processes/part_a/dereplicate_fasta.nf.test`            | S01          | red    |
 | `list_local_clusters`           | `tests/processes/part_a/list_local_clusters.nf.test`          | S17          | red    |

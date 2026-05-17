@@ -161,7 +161,7 @@ isolation.
     `reverse_primer` must be empty (not set on the CLI or in the
     config). The minimum-length and max-N filters that the trimming
     step used to enforce are taken over by
-    `convert_fastq_to_fasta` (vsearch `--fastq_minlen 32`,
+    `filter_and_convert_to_fasta` (vsearch `--fastq_minlen 32`,
     `--fastq_maxns <caller-supplied>`).
   - when `--no_trimming` is `false` (the default),
     `forward_primer` and `reverse_primer` are required (see

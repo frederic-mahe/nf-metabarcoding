@@ -71,7 +71,7 @@ nextflow_pipeline {
             assert !out.contains("trim_primers") :
                 "trim_primers should not run when --no_trimming is set, got: ${out}"
             // the other Part A processes still run
-            ["merge_fastq_pairs", "convert_fastq_to_fasta",
+            ["merge_fastq_pairs", "filter_and_convert_to_fasta",
              "dereplicate_fasta", "list_local_clusters"].each { proc ->
                 assert out.contains(proc) :
                     "expected ${proc} to run, got: ${out}"

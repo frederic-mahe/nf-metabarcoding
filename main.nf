@@ -45,7 +45,7 @@ process trim_primers {
     // search forward primer in both normal and revcomp: now all reads
     // are in the same orientation. Matching leftmost is the default.
     // Length and N-count filtering are delegated to
-    // convert_fastq_to_fasta (vsearch --fastq_minlen / --fastq_maxns).
+    // filter_and_convert_to_fasta (vsearch --fastq_minlen / --fastq_maxns).
     publishDir path: { params.fastq_folder }, mode: 'link', pattern: "*.log",
         enabled: params.fastq_folder != null
 
@@ -90,7 +90,7 @@ process trim_primers {
 }
 
 
-process convert_fastq_to_fasta {
+process filter_and_convert_to_fasta {
     // use SHA1 values as sequence names, compute expected error
     // values (ee), and apply the minimum-length / max-N filters.
     // max_n is a caller-supplied input so the same process can serve
@@ -244,16 +244,16 @@ workflow {
     // convert to fasta with SHA1 + ee, apply min-length / max-N
     // filters (max_n=0 for merged reads; the [S04] unmerged-pair
     // path will pass the N-join insert size when implemented)
-    convert_fastq_to_fasta(sampleId_ch, fastq_ch, 0)
+    filter_and_convert_to_fasta(sampleId_ch, fastq_ch, 0)
 
     // set aside EE values
     extract_expected_error_values(
-        convert_fastq_to_fasta.out[0], convert_fastq_to_fasta.out[1]
+        filter_and_convert_to_fasta.out[0], filter_and_convert_to_fasta.out[1]
     )
 
     // dereplicate and clusterize
     dereplicate_fasta(
-        convert_fastq_to_fasta.out[0], convert_fastq_to_fasta.out[1]
+        filter_and_convert_to_fasta.out[0], filter_and_convert_to_fasta.out[1]
     )
     list_local_clusters(dereplicate_fasta.out[0], dereplicate_fasta.out[1])
 }

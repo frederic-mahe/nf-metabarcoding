@@ -1,8 +1,8 @@
 nextflow_process {
 
-    name "convert_fastq_to_fasta"
+    name "filter_and_convert_to_fasta"
     script "main.nf"
-    process "convert_fastq_to_fasta"
+    process "filter_and_convert_to_fasta"
 
     setup {
         run("merge_fastq_pairs") {
