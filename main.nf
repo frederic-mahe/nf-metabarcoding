@@ -165,7 +165,7 @@ process dereplicate_fasta {
     shell:
     '''
     vsearch \
-        --derep_fulllength !{filtered_fasta} \
+        --fastx_uniques !{filtered_fasta} \
         --sizeout \
         --quiet \
         --log !{sampleId}_dereplicating.log \
