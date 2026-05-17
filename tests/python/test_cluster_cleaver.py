@@ -332,3 +332,39 @@ def test_cleaver_no_fastidious_flag(tmp_path: Path) -> None:
     # The fastidious-suffix variant must NOT exist when --no-fastidious
     # is passed — guards the flag-driven branch in ``main()``.
     assert not (tmp_path / "cleaver_1f_representatives.fas2").exists()
+
+
+def test_cleaver_explicit_out_paths(tmp_path: Path) -> None:
+    """``--out-stats / --out-swarms / --out-fasta`` redirect outputs."""
+    inputs = _write_inputs(tmp_path, swarm_parameters="1f")
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    out_stats = out_dir / "custom.stats"
+    out_swarms = out_dir / "custom.swarms"
+    out_fasta = out_dir / "custom.fasta"
+
+    subprocess.run(
+        [
+            "python3",
+            str(SCRIPT),
+            "--global_stats", str(inputs["stats"]),
+            "--per_sample_stats", str(inputs["per_sample"]),
+            "--fasta", str(inputs["fasta"]),
+            "--struct", str(inputs["struct"]),
+            "--swarms", str(inputs["swarms"]),
+            "--out-stats", str(out_stats),
+            "--out-swarms", str(out_swarms),
+            "--out-fasta", str(out_fasta),
+        ],
+        cwd=tmp_path,
+        check=True,
+    )
+
+    assert out_stats.read_text() == EXPECTED_STATS2
+    assert out_swarms.read_text() == EXPECTED_SWARMS2
+    assert out_fasta.read_text() == EXPECTED_FAS2
+    # Legacy '<input>2'-suffixed files must NOT be created when the
+    # caller passed explicit output paths.
+    assert not (tmp_path / "cleaver_1f.stats2").exists()
+    assert not (tmp_path / "cleaver_1f.swarms2").exists()
+    assert not (tmp_path / "cleaver_1f_representatives.fas2").exists()

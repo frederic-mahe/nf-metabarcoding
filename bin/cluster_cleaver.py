@@ -249,7 +249,7 @@ def add_abundance_values(
 
 
 def per_cluster_stats(
-    global_stats_file: str,
+    out_stats_file: str,
     new_clusters_with_abundance: list[dict[str, list[tuple[str, int]]]],
 ) -> list[tuple[int, int, str, int, int, str, str]]:
     """
@@ -286,7 +286,7 @@ def per_cluster_stats(
     # preserve the order for ties)
     new_stats.sort(key=operator.itemgetter(2))
     new_stats.sort(key=operator.itemgetter(1, 0), reverse=True)
-    with open(global_stats_file + "2", "w") as new_stats_file:
+    with open(out_stats_file, "w") as new_stats_file:
         for t in new_stats:
             print(*t, sep="\t", file=new_stats_file)
 
@@ -294,14 +294,14 @@ def per_cluster_stats(
 
 
 def per_cluster_swarms(
-    swarms_file: str,
+    out_swarms_file: str,
     new_clusters_with_abundance: list[dict[str, list[tuple[str, int]]]],
 ) -> None:
     """
     Compute per-cluster swarms.
     """
     print("PROGRESS: computing per-cluster swarms", file=sys.stderr)
-    with open(swarms_file + "2", "w") as new_swarms_file:
+    with open(out_swarms_file, "w") as new_swarms_file:
         for super_cluster in new_clusters_with_abundance:
             for cluster in super_cluster:
                 print(*[t[0] + ";size=" + str(t[1]) for t in super_cluster[cluster]],
@@ -312,16 +312,12 @@ def per_cluster_swarms(
 
 def fasta_parse(
     fasta_file: str,
+    out_fasta_file: str,
     new_stats: list[tuple[int, int, str, int, int, str, str]],
-    swarm_parameters: str,
 ) -> None:
     """
     Get seed sequences, update abundances.
     """
-    new_representatives_file = (os.path.splitext(fasta_file)[0]
-                                + "_"
-                                + swarm_parameters
-                                + "_representatives.fas2")
     # create a dict of target amplicons and abundances
     fasta = [dict() for i in range(0, 256)]
     for t in new_stats:
@@ -343,7 +339,7 @@ def fasta_parse(
                 if amplicon in fasta[index]:
                     fasta[index][amplicon].append(line.strip())
 
-    with open(new_representatives_file, "w") as new_representatives_file:
+    with open(out_fasta_file, "w") as new_representatives_file:
         for t in new_stats:
             amplicon = t[2]
             index = int(amplicon[0:2], 16)
@@ -409,6 +405,25 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
                              "(default: True, matches the legacy "
                              "pipeline). Use --no-fastidious for '_1_'.")
 
+    parser.add_argument("--out-stats",
+                        dest="out_stats_file",
+                        default=None,
+                        help="output path for the cleaved cluster stats "
+                             "(default: <--global_stats>2)")
+
+    parser.add_argument("--out-swarms",
+                        dest="out_swarms_file",
+                        default=None,
+                        help="output path for the cleaved cluster swarms "
+                             "(default: <--swarms>2)")
+
+    parser.add_argument("--out-fasta",
+                        dest="out_fasta_file",
+                        default=None,
+                        help="output path for the cleaved cluster "
+                             "representatives FASTA (default: "
+                             "<basename of --fasta>_<1|1f>_representatives.fas2)")
+
     return parser.parse_args(argv)
 
 
@@ -427,6 +442,16 @@ def main(argv: Optional[list[str]] = None) -> int:
     # fastidious or not? (explicit flag, default True — see [S22])
     swarm_parameters = "1f" if args.fastidious else "1"
 
+    # resolve output paths (legacy `<input>2` defaults if --out-* unset)
+    out_stats_file = args.out_stats_file or global_stats_file + "2"
+    out_swarms_file = args.out_swarms_file or swarms_file + "2"
+    out_fasta_file = args.out_fasta_file or (
+        os.path.splitext(fasta_file)[0]
+        + "_"
+        + swarm_parameters
+        + "_representatives.fas2"
+    )
+
     # cleaving threshold (keystone parameter)
     percentage = args.percentage
 
@@ -442,10 +467,10 @@ def main(argv: Optional[list[str]] = None) -> int:
                                                        swarms)
 
     # Create output files (stats2, swarms2, fas2)
-    new_stats = per_cluster_stats(global_stats_file,
+    new_stats = per_cluster_stats(out_stats_file,
                                   new_clusters_with_abundance)
-    per_cluster_swarms(swarms_file, new_clusters_with_abundance)
-    fasta_parse(fasta_file, new_stats, swarm_parameters)
+    per_cluster_swarms(out_swarms_file, new_clusters_with_abundance)
+    fasta_parse(fasta_file, out_fasta_file, new_stats)
 
     return 0
 
