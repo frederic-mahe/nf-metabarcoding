@@ -172,7 +172,7 @@ process dereplicate_fasta {
         --fasta_width 0 \
         --xee \
         --xlength \
-        --output - > !{sampleId}.fas
+        --fastaout - > !{sampleId}.fas
     '''
 }
 
