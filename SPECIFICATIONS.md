@@ -46,11 +46,31 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
   - **Pass when:** the same input data in any of these forms produces
     byte-identical Part A outputs
 - `[S04]` when processing paired-end fastq files, reads that can be
-  merged are processed normally; reads that cannot be merged follow a
-  parallel pipeline (joined with Ns, Ns converted to As when passed
-  to swarm, then converted back), yielding a second occurrence table
-  - **Blocked by:** [`DECISIONS.md`](DECISIONS.md) — N↔A round-trip
-    rules need to be defined to avoid rewriting legitimate As
+  merged are processed normally; reads that cannot be merged are
+  collected via `vsearch --fastq_mergepairs --fastqout_notmerged_fwd`
+  and `--fastqout_notmerged_rev` (reads stay in sync) and routed
+  through a parallel **shadow** Part A pipeline:
+    1. join R1/R2 with `vsearch --fastq_join` (8-N padding — the
+       tool default);
+    2. trim primers (when `--no_trimming` is false) and convert to
+       fasta with `vsearch --fastq_filter --fastq_maxns 8` so the
+       join-padding `N`s survive the filter;
+    3. dereplicate and extract ee values per the normal pipeline; the
+       published `.fas` retains the `N`s;
+    4. replace every `N` with `A` **inline** just before swarm (swarm
+       rejects `N`s). The masked fasta is **not** published; only
+       sequence lines are rewritten so SHA1 headers (computed in step
+       2) are unchanged and the published `.stats` IDs match the
+       `.fas` IDs.
+  - shadow-pipeline sample IDs are `<sampleId>_notmerged`; published
+    artefacts are `<sampleId>_notmerged.{fas,qual,stats}` plus the
+    same per-step logs as the normal pipeline with the `_notmerged`
+    prefix (`<sampleId>_notmerged_{merging,trimming,dereplicating,clustering}.log`).
+  - **Pass when:** running Part A on a paired-end fixture whose reads
+    cannot overlap produces non-empty `<sampleId>_notmerged.{fas,qual,stats}`
+    in `params.fastq_folder`, the published `.fas` contains the 8-`N`
+    join padding, and every `_notmerged_<step>.log` from `[S19]` is
+    present and non-empty.
 - `[S05]` unmerged-pair clusters appear in the occurrence table with a
   per-sample marker (working name: `sampleID_partial`)
   - **Blocked by:** [`DECISIONS.md`](DECISIONS.md) — final marker name
@@ -198,6 +218,14 @@ isolation.
     unpaired fastq file produces the expected per-sample artefacts
     (`<sampleId>.fas`, `_dereplicating.log`, `_clustering.log`) and
     the workflow trace does **not** mention `merge_fastq_pairs`.
+- `[S23]` `notmerged` is a reserved sample-ID suffix used by the
+  shadow pipeline (`[S04]`). A sample whose ID ends with the literal
+  string `notmerged` (e.g. `X_notmerged`) is rejected at discovery
+  time, before any merging step runs, so shadow-pipeline artefacts
+  cannot collide with user-supplied sample IDs.
+  - **Pass when:** running Part A on a folder containing
+    `<X_notmerged>_{1,2}.<ext>` (or any single-end variant) exits
+    non-zero and the error message names the reserved keyword.
 - `[S22]` Part B's first step re-cleaves global swarm clusters by
   detecting alternative ("sub-") seeds that appear in a configurable
   fraction of samples (default 5 %, exposed as `--percentage`). For

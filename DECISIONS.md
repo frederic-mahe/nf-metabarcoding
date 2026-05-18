@@ -18,20 +18,32 @@ the entry) and update the matching bullets in
 
 ## D01 — N↔A round-trip for unmerged pairs
 
-**Blocks:** `[S04]`, `[S05]`
-**Status:** `open`
+**Blocks:** `[S04]` (resolved), `[S05]` (still blocked on marker name)
+**Status:** `resolved`
 
-When paired-end reads fail to merge, [`SPECIFICATIONS.md`](SPECIFICATIONS.md)
-calls for joining R1 and R2 with `N`s, then converting `N→A` before
-feeding the sequence to swarm (which does not handle `N`), then back
-to `N` for the occurrence table. Open sub-questions:
+**Resolution (2026-05-18):** the `N→A` rewrite is applied uniformly
+to **every** `N` in the fasta sequence lines (no per-position
+tracking, no sidecar). The masked fasta is consumed only by `swarm`
+and is **not** published; the original (N-containing) fasta is the
+one published as `<sampleId>_notmerged.fas`. There is no `A→N` round
+trip back, since the `.fas` is preserved through dereplication and
+serves as the authoritative shadow-pipeline artefact. The swarm
+`.stats` SHA1 IDs match the `.fas` IDs because the SHA1 is computed
+in `filter_and_convert_to_fasta` (before the mask step) and the mask
+step rewrites only sequence lines, never headers.
 
-- **Which positions get rewritten?** Every `N`, or only the
-  artificial joiner `N`s? Real reads may legitimately contain `N`s.
-- **How is the round-trip tracked?** Per-sequence sidecar (cluster ID
-  → list of N positions), or do we forbid downstream `A`s at known
-  join positions?
-- **Failure mode** if a sequence acquires unexpected `N`s mid-pipeline.
+A new `[S23]` reserves the `notmerged` suffix so a user-supplied
+sample ID can never collide with a shadow-pipeline artefact.
+
+Sub-questions, retained for the record:
+
+- **Which positions get rewritten?** Every `N` (the rewrite is fed
+  only to swarm; the published artefact keeps the original `N`s).
+- **How is the round-trip tracked?** It isn't — the original is
+  preserved upstream, so no tracking is needed.
+- **Failure mode** if a sequence acquires unexpected `N`s mid-pipeline:
+  vsearch's `--fastq_maxns 8` (shadow) / `--fastq_maxns 0` (regular)
+  drops any read with too many `N`s before fasta conversion.
 
 
 ## D02 — Marker for unmerged-pair clusters

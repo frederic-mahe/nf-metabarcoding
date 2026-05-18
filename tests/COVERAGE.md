@@ -24,7 +24,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S01]`| three-part workflow (fastq→fasta, fasta→occurrence, taxonomic assignment)  | `tests/main.nf.test`                            | red     | —          |
 | `[S02]`| each part can be run separately or all at once                             | `tests/main.nf.test`                            | TODO    | —          |
 | `[S03]`| paired-end or single-end, compressed (gz/bz2) or uncompressed input        | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/main.nf.test` | red | — |
-| `[S04]`| unmerged paired reads → parallel pipeline (N-join, N↔A round-trip)         | `tests/processes/part_a/merge_fastq_pairs.nf.test`     | blocked | D01        |
+| `[S04]`| unmerged paired reads → shadow pipeline (N-join, N→A mask before swarm)    | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/join_notmerged.nf.test`, `tests/processes/part_a/mask_ns_for_swarm.nf.test`, `tests/main.nf.test` | done | — |
 | `[S05]`| unmerged clusters appear in occurrence table with per-sample marker        | —                                               | blocked | D01, D02   |
 
 
@@ -49,6 +49,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S20]`| `--no_trimming` toggle skips primer trimming; mutually exclusive w/ primers| `tests/main.nf.test`                            | red     | —          |
 | `[S21]`| unpaired fastq files skip the merging step                                 | `tests/main.nf.test`                            | done    | —          |
 | `[S22]`| Part B re-cleaves global swarm clusters using per-sample sub-seed presence | `tests/python/test_cluster_cleaver.py`          | done    | —          |
+| `[S23]`| `notmerged` reserved suffix — sample IDs ending in `notmerged` are rejected | `tests/python/test_reserved_keyword.py`, `tests/main.nf.test` | done | — |
 
 
 ## Per-process tests
@@ -61,3 +62,5 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `extract_expected_error_values` | `tests/processes/part_a/extract_expected_error_values.nf.test`| S01          | red    |
 | `dereplicate_fasta`             | `tests/processes/part_a/dereplicate_fasta.nf.test`            | S01          | red    |
 | `list_local_clusters`           | `tests/processes/part_a/list_local_clusters.nf.test`          | S17          | red    |
+| `join_notmerged`                | `tests/processes/part_a/join_notmerged.nf.test`               | S04, S19     | red    |
+| `mask_ns_for_swarm`             | `tests/processes/part_a/mask_ns_for_swarm.nf.test`            | S04          | red    |
