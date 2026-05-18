@@ -1,0 +1,41 @@
+nextflow_process {
+
+    name "mask_ns_for_swarm"
+    script "main.nf"
+    process "mask_ns_for_swarm"
+
+    test("replaces N with A in sequence lines, leaves headers alone") {
+        // COVERAGE: [S04]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = "sample_notmerged"
+                input[1] = file("\${projectDir}/tests/data/n_containing.fas")
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[1].get(0)).readLines()
+
+            assert lines.size() == 4 : "expected 4 lines (2 records), got ${lines.size()}"
+
+            // header lines untouched (>seq1_with_Ns must keep its 'N's)
+            assert lines[0] == ">seq1_with_Ns" : "header 1 was rewritten: ${lines[0]}"
+            assert lines[2] == ">seq2_no_Ns"   : "header 2 was rewritten: ${lines[2]}"
+
+            // sequence lines: every N -> A
+            lines.eachWithIndex { line, i ->
+                if (i % 2 == 1) {
+                    assert !line.contains("N") :
+                        "sequence line ${i} still contains N: ${line}"
+                }
+            }
+
+            // padding of 8 Ns becomes 8 As in seq1
+            assert lines[1].contains("AAAAAAAA") :
+                "expected 8 As where the 8 Ns were, got: ${lines[1]}"
+        }
+    }
+}

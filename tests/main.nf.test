@@ -192,6 +192,63 @@ nextflow_pipeline {
         }
     }
 
+    test("paired-end pairs that cannot merge produce a _notmerged shadow set") {
+        // COVERAGE: [S04], [S19]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_fail_{1,2}.fastq.gz"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+
+            def folder = "${projectDir}/tests/data"
+            def shadowId = "paired_merge_fail_notmerged"
+
+            // per-step shadow logs land alongside the regular ones
+            ["merging", "trimming", "dereplicating", "clustering"].each { step ->
+                def log = file("${folder}/${shadowId}_${step}.log")
+                assert log.exists()   : "missing shadow ${step} log: ${log}"
+                assert log.size() > 0 : "empty shadow ${step} log: ${log}"
+            }
+
+            // shadow .fas exists and retains the 8-N join padding
+            def fas = file("${folder}/${shadowId}.fas")
+            assert fas.exists() : "missing shadow .fas"
+            assert fas.text.contains("NNNNNNNN") :
+                "shadow .fas must preserve the 8-N join padding"
+
+            // shadow .qual / .stats also published
+            assert file("${folder}/${shadowId}.qual").exists() : "missing shadow .qual"
+            assert file("${folder}/${shadowId}.stats").exists() : "missing shadow .stats"
+        }
+    }
+
+    test("aborts when a sample ID ends with the reserved 'notmerged' suffix") {
+        // COVERAGE: [S23]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data/reserved_keyword"
+                fastq_pattern  = ""
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.toLowerCase().contains("notmerged") :
+                "expected error to mention the reserved suffix, got: ${msg}"
+        }
+    }
+
     test("empty input samples travel through to the occurrence table") {
         // COVERAGE: [S09] — pending until empty-sample passthrough lands.
         // Tagged "pending" so CI (`nf-test test --tag '!pending'`) skips

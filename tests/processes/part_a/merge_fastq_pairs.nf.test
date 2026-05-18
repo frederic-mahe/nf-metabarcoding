@@ -50,11 +50,10 @@ nextflow_process {
         }
     }
 
-    test("non-overlapping pairs do not merge (parallel pipeline)") {
-        // COVERAGE: [S04] — blocked on D01 (N<->A round-trip).
-        // Tagged "pending" so CI skips it; run `nf-test test` locally
-        // to see the red phase.
-        tag "pending"
+    test("non-overlapping pairs are captured as notmerged_{fwd,rev}") {
+        // COVERAGE: [S04] — D01 is resolved; the shadow pipeline
+        // collects unmerged R1/R2 via --fastqout_notmerged_fwd/_rev.
+        tag "ci"
         when {
             process {
                 """
@@ -70,8 +69,20 @@ nextflow_process {
         }
         then {
             assert process.success
-            // TODO: once parallel pipeline is implemented, assert that unmerged
-            // reads are joined with Ns and routed downstream.
+
+            // out[1] = merged fastq (empty — every pair failed to merge)
+            def mergedLines = path(process.out[1].get(0)).readLines()
+            assert mergedLines.size() == 0 :
+                "expected zero merged reads, got ${mergedLines.size()} lines"
+
+            // out[3] = notmerged_fwd, out[4] = notmerged_rev — both non-empty
+            def fwdLines = path(process.out[3].get(0)).readLines()
+            def revLines = path(process.out[4].get(0)).readLines()
+            assert fwdLines.size() > 0 && fwdLines.size() % 4 == 0 :
+                "unexpected notmerged_fwd content: ${fwdLines.size()} lines"
+            assert fwdLines.size() == revLines.size() :
+                "fwd/rev streams must stay in sync, got " +
+                "fwd=${fwdLines.size()} rev=${revLines.size()}"
         }
     }
 }

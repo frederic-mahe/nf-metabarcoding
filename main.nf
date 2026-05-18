@@ -13,6 +13,9 @@ params.no_trimming = false
 
 
 process merge_fastq_pairs {
+    // --fastqout_notmerged_fwd/_rev capture reads that fail to merge;
+    // they feed the shadow Part A pipeline ([S04]). Fwd and rev are
+    // kept in sync by vsearch.
     publishDir path: { params.fastq_folder }, mode: 'link', pattern: "*.log",
         enabled: params.fastq_folder != null
 
@@ -23,6 +26,8 @@ process merge_fastq_pairs {
     val sampleId
     path "merged_fastq"
     path "${sampleId}_merging.log"
+    path "notmerged_fwd"
+    path "notmerged_rev"
 
     shell:
     '''
@@ -36,7 +41,65 @@ process merge_fastq_pairs {
         --fastq_allowmergestagger \
         --quiet \
         --log !{sampleId}_merging.log \
-        --fastqout merged_fastq
+        --fastqout merged_fastq \
+        --fastqout_notmerged_fwd notmerged_fwd \
+        --fastqout_notmerged_rev notmerged_rev
+    '''
+}
+
+
+process join_notmerged {
+    // Shadow pipeline ([S04]) entry point: concatenate fwd/rev reads
+    // that failed --fastq_mergepairs with the default 8-N padding so
+    // they can be processed by the rest of Part A as a single fastq.
+    // The sampleId already carries the `_notmerged` suffix, so the
+    // published log lands at <sampleId>_notmerged_merging.log.
+    publishDir path: { params.fastq_folder }, mode: 'link', pattern: "*.log",
+        enabled: params.fastq_folder != null
+
+    input:
+    val sampleId
+    path notmerged_fwd
+    path notmerged_rev
+
+    output:
+    val sampleId
+    path "joined_fastq"
+    path "${sampleId}_merging.log"
+
+    shell:
+    '''
+    #!/bin/bash
+
+    vsearch \
+        --fastq_join !{notmerged_fwd} \
+        --reverse !{notmerged_rev} \
+        --fastq_ascii !{params.fastq_encoding} \
+        --quiet \
+        --log !{sampleId}_merging.log \
+        --fastqout joined_fastq
+    '''
+}
+
+
+process mask_ns_for_swarm {
+    // Shadow pipeline ([S04]) only: swarm rejects Ns, so every N in
+    // sequence lines is rewritten to A just before clustering. Header
+    // lines are left untouched so the SHA1 IDs computed by
+    // filter_and_convert_to_fasta stay consistent across .fas, .qual,
+    // and .stats. The masked fasta is intentionally NOT published.
+
+    input:
+    val sampleId
+    path fasta
+
+    output:
+    val sampleId
+    path "masked_fasta"
+
+    shell:
+    '''
+    sed '/^>/!s/N/A/g' !{fasta} > masked_fasta
     '''
 }
 
@@ -284,41 +347,90 @@ workflow {
     // discover pairs and merge
     merge_fastq_pairs(paired_ch)
 
-    // re-pair merge outputs into tuples, mix with unpaired files,
-    // then split back into two synchronised channels for downstream
-    def to_process = merge_fastq_pairs.out[0]
+    // [S04] shadow pipeline: join unmerged R1/R2 with 8-N padding.
+    // The shadow sampleId is `<sampleId>_notmerged`, so all subsequent
+    // processes naturally publish artefacts at `<sampleId>_notmerged.*`
+    // without touching the regular pipeline.
+    def shadow_id = merge_fastq_pairs.out[0].map { it + "_notmerged" }
+    join_notmerged(shadow_id, merge_fastq_pairs.out[3], merge_fastq_pairs.out[4])
+
+    // Build a unified (id, fastq, max_n) stream for the rest of Part A.
+    //   regular path uses max_n=0; shadow path uses max_n=8 (the
+    //   vsearch --fastq_join default padding length).
+    def regular_ch = merge_fastq_pairs.out[0]
         .merge(merge_fastq_pairs.out[1])
         .mix(unpaired_ch)
-        .multiMap { id, f ->
-            id:   id
-            file: f
-        }
+        .map { id, f -> tuple(id, f, 0) }
+    def shadow_ch = join_notmerged.out[0]
+        .merge(join_notmerged.out[1])
+        .map { id, f -> tuple(id, f, 8) }
+
+    def to_process = regular_ch.mix(shadow_ch).multiMap { id, f, max_n ->
+        id:    id
+        file:  f
+        max_n: max_n
+    }
 
     // trim primers (skipped when --no_trimming is set)
     def sampleId_ch
     def fastq_ch
+    def max_n_ch
     if ( params.no_trimming ) {
         sampleId_ch = to_process.id
         fastq_ch    = to_process.file
+        max_n_ch    = to_process.max_n
     } else {
         trim_primers(to_process.id, to_process.file)
-        sampleId_ch = trim_primers.out[0]
-        fastq_ch    = trim_primers.out[1]
+        // trim_primers may reorder items (parallel execution), so
+        // re-attach max_n by joining on sampleId.
+        def id_max_n = to_process.id.merge(to_process.max_n)
+        def joined = trim_primers.out[0]
+            .merge(trim_primers.out[1])
+            .join(id_max_n)
+            .multiMap { id, f, m ->
+                id:    id
+                file:  f
+                max_n: m
+            }
+        sampleId_ch = joined.id
+        fastq_ch    = joined.file
+        max_n_ch    = joined.max_n
     }
 
     // convert to fasta with SHA1 + ee, apply min-length / max-N
-    // filters (max_n=0 for merged reads; the [S04] unmerged-pair
-    // path will pass the N-join insert size when implemented)
-    filter_and_convert_to_fasta(sampleId_ch, fastq_ch, 0)
+    // filters (max_n=0 for the regular path, max_n=8 for the shadow
+    // path so the join-padding Ns survive)
+    filter_and_convert_to_fasta(sampleId_ch, fastq_ch, max_n_ch)
 
     // set aside EE values
     extract_expected_error_values(
         filter_and_convert_to_fasta.out[0], filter_and_convert_to_fasta.out[1]
     )
 
-    // dereplicate and clusterize
+    // dereplicate
     dereplicate_fasta(
         filter_and_convert_to_fasta.out[0], filter_and_convert_to_fasta.out[1]
     )
-    list_local_clusters(dereplicate_fasta.out[0], dereplicate_fasta.out[1])
+
+    // [S04] swarm rejects Ns, so the shadow path's dereplicated fasta
+    // gets a transient N->A pass before clustering. Regular-path items
+    // (no _notmerged suffix) bypass the mask step.
+    def derep_branched = dereplicate_fasta.out[0]
+        .merge(dereplicate_fasta.out[1])
+        .branch { id, _f ->
+            shadow:  id.endsWith("_notmerged")
+            regular: true
+        }
+    mask_ns_for_swarm(
+        derep_branched.shadow.map { id, _f -> id },
+        derep_branched.shadow.map { _id, f -> f }
+    )
+    def ready_for_swarm = derep_branched.regular
+        .mix(mask_ns_for_swarm.out[0].merge(mask_ns_for_swarm.out[1]))
+        .multiMap { id, f ->
+            id:   id
+            file: f
+        }
+
+    list_local_clusters(ready_for_swarm.id, ready_for_swarm.file)
 }

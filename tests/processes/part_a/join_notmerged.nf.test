@@ -1,0 +1,76 @@
+nextflow_process {
+
+    name "join_notmerged"
+    script "main.nf"
+    process "join_notmerged"
+
+    setup {
+        run("merge_fastq_pairs") {
+            script "main.nf"
+            process {
+                """
+                input[0] = tuple(
+                    "sample_fail",
+                    [
+                        file("\${projectDir}/tests/data/paired_merge_fail_1.fastq.gz"),
+                        file("\${projectDir}/tests/data/paired_merge_fail_2.fastq.gz")
+                    ]
+                )
+                """
+            }
+        }
+    }
+
+    test("joins not-merged R1/R2 with the default 8-N padding") {
+        // COVERAGE: [S04]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = merge_fastq_pairs.out[0].map { it + '_notmerged' }
+                input[1] = merge_fastq_pairs.out[3]
+                input[2] = merge_fastq_pairs.out[4]
+                """
+            }
+        }
+        then {
+            assert process.success
+
+            def lines = path(process.out[1].get(0)).readLines()
+            assert lines.size() >= 4 : "expected at least one joined fastq record"
+            assert lines.size() % 4 == 0 :
+                "fastq must have a multiple of 4 lines, got ${lines.size()}"
+
+            def seqs = []
+            for (int i = 1; i < lines.size(); i += 4) {
+                seqs.add(lines[i])
+            }
+            seqs.each { seq ->
+                assert seq.contains("NNNNNNNN") :
+                    "expected 8-N join padding in: ${seq}"
+            }
+        }
+    }
+
+    test("emits a per-sample <sampleId>_merging.log for the shadow path") {
+        // COVERAGE: [S04], [S19]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = merge_fastq_pairs.out[0].map { it + '_notmerged' }
+                input[1] = merge_fastq_pairs.out[3]
+                input[2] = merge_fastq_pairs.out[4]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def logPath = process.out[2].get(0)
+            assert logPath.endsWith("sample_fail_notmerged_merging.log") :
+                "unexpected log path: ${logPath}"
+            assert path(logPath).readLines().size() > 0 :
+                "expected non-empty merging log"
+        }
+    }
+}
