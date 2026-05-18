@@ -213,6 +213,34 @@ class Sample(NamedTuple):
     r2: Optional[Path]  # None for single-end / unpaired samples
 
 
+# `notmerged` is reserved for the shadow pipeline ([S23]): shadow
+# artefacts are named `<sampleId>_notmerged.*`, so a user sample ID
+# already ending in this token would collide. The check is
+# case-insensitive to match how a user might name a fastq file.
+RESERVED_SUFFIX: str = "notmerged"
+
+
+class ReservedSuffixError(ValueError):
+    """Raised when a discovered sample ID ends with ``RESERVED_SUFFIX``."""
+
+
+def check_reserved_suffix(samples: list[Sample]) -> None:
+    """Reject any sample whose ID ends with the reserved ``notmerged`` token.
+
+    See ``[S23]`` in SPECIFICATIONS.md.
+    """
+    offenders = [
+        s.sample_id
+        for s in samples
+        if s.sample_id.lower().endswith(RESERVED_SUFFIX)
+    ]
+    if offenders:
+        raise ReservedSuffixError(
+            f"sample IDs ending in '{RESERVED_SUFFIX}' are reserved for the "
+            f"shadow pipeline ([S04]); offending IDs: {', '.join(offenders)}"
+        )
+
+
 def _walk(
     name: str, entries: list[PatternEntry]
 ) -> Optional[tuple[PatternEntry, re.Match[str]]]:
@@ -355,7 +383,13 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
-    for sample in discover(args.folders, extra_pattern=args.extra_pattern):
+    samples = discover(args.folders, extra_pattern=args.extra_pattern)
+    try:
+        check_reserved_suffix(samples)
+    except ReservedSuffixError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    for sample in samples:
         r2 = str(sample.r2) if sample.r2 is not None else ""
         print(f"{sample.sample_id}\t{sample.r1}\t{r2}")
     return 0
