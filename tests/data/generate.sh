@@ -167,6 +167,31 @@ emit_miseq_pair() {
     gzip --force "${r1}" "${r2}"
 }
 
+emit_reserved_keyword() {
+    # [S23] — a paired-end fixture whose R1 name resolves to the
+    # reserved sample ID `X_notmerged`. Isolated in its own folder so
+    # the validation can be exercised end-to-end without contaminating
+    # the main `tests/data/` listing.
+    local -r dir="reserved_keyword"
+    mkdir -p "${dir}"
+    cp paired_merge_ok_1.fastq.gz "${dir}/X_notmerged_1.fastq.gz"
+    cp paired_merge_ok_2.fastq.gz "${dir}/X_notmerged_2.fastq.gz"
+}
+
+emit_n_containing_fasta() {
+    # [S04] — minimal fixture for `mask_ns_for_swarm`: one sequence
+    # with 8 internal Ns (mirrors the `vsearch --fastq_join` padding),
+    # one clean sequence. Sequence lines must be rewritten N→A;
+    # header lines (including the literal 'N' in '>seq1_with_Ns') must
+    # be left alone.
+    cat > n_containing.fas <<'FASTA'
+>seq1_with_Ns
+ACGTACGTNNNNNNNNACGTACGT
+>seq2_no_Ns
+ACGTACGT
+FASTA
+}
+
 emit_paired "paired_merge_ok"   "${AMPLICONS_OK[@]}"
 emit_paired "paired_merge_fail" "${AMPLICONS_LONG[@]}"
 emit_single
@@ -174,5 +199,7 @@ emit_uncompressed
 emit_empty
 emit_unpaired_only
 emit_miseq_pair
+emit_reserved_keyword
+emit_n_containing_fasta
 
 echo "Wrote fixtures to ${DATA_DIR}"
