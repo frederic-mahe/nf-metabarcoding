@@ -50,6 +50,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S21]`| unpaired fastq files skip the merging step                                 | `tests/main.nf.test`                            | done    | —          |
 | `[S22]`| Part B re-cleaves global swarm clusters using per-sample sub-seed presence | `tests/python/test_cluster_cleaver.py`          | done    | —          |
 | `[S23]`| `notmerged` reserved suffix — sample IDs ending in `notmerged` are rejected | `tests/python/test_reserved_keyword.py`, `tests/main.nf.test` | done | — |
+| `[S24]`| shadow pipeline 3'-strip via `vsearch --fastq_stripright` (default 30)     | `tests/processes/part_a/strip_reads.nf.test`    | done    | —          |
 
 
 ## Per-process tests
@@ -64,3 +65,4 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `list_local_clusters`           | `tests/processes/part_a/list_local_clusters.nf.test`          | S17          | red    |
 | `join_notmerged`                | `tests/processes/part_a/join_notmerged.nf.test`               | S04, S19     | red    |
 | `mask_ns_for_swarm`             | `tests/processes/part_a/mask_ns_for_swarm.nf.test`            | S04          | red    |
+| `strip_reads`                   | `tests/processes/part_a/strip_reads.nf.test`                  | S24          | red    |

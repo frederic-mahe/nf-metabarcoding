@@ -1,0 +1,74 @@
+nextflow_process {
+
+    name "strip_reads"
+    script "main.nf"
+    process "strip_reads"
+
+    test("trims params.stripright bases from the 3' end of both reads") {
+        // COVERAGE: [S24]
+        tag "ci"
+        when {
+            params {
+                stripright = 30
+            }
+            process {
+                """
+                input[0] = "sample_fail"
+                input[1] = file("\${projectDir}/tests/data/paired_merge_fail_1.fastq.gz")
+                input[2] = file("\${projectDir}/tests/data/paired_merge_fail_2.fastq.gz")
+                """
+            }
+        }
+        then {
+            assert process.success
+
+            // raw reads are 70 nt; expect 40 nt after stripping 30
+            def fwdLines = path(process.out[1].get(0)).readLines()
+            def revLines = path(process.out[2].get(0)).readLines()
+            assert fwdLines.size() > 0 && fwdLines.size() % 4 == 0 :
+                "fwd fastq must be a multiple of 4 lines, got ${fwdLines.size()}"
+            assert revLines.size() == fwdLines.size() :
+                "fwd/rev streams must stay in sync"
+
+            for (int i = 1; i < fwdLines.size(); i += 4) {
+                assert fwdLines[i].length() == 40 :
+                    "fwd: expected length 40, got ${fwdLines[i].length()}: ${fwdLines[i]}"
+                assert revLines[i].length() == 40 :
+                    "rev: expected length 40, got ${revLines[i].length()}: ${revLines[i]}"
+                // quality string must match sequence length
+                assert fwdLines[i + 2].length() == fwdLines[i].length() :
+                    "fwd: quality length must match sequence length"
+                assert revLines[i + 2].length() == revLines[i].length() :
+                    "rev: quality length must match sequence length"
+            }
+        }
+    }
+
+    test("stripright = 0 is a no-op (reads keep their original length)") {
+        // COVERAGE: [S24]
+        tag "ci"
+        when {
+            params {
+                stripright = 0
+            }
+            process {
+                """
+                input[0] = "sample_fail"
+                input[1] = file("\${projectDir}/tests/data/paired_merge_fail_1.fastq.gz")
+                input[2] = file("\${projectDir}/tests/data/paired_merge_fail_2.fastq.gz")
+                """
+            }
+        }
+        then {
+            assert process.success
+            def fwdLines = path(process.out[1].get(0)).readLines()
+            def revLines = path(process.out[2].get(0)).readLines()
+            for (int i = 1; i < fwdLines.size(); i += 4) {
+                assert fwdLines[i].length() == 70 :
+                    "fwd: expected original length 70, got ${fwdLines[i].length()}"
+                assert revLines[i].length() == 70 :
+                    "rev: expected original length 70, got ${revLines[i].length()}"
+            }
+        }
+    }
+}

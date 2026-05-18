@@ -5,6 +5,10 @@ params.fastq_pattern = "/*_1_{1,2}.fastq.gz"
 params.fastq_encoding = 33
 params.threads = 4
 params.no_trimming = false
+// [S24] number of nucleotides stripped from the 3' end of each
+// not-merged R1/R2 read before they are joined (shadow pipeline).
+// Set to 0 to disable.
+params.stripright = 30
 
 // forward_primer, reverse_primer, fastq_folder are required and have
 // no default; the workflow asserts them at startup (see [S18]).
@@ -44,6 +48,44 @@ process merge_fastq_pairs {
         --fastqout merged_fastq \
         --fastqout_notmerged_fwd notmerged_fwd \
         --fastqout_notmerged_rev notmerged_rev
+    '''
+}
+
+
+process strip_reads {
+    // [S24] shadow pipeline only: trim params.stripright nucleotides
+    // from the 3' end of each R1 and R2 not-merged read. Used to
+    // discard the low-quality tails before --fastq_join so the join
+    // padding is surrounded by higher-quality bases. vsearch
+    // --fastq_stripright 0 is a valid no-op pass-through.
+
+    input:
+    val sampleId
+    path notmerged_fwd
+    path notmerged_rev
+
+    output:
+    val sampleId
+    path "stripped_fwd"
+    path "stripped_rev"
+
+    shell:
+    '''
+    #!/bin/bash
+
+    vsearch \
+        --fastx_filter !{notmerged_fwd} \
+        --fastq_ascii !{params.fastq_encoding} \
+        --fastq_stripright !{params.stripright} \
+        --quiet \
+        --fastqout stripped_fwd
+
+    vsearch \
+        --fastx_filter !{notmerged_rev} \
+        --fastq_ascii !{params.fastq_encoding} \
+        --fastq_stripright !{params.stripright} \
+        --quiet \
+        --fastqout stripped_rev
     '''
 }
 
@@ -347,12 +389,18 @@ workflow {
     // discover pairs and merge
     merge_fastq_pairs(paired_ch)
 
-    // [S04] shadow pipeline: join unmerged R1/R2 with 8-N padding.
-    // The shadow sampleId is `<sampleId>_notmerged`, so all subsequent
+    // [S04] shadow pipeline: optionally strip the low-quality 3' tails
+    // ([S24]) and then join unmerged R1/R2 with 8-N padding. The
+    // shadow sampleId is `<sampleId>_notmerged`, so all subsequent
     // processes naturally publish artefacts at `<sampleId>_notmerged.*`
     // without touching the regular pipeline.
-    def shadow_id = merge_fastq_pairs.out[0].map { it + "_notmerged" }
-    join_notmerged(shadow_id, merge_fastq_pairs.out[3], merge_fastq_pairs.out[4])
+    strip_reads(
+        merge_fastq_pairs.out[0],
+        merge_fastq_pairs.out[3],
+        merge_fastq_pairs.out[4]
+    )
+    def shadow_id = strip_reads.out[0].map { it + "_notmerged" }
+    join_notmerged(shadow_id, strip_reads.out[1], strip_reads.out[2])
 
     // Build a unified (id, fastq, max_n) stream for the rest of Part A.
     //   regular path uses max_n=0; shadow path uses max_n=8 (the

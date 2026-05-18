@@ -247,6 +247,17 @@ isolation.
     that splits on a sub-seed, (b) a cluster that does not split,
     (c) a candidate sub-seed below the per-sample-presence threshold,
     (d) a sort tie within a sub-cluster.
+- `[S24]` the shadow pipeline ([S04]) strips `params.stripright`
+  nucleotides from the 3' end of each not-merged R1 and R2 read
+  before joining, using `vsearch --fastx_filter --fastq_stripright`.
+  The parameter is user-configurable and defaults to 30. Setting it
+  to 0 disables the trim (vsearch runs as a no-op pass-through). The
+  strip step sits between `merge_fastq_pairs` and `join_notmerged`,
+  so the join padding falls inside higher-quality bases on both
+  sides. The regular (merged) Part A path is unaffected.
+  - **Pass when:** running `strip_reads` on a fastq with 70 nt reads
+    produces 40 nt reads with the default `stripright = 30`, and 70 nt
+    reads with `stripright = 0`.
 
 
 ## Common fastq file-name patterns
