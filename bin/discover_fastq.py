@@ -241,6 +241,42 @@ def check_reserved_suffix(samples: list[Sample]) -> None:
         )
 
 
+class DuplicateSampleIDError(ValueError):
+    """Raised when two or more discovered samples share a sample ID."""
+
+
+def check_unique_sample_ids(samples: list[Sample]) -> None:
+    """Reject any duplicate sample ID across the discovered samples.
+
+    See ``[S13]`` / ``[S14]`` in SPECIFICATIONS.md and ``D03`` in
+    DECISIONS.md. The error message names each colliding sample ID
+    and every input fastq path involved in that collision (R1 and
+    R2 when the sample is paired-end), so the user can resolve the
+    conflict explicitly.
+    """
+    groups: dict[str, list[Sample]] = {}
+    for sample in samples:
+        groups.setdefault(sample.sample_id, []).append(sample)
+
+    duplicates = {
+        sid: members for sid, members in groups.items() if len(members) > 1
+    }
+    if not duplicates:
+        return
+
+    lines: list[str] = [
+        "duplicate sample IDs (each sample ID must be unique):"
+    ]
+    for sid in sorted(duplicates):
+        paths: list[str] = []
+        for member in duplicates[sid]:
+            paths.append(str(member.r1))
+            if member.r2 is not None:
+                paths.append(str(member.r2))
+        lines.append(f"  {sid}: {', '.join(paths)}")
+    raise DuplicateSampleIDError("\n".join(lines))
+
+
 def _walk(
     name: str, entries: list[PatternEntry]
 ) -> Optional[tuple[PatternEntry, re.Match[str]]]:
@@ -386,7 +422,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     samples = discover(args.folders, extra_pattern=args.extra_pattern)
     try:
         check_reserved_suffix(samples)
-    except ReservedSuffixError as exc:
+        check_unique_sample_ids(samples)
+    except (ReservedSuffixError, DuplicateSampleIDError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     for sample in samples:

@@ -178,6 +178,20 @@ emit_reserved_keyword() {
     cp paired_merge_ok_2.fastq.gz "${dir}/X_notmerged_2.fastq.gz"
 }
 
+emit_duplicate_sample_ids() {
+    # [S13]/[S14]: two folders that both resolve to the same sample
+    # ID `A` (one via canonical pattern row 5, the other via row 6),
+    # so the workflow can verify the abort-on-duplicate behaviour.
+    local -r root="duplicate_sample_ids"
+    local -r a="${root}/run1"
+    local -r b="${root}/run2"
+    mkdir -p "${a}" "${b}"
+    cp paired_merge_ok_1.fastq.gz "${a}/A_1.fastq.gz"
+    cp paired_merge_ok_2.fastq.gz "${a}/A_2.fastq.gz"
+    cp paired_merge_ok_1.fastq.gz "${b}/A_R1.fastq.gz"
+    cp paired_merge_ok_2.fastq.gz "${b}/A_R2.fastq.gz"
+}
+
 emit_n_containing_fasta() {
     # [S04] — minimal fixture for `mask_ns_for_swarm`: one sequence
     # with 8 internal Ns (mirrors the `vsearch --fastq_join` padding),
@@ -200,6 +214,7 @@ emit_empty
 emit_unpaired_only
 emit_miseq_pair
 emit_reserved_keyword
+emit_duplicate_sample_ids
 emit_n_containing_fasta
 
 echo "Wrote fixtures to ${DATA_DIR}"

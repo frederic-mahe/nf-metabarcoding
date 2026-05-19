@@ -39,8 +39,8 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S10]`| accept a directory or a list of directories (absolute or relative)         | `tests/python/test_discover_fastq.py`, `tests/bin/discover_fastq.bats`, `tests/main.nf.test` | done | —          |
 | `[S11]`| auto-discover fastq files using common name patterns                       | `tests/python/test_discover_fastq.py`, `tests/bin/discover_fastq.bats`, `tests/main.nf.test` | done | —          |
 | `[S12]`| auto-deduce sample names from fastq file names                             | `tests/python/test_discover_fastq.py`, `tests/bin/discover_fastq.bats`, `tests/main.nf.test` | done | —          |
-| `[S13]`| abort if two or more samples share a derived ID; list duplicate file paths | `tests/python/test_discover_fastq.py`, `tests/python/test_discover_fasta.py`, `tests/main.nf.test` | red | — |
-| `[S14]`| collision policy for same-named samples: refuse (sample IDs must be unique) | `tests/python/test_discover_fastq.py`, `tests/python/test_discover_fasta.py` | red     | —          |
+| `[S13]`| abort if two or more samples share a derived ID; list duplicate file paths | `tests/python/test_discover_fastq.py`, `tests/python/test_discover_fasta.py`, `tests/main.nf.test` | done | — |
+| `[S14]`| collision policy for same-named samples: refuse (sample IDs must be unique) | `tests/python/test_discover_fastq.py`, `tests/python/test_discover_fasta.py` | done    | —          |
 | `[S15]`| export single occurrence table *or* two-part (long + metadata) table       | `tests/main.nf.test`                            | TODO    | —          |
 | `[S16]`| expect demultiplexed fastq files                                           | —                                               | n/a     | —          |
 | `[S17]`| per-cluster minimum-read threshold (> 2 reads)                             | `tests/processes/part_a/list_local_clusters.nf.test`   | red     | —          |

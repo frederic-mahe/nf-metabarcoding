@@ -229,6 +229,37 @@ nextflow_pipeline {
         }
     }
 
+    test("aborts when two input fastq pairs resolve to the same sample ID") {
+        // COVERAGE: [S13], [S14]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                // Two folders, each producing sample ID "A" via a
+                // different canonical pattern row.
+                fastq_folder   = (
+                    "${projectDir}/tests/data/duplicate_sample_ids/run1," +
+                    "${projectDir}/tests/data/duplicate_sample_ids/run2"
+                )
+                fastq_pattern  = ""
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            // error names the colliding sample ID and lists every
+            // duplicated fastq path
+            assert msg.toLowerCase().contains("duplicate") :
+                "expected error to mention duplicates, got: ${msg}"
+            assert msg.contains("run1/A_1.fastq.gz") :
+                "expected error to list run1 R1, got: ${msg}"
+            assert msg.contains("run2/A_R1.fastq.gz") :
+                "expected error to list run2 R1, got: ${msg}"
+        }
+    }
+
     test("aborts when a sample ID ends with the reserved 'notmerged' suffix") {
         // COVERAGE: [S23]
         tag "ci"

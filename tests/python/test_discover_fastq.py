@@ -13,12 +13,16 @@ the spec-by-example for the canonical patterns documented in
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from discover_fastq import (
+    DuplicateSampleIDError,
     Sample,
+    check_unique_sample_ids,
     derive_r2_name,
     derive_sample_id,
     discover,
@@ -319,3 +323,112 @@ def test_user_pattern_takes_precedence_over_canonical_table(
 
     # Override strips at the literal `R1`, so sample = "A_".
     assert result == [Sample(sample_id="A_", r1=r1, r2=r2)]
+
+
+# ---------- sample-ID uniqueness ([S13]/[S14], D03) ------------------------
+# COVERAGE: [S13], [S14]
+
+
+def test_check_unique_sample_ids_passes_on_distinct_ids() -> None:
+    samples = [
+        Sample(sample_id="A", r1=Path("A_1.fastq.gz"), r2=None),
+        Sample(sample_id="B", r1=Path("B_1.fastq.gz"), r2=None),
+    ]
+    # no exception
+    check_unique_sample_ids(samples)
+
+
+def test_check_unique_sample_ids_raises_when_two_samples_collide() -> None:
+    samples = [
+        Sample(
+            sample_id="A",
+            r1=Path("/run1/A_1.fastq.gz"),
+            r2=Path("/run1/A_2.fastq.gz"),
+        ),
+        Sample(
+            sample_id="A",
+            r1=Path("/run2/A_R1.fastq.gz"),
+            r2=Path("/run2/A_R2.fastq.gz"),
+        ),
+    ]
+    with pytest.raises(DuplicateSampleIDError) as excinfo:
+        check_unique_sample_ids(samples)
+    msg = str(excinfo.value)
+    # the colliding sample ID is named
+    assert "A" in msg
+    # every offending fastq path is listed (R1 paths at minimum)
+    assert "/run1/A_1.fastq.gz" in msg
+    assert "/run2/A_R1.fastq.gz" in msg
+
+
+def test_check_unique_sample_ids_reports_every_collision_group() -> None:
+    # two independent collisions must all surface in one error so the
+    # user can resolve them in a single pass.
+    samples = [
+        Sample(sample_id="A", r1=Path("/run1/A_R1.fastq.gz"), r2=None),
+        Sample(sample_id="A", r1=Path("/run2/A_R1.fastq.gz"), r2=None),
+        Sample(sample_id="B", r1=Path("/run1/B.fastq.gz"), r2=None),
+        Sample(sample_id="C", r1=Path("/run1/C_R1.fastq.gz"), r2=None),
+        Sample(sample_id="C", r1=Path("/run2/C_R1.fastq.gz"), r2=None),
+    ]
+    with pytest.raises(DuplicateSampleIDError) as excinfo:
+        check_unique_sample_ids(samples)
+    msg = str(excinfo.value)
+    assert "A" in msg and "C" in msg
+    # the non-colliding sample (B) must not be listed
+    assert "B.fastq.gz" not in msg
+
+
+def test_check_unique_sample_ids_lists_both_r1_and_r2(tmp_path: Path) -> None:
+    # When the colliding samples are paired-end, the error must surface
+    # both R1 *and* R2 so the user knows which file pair to delete.
+    samples = [
+        Sample(
+            sample_id="A",
+            r1=Path("/run1/A_1.fastq.gz"),
+            r2=Path("/run1/A_2.fastq.gz"),
+        ),
+        Sample(
+            sample_id="A",
+            r1=Path("/run2/A_1.fastq.gz"),
+            r2=Path("/run2/A_2.fastq.gz"),
+        ),
+    ]
+    with pytest.raises(DuplicateSampleIDError) as excinfo:
+        check_unique_sample_ids(samples)
+    msg = str(excinfo.value)
+    for required in (
+        "/run1/A_1.fastq.gz",
+        "/run1/A_2.fastq.gz",
+        "/run2/A_1.fastq.gz",
+        "/run2/A_2.fastq.gz",
+    ):
+        assert required in msg, f"missing {required} in: {msg}"
+
+
+def test_cli_exits_non_zero_on_duplicate_sample_ids(tmp_path: Path) -> None:
+    # Two folders each providing a pair that resolves to sample ID "A".
+    a = tmp_path / "run1"
+    b = tmp_path / "run2"
+    a.mkdir()
+    b.mkdir()
+    (a / "A_1.fastq.gz").write_bytes(b"")
+    (a / "A_2.fastq.gz").write_bytes(b"")
+    (b / "A_R1.fastq.gz").write_bytes(b"")
+    (b / "A_R2.fastq.gz").write_bytes(b"")
+
+    script = (
+        Path(__file__).resolve().parents[2] / "bin" / "discover_fastq.py"
+    )
+    proc = subprocess.run(
+        [sys.executable, str(script), str(a), str(b)],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode != 0, (
+        f"expected non-zero exit; stdout={proc.stdout!r}"
+    )
+    assert "duplicate" in proc.stderr.lower(), proc.stderr
+    # Both R1 paths must be listed
+    assert str(a / "A_1.fastq.gz") in proc.stderr
+    assert str(b / "A_R1.fastq.gz") in proc.stderr
