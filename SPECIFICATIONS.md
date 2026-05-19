@@ -365,6 +365,28 @@ isolation.
   run log is `<project_name>_<N>_samples_1f.log`.
   - **Pass when:** the four output files plus the log exist and are
     non-empty for the documented fixture.
+- `[S33]` Part B's `fake_taxonomic_assignment` writes a placeholder
+  Part C input file by scanning the swarm representatives FASTA
+  (`<basename>_1f_representatives.fas` from `[S32]`) and emitting,
+  per record, the tab-separated row
+  `<sha1>\t<size>\t0.0\tNA\tNA`. The output path is
+  `<basename>_1f_representatives.results`. This step exists so the
+  occurrence-table builder can run before the real taxonomic
+  assignment lands (Part C); it is later overwritten by the
+  stampa/sintax output.
+  - **Pass when:** running on a representatives FASTA with three
+    records emits three TSV rows, one per record, in the
+    `<sha1>\t<size>\t0.0\tNA\tNA` shape.
+- `[S34]` Part B's `chimera_detection` filters the global swarm
+  representatives to abundance `>= params.chimera_minsize` (default
+  2) with `vsearch --fastx_filter --minsize`, then pipes the kept
+  records into `vsearch --uchime_denovo`. Outputs are
+  `<basename>_1f_representatives.uchime` (the uchime hit table)
+  and `<basename>_1f_representatives.log` (stderr of the uchime
+  run).
+  - **Pass when:** both output files exist and the `.log` is
+    non-empty for the documented fixture (the `.uchime` table can
+    legitimately be empty when no chimeras are found).
 
 
 ## Common fastq file-name patterns

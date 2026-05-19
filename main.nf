@@ -22,6 +22,10 @@ params.stripright = 30
 params.fasta_folder    = null
 params.project_name    = null
 params.results_folder  = null
+// [S34]: minimum size threshold for chimera detection
+// (vsearch --fastx_filter --minsize). Records below this size are
+// dropped before uchime_denovo runs.
+params.chimera_minsize = 2
 
 
 process merge_fastq_pairs {
@@ -533,6 +537,97 @@ process global_clustering {
 }
 
 
+process fake_taxonomic_assignment {
+    // [S33]: emit a placeholder TSV that the occurrence-table builder
+    // can consume before Part C lands. Each row mirrors the stampa
+    // output shape: <amplicon>\t<size>\t<identity>\t<taxonomy>\t<refs>.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path representatives
+    val basename
+
+    output:
+    path "${basename}_1f_representatives.results"
+
+    shell:
+    '''
+    grep "^>" !{representatives} | \
+        sed -r 's/^>//
+                s/;size=/\t/
+                s/;?$/\t0.0\tNA\tNA/' > !{basename}_1f_representatives.results
+    '''
+}
+
+
+process chimera_detection {
+    // [S34]: filter representatives down to abundance >= chimera_minsize
+    // (default 2), then run vsearch --uchime_denovo. The .uchime
+    // hit table can be empty when no chimeras are found; the stderr
+    // log captures the run.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path representatives
+    val basename
+
+    output:
+    path "${basename}_1f_representatives.uchime"
+    path "${basename}_1f_representatives.log"
+
+    shell:
+    '''
+    vsearch \
+        --fastx_filter !{representatives} \
+        --minsize !{params.chimera_minsize} \
+        --quiet \
+        --fastaout - | \
+    vsearch \
+        --uchime_denovo - \
+        --uchimeout !{basename}_1f_representatives.uchime \
+        2> !{basename}_1f_representatives.log
+    '''
+}
+
+
+process cleaving {
+    // [S22]: re-cleave global swarm clusters along sub-seed
+    // boundaries. The script does all the work — this process is the
+    // nextflow wrapper around bin/cluster_cleaver.py. The output
+    // names follow the legacy `<input>2` / `<basename>_1f_representatives.fas2`
+    // convention so downstream concatenations (used by the
+    // occurrence-table builder) keep working unchanged.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path global_stats        // <basename>_1f.stats
+    path struct              // <basename>_1f.struct
+    path swarms              // <basename>_1f.swarms
+    path global_fasta        // <basename>.fas
+    path per_sample_stats    // <basename>_per_sample_OTUs.stats
+    val basename
+
+    output:
+    path "${basename}_1f.stats2"
+    path "${basename}_1f.swarms2"
+    path "${basename}_1f_representatives.fas2"
+
+    shell:
+    '''
+    cluster_cleaver.py \
+        --global_stats !{global_stats} \
+        --per_sample_stats !{per_sample_stats} \
+        --struct !{struct} \
+        --swarms !{swarms} \
+        --fasta !{global_fasta} \
+        --fastidious
+    '''
+}
+
+
 workflow part_b_processes {
     // Runs the five Part B pre-cleaving processes on already-collected
     // lists of per-sample fasta / qual / stats files. Shared by the
@@ -554,6 +649,21 @@ workflow part_b_processes {
     list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
     global_dereplication(fasta_list, basename)
     global_clustering(global_dereplication.out[0], basename)
+
+    // Placeholder taxonomy + chimera flag run in parallel — both
+    // consume only the swarm representatives ([S33]/[S34]).
+    fake_taxonomic_assignment(global_clustering.out[3], basename)
+    chimera_detection(global_clustering.out[3], basename)
+
+    // Re-cleave clusters using the per-sample stats ([S22]).
+    cleaving(
+        global_clustering.out[1],            // .stats
+        global_clustering.out[2],            // .struct
+        global_clustering.out[0],            // .swarms
+        global_dereplication.out[0],         // global .fas
+        list_all_cluster_seeds_of_size_greater_than_2.out[0],
+        basename
+    )
 }
 
 

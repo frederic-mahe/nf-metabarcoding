@@ -320,6 +320,14 @@ def fasta_parse(
     """
     Get seed sequences, update abundances.
     """
+    # No cleaved clusters → write an empty fas2 and bail out. The
+    # downstream concatenation (`cat <input>{,2}`) tolerates empty
+    # files, so this matches the per_cluster_stats / per_cluster_swarms
+    # branches which also produce empty output for an empty input.
+    if not new_stats:
+        open(out_fasta_file, "w").close()
+        return None
+
     # create a dict of target amplicons and abundances
     fasta: dict[str, list] = {}
     for t in new_stats:

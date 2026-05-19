@@ -334,6 +334,60 @@ def test_cleaver_no_fastidious_flag(tmp_path: Path) -> None:
     assert not (tmp_path / "cleaver_1f_representatives.fas2").exists()
 
 
+def test_cleaver_no_subseeds_emits_empty_outputs(tmp_path: Path) -> None:
+    """Fixtures where no cluster has a sub-seed must still produce
+    output files (empty), not crash.
+
+    Mirrors what happens when the Part B pipeline runs on small data:
+    if the per-sample stats never surface a sub-seed above the
+    threshold, ``new_stats`` ends up empty and the cleaver historically
+    crashed inside ``fasta_parse`` with ``ValueError: min() iterable
+    argument is empty``. Empty outputs are a legitimate outcome
+    (downstream concatenation via ``cat <out>{,2}`` tolerates empty
+    files), so the script must produce them rather than abort.
+    """
+    fasta = tmp_path / "trivial.fasta"
+    stats = tmp_path / "trivial_1f.stats"
+    struct = tmp_path / "trivial_1f.struct"
+    swarms = tmp_path / "trivial_1f.swarms"
+    per_sample = tmp_path / "trivial_per_sample.stats"
+
+    # Single global cluster, single per-sample seed, but the sample's
+    # seed is the same amplicon as the global seed → no sub-seed
+    # candidate, no cleaving.
+    fasta.write_text(">aa01;size=10\nACGTACGT\n")
+    stats.write_text("1\t10\taa01\t10\t0\t0\t0\n")
+    struct.write_text("")
+    swarms.write_text("aa01;size=10\n")
+    # one sample row, with the global seed as its own per-sample seed
+    per_sample.write_text("sample1\t1\t10\taa01\t10\t0\t0\t0\n")
+
+    subprocess.run(
+        [
+            "python3",
+            str(SCRIPT),
+            "--global_stats", str(stats),
+            "--per_sample_stats", str(per_sample),
+            "--fasta", str(fasta),
+            "--struct", str(struct),
+            "--swarms", str(swarms),
+        ],
+        cwd=tmp_path,
+        check=True,
+    )
+
+    # All three legacy `<input>2` files exist and are empty.
+    out_stats = tmp_path / "trivial_1f.stats2"
+    out_swarms = tmp_path / "trivial_1f.swarms2"
+    out_fasta = tmp_path / "trivial_1f_representatives.fas2"
+    assert out_stats.exists()
+    assert out_swarms.exists()
+    assert out_fasta.exists()
+    assert out_stats.read_text() == ""
+    assert out_swarms.read_text() == ""
+    assert out_fasta.read_text() == ""
+
+
 def test_cleaver_explicit_out_paths(tmp_path: Path) -> None:
     """``--out-stats / --out-swarms / --out-fasta`` redirect outputs."""
     inputs = _write_inputs(tmp_path, swarm_parameters="1f")

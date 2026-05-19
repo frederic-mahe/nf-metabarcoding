@@ -1,0 +1,84 @@
+nextflow_process {
+
+    name "cleaving"
+    script "main.nf"
+    process "cleaving"
+
+    setup {
+        run("list_all_cluster_seeds_of_size_greater_than_2") {
+            script "main.nf"
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/data/part_b/S1.stats"),
+                    file("\${projectDir}/tests/data/part_b/S2.stats"),
+                    file("\${projectDir}/tests/data/part_b/E.stats")
+                ]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        run("global_dereplication") {
+            script "main.nf"
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/data/part_b/S1.fas"),
+                    file("\${projectDir}/tests/data/part_b/S2.fas"),
+                    file("\${projectDir}/tests/data/part_b/E.fas")
+                ]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        run("global_clustering") {
+            script "main.nf"
+            process {
+                """
+                input[0] = global_dereplication.out[0]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+    }
+
+    test("wraps bin/cluster_cleaver.py and emits .stats2, .swarms2, .fas2") {
+        // COVERAGE: [S22]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = global_clustering.out[1]   // .stats
+                input[1] = global_clustering.out[2]   // .struct
+                input[2] = global_clustering.out[0]   // .swarms
+                input[3] = global_dereplication.out[0] // global .fas
+                input[4] = list_all_cluster_seeds_of_size_greater_than_2.out[0]
+                input[5] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+
+            // The process emits three paths: .stats2, .swarms2,
+            // _representatives.fas2.
+            def stats2 = process.out[0].get(0)
+            def swarms2 = process.out[1].get(0)
+            def fas2 = process.out[2].get(0)
+
+            assert stats2.endsWith("proj_3_samples_1f.stats2") :
+                "unexpected .stats2 filename: ${stats2}"
+            assert swarms2.endsWith("proj_3_samples_1f.swarms2") :
+                "unexpected .swarms2 filename: ${swarms2}"
+            assert fas2.endsWith("proj_3_samples_1f_representatives.fas2") :
+                "unexpected .fas2 filename: ${fas2}"
+
+            // All three files must exist (they may be empty when the
+            // fixture's clusters carry no sub-seeds — that is a valid
+            // outcome per the cleaver's contract).
+            [stats2, swarms2, fas2].each { p ->
+                assert file(p).exists() : "missing cleaver output: ${p}"
+            }
+        }
+    }
+}

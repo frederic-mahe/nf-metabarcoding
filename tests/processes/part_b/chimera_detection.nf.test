@@ -1,0 +1,63 @@
+nextflow_process {
+
+    name "chimera_detection"
+    script "main.nf"
+    process "chimera_detection"
+
+    setup {
+        run("global_dereplication") {
+            script "main.nf"
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/data/part_b/S1.fas"),
+                    file("\${projectDir}/tests/data/part_b/S2.fas"),
+                    file("\${projectDir}/tests/data/part_b/E.fas")
+                ]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        run("global_clustering") {
+            script "main.nf"
+            process {
+                """
+                input[0] = global_dereplication.out[0]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+    }
+
+    test("runs uchime_denovo on minsize-filtered representatives") {
+        // COVERAGE: [S34]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = global_clustering.out[3]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+
+            // The process emits two paths: the uchime hit table and
+            // the stderr log.
+            def uchimePath = process.out[0].get(0)
+            def logPath    = process.out[1].get(0)
+
+            assert uchimePath.endsWith("proj_3_samples_1f_representatives.uchime") :
+                "unexpected uchime filename: ${uchimePath}"
+            assert logPath.endsWith("proj_3_samples_1f_representatives.log") :
+                "unexpected log filename: ${logPath}"
+
+            // The .uchime table may legitimately be empty (no
+            // chimeras found in the tiny fixture); the log must not.
+            assert file(uchimePath).exists() : "missing .uchime file"
+            assert path(logPath).readLines().size() > 0 :
+                "uchime stderr log should not be empty"
+        }
+    }
+}

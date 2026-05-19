@@ -59,6 +59,8 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S30]`| Part B `list_all_cluster_seeds_of_size_greater_than_2` — concatenate per-sample `.stats` | `tests/processes/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf.test` | done | — |
 | `[S31]`| Part B `global_dereplication` — vsearch --derep_fulllength across every input `.fas` | `tests/processes/part_b/global_dereplication.nf.test` | done | — |
 | `[S32]`| Part B `global_clustering` — swarm `--fastidious` on the global fasta      | `tests/processes/part_b/global_clustering.nf.test` | done | — |
+| `[S33]`| Part B `fake_taxonomic_assignment` — placeholder taxonomy TSV              | `tests/processes/part_b/fake_taxonomic_assignment.nf.test` | done | — |
+| `[S34]`| Part B `chimera_detection` — vsearch uchime_denovo on representatives     | `tests/processes/part_b/chimera_detection.nf.test` | done | — |
 
 
 ## Per-process tests
@@ -79,3 +81,6 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `list_all_cluster_seeds_of_size_greater_than_2` | `tests/processes/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf.test` | S30 | red |
 | `global_dereplication`          | `tests/processes/part_b/global_dereplication.nf.test`         | S25, S31     | red    |
 | `global_clustering`             | `tests/processes/part_b/global_clustering.nf.test`            | S32          | red    |
+| `fake_taxonomic_assignment`     | `tests/processes/part_b/fake_taxonomic_assignment.nf.test`    | S33          | done   |
+| `chimera_detection`             | `tests/processes/part_b/chimera_detection.nf.test`            | S34          | done   |
+| `cleaving`                      | `tests/processes/part_b/cleaving.nf.test`                     | S22          | done   |
