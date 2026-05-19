@@ -1,0 +1,97 @@
+nextflow_process {
+
+    name "chimera_detection2"
+    script "main.nf"
+    process "chimera_detection2"
+
+    setup {
+        run("global_dereplication") {
+            script "main.nf"
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/data/part_b/S1.fas"),
+                    file("\${projectDir}/tests/data/part_b/S2.fas"),
+                    file("\${projectDir}/tests/data/part_b/E.fas")
+                ]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        run("global_clustering") {
+            script "main.nf"
+            process {
+                """
+                input[0] = global_dereplication.out[0]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+    }
+
+    test("runs uchime_denovo on cat(pre-cleave, cleaved); empty cleaved → fallback minsize") {
+        // COVERAGE: [S37]
+        // We exercise the empty-cleaved branch: the part_b fixture's
+        // cleaving step legitimately produces an empty .fas2 (no
+        // sub-seeds in the tiny inputs), so the dynamic --minsize
+        // must fall back to params.chimera_minsize and the
+        // concatenated stream effectively boils down to the
+        // pre-cleave representatives.
+        tag "ci"
+        when {
+            process {
+                """
+                def empty_fas2 = workDir.resolve("empty.fas2")
+                empty_fas2.text = ""
+                input[0] = global_clustering.out[3]
+                input[1] = file(empty_fas2.toString())
+                input[2] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def uchime2 = process.out[0].get(0)
+            def log2    = process.out[1].get(0)
+            assert uchime2.endsWith("proj_3_samples_1f_representatives.uchime2")
+            assert log2.endsWith("proj_3_samples_1f_representatives.log2")
+            assert file(uchime2).exists()
+            // log2 should mention vsearch's chimera-search activity
+            assert path(log2).readLines().size() > 0 :
+                "uchime stderr log should not be empty"
+        }
+    }
+
+    test("non-empty cleaved fas2 drops --minsize to its smallest size") {
+        // COVERAGE: [S37]
+        // The smallest size in the cleaved fas2 below is 1; since
+        // params.chimera_minsize defaults to 2 and the spec says
+        // --minsize never drops below it, the effective minsize is
+        // 2. The test asserts the run completes (uchime is invoked
+        // on the concat) — exact uchime output isn't pinned (it
+        // depends on the vsearch version), but the contract is:
+        //   non-empty pre-cleave fasta + cleaved fas2 with low-size
+        //   records → completes without error.
+        tag "ci"
+        when {
+            process {
+                """
+                def fas2 = workDir.resolve("cleaved.fas2")
+                fas2.text = '''>cleaved_aa;size=1
+AAAAAAAAAA
+>cleaved_bb;size=3
+ACACACACAC
+'''
+                input[0] = global_clustering.out[3]
+                input[1] = file(fas2.toString())
+                input[2] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert file(process.out[0].get(0)).exists()
+            assert path(process.out[1].get(0)).readLines().size() > 0
+        }
+    }
+}

@@ -387,6 +387,29 @@ isolation.
   - **Pass when:** both output files exist and the `.log` is
     non-empty for the documented fixture (the `.uchime` table can
     legitimately be empty when no chimeras are found).
+- `[S36]` Part B's `fake_taxonomic_assignment2` mirrors `[S33]` on
+  the cleaver's representatives FASTA (`<basename>_1f_representatives.fas2`
+  from `[S22]`). Output: `<basename>_1f_representatives.results2`.
+  Empty input (no clusters got cleaved) yields an empty output
+  file — downstream concatenation tolerates that.
+  - **Pass when:** running on a fas2 with `K` records emits `K`
+    placeholder rows; running on an empty fas2 emits an empty
+    file.
+- `[S37]` Part B's `chimera_detection2` re-runs uchime_denovo on
+  the concatenation of pre-cleave and cleaved representatives
+  (`<basename>_1f_representatives.fas` from `[S32]` plus
+  `<basename>_1f_representatives.fas2` from `[S22]`). The
+  `--minsize` filter is dynamic: it drops to the smallest size
+  observed in the cleaved file (so newly cleaved low-abundance
+  clusters are still searched for chimeras), but never goes below
+  `params.chimera_minsize` (default 2). If the cleaved file is
+  empty, `--minsize` falls back to `params.chimera_minsize`. The
+  concatenated stream is sorted by size before uchime sees it.
+  Outputs are `<basename>_1f_representatives.uchime2` and
+  `<basename>_1f_representatives.log2`.
+  - **Pass when:** both output files exist and the `.log2` is
+    non-empty for the documented fixture (the `.uchime2` table can
+    legitimately be empty when no chimeras are found).
 - `[S35]` Part B's `build_occurrence_table` runs
   `bin/build_filtered_contingency_table.py` to merge the
   swarm representatives, swarm stats, swarm output, uchime hits,

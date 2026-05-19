@@ -6,21 +6,36 @@ nextflow_process {
 
     test("merges Part B inputs into the filtered occurrence table") {
         // COVERAGE: [S35]
+        // The cleaved variants (representatives_2, stats_2, swarms_2,
+        // uchime_2, assignments_2) are wired as empty fixtures here to
+        // exercise the empty-cleaved path; the same script is also
+        // pinned byte-exact by the pytest characterization test.
         tag "ci"
         when {
             process {
                 """
-                input[0]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/representatives.fas")
-                input[1]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/representatives.fas")
-                input[2]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/stats")
-                input[3]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/stats")
-                input[4]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/swarms")
-                input[5]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/swarms")
-                input[6]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/uchime")
-                input[7]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/quality")
-                input[8]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/assignments")
-                input[9]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/distribution")
-                input[10] = "proj"
+                def empty = workDir.resolve("empty")
+                empty.text = ""
+                def reps = file("\${projectDir}/tests/data/build_filtered_contingency_table/representatives.fas")
+                def stats = file("\${projectDir}/tests/data/build_filtered_contingency_table/stats")
+                def swarms = file("\${projectDir}/tests/data/build_filtered_contingency_table/swarms")
+                def uchime = file("\${projectDir}/tests/data/build_filtered_contingency_table/uchime")
+                def quality = file("\${projectDir}/tests/data/build_filtered_contingency_table/quality")
+                def assigns = file("\${projectDir}/tests/data/build_filtered_contingency_table/assignments")
+                def distr = file("\${projectDir}/tests/data/build_filtered_contingency_table/distribution")
+                input[0]  = reps
+                input[1]  = file(empty.toString())   // empty fas2
+                input[2]  = stats
+                input[3]  = file(empty.toString())   // empty stats2
+                input[4]  = swarms
+                input[5]  = file(empty.toString())   // empty swarms2
+                input[6]  = uchime
+                input[7]  = file(empty.toString())   // empty uchime2
+                input[8]  = quality
+                input[9]  = assigns
+                input[10] = file(empty.toString())   // empty results2
+                input[11] = distr
+                input[12] = "proj"
                 """
             }
         }

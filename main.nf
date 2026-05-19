@@ -592,20 +592,93 @@ process chimera_detection {
 }
 
 
+process fake_taxonomic_assignment2 {
+    // [S36]: same transform as [S33] but operating on the cleaver's
+    // representatives (cleaving's third output, `*_1f_representatives.fas2`).
+    // An empty fas2 (no clusters got cleaved) is a legitimate input
+    // — the output is then an empty results2 file.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path cleaved_representatives
+    val basename
+
+    output:
+    path "${basename}_1f_representatives.results2"
+
+    shell:
+    '''
+    : > !{basename}_1f_representatives.results2
+    grep "^>" !{cleaved_representatives} | \
+        sed -r 's/^>//
+                s/;size=/\t/
+                s/;?$/\t0.0\tNA\tNA/' \
+        >> !{basename}_1f_representatives.results2 || true
+    '''
+}
+
+
+process chimera_detection2 {
+    // [S37]: re-run uchime_denovo on cat(pre-cleave, cleaved). The
+    // --minsize threshold drops to the smallest size found in the
+    // cleaved fas2 so newly cleaved low-abundance clusters are still
+    // searched for chimeras, but it never goes below
+    // params.chimera_minsize. An empty cleaved input falls back to
+    // params.chimera_minsize.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path representatives           // pre-cleave: <basename>_1f_representatives.fas
+    path cleaved_representatives   // cleaver:    <basename>_1f_representatives.fas2
+    val basename
+
+    output:
+    path "${basename}_1f_representatives.uchime2"
+    path "${basename}_1f_representatives.log2"
+
+    shell:
+    '''
+    #!/bin/bash
+    set -euo pipefail
+
+    lowest="$(sed -rn '/^>/ s/.*;size=([0-9]+);?/\\1/p' !{cleaved_representatives} \
+                | sort -n | head -n 1)"
+    lowest="${lowest:-0}"
+    if (( lowest < !{params.chimera_minsize} )) ; then
+        lowest=!{params.chimera_minsize}
+    fi
+
+    cat !{representatives} !{cleaved_representatives} | \
+        vsearch \
+            --sortbysize - \
+            --sizein \
+            --minsize "${lowest}" \
+            --sizeout \
+            --quiet \
+            --output - | \
+        vsearch \
+            --uchime_denovo - \
+            --uchimeout !{basename}_1f_representatives.uchime2 \
+            2> !{basename}_1f_representatives.log2
+    '''
+}
+
+
 process build_occurrence_table {
     // [S35]: merge swarm / uchime / quality / stampa / distribution
     // into the filtered occurrence table. Representatives, stats,
-    // and swarms are concatenated across the pre-cleave global
-    // outputs and the cleaved (`.fas2` / `.stats2` / `.swarms2`)
-    // outputs so cleaved clusters get a row when they have
-    // downstream taxonomy / chimera annotations.
+    // swarms, chimera annotations, and taxonomic assignments are
+    // each concatenated across the pre-cleave outputs and the
+    // post-cleave ([S22]/[S36]/[S37]) outputs so cleaved clusters
+    // get a row.
     //
-    // For now, chimera_detection and fake_taxonomic_assignment run
-    // on the pre-cleave representatives only — clusters that exist
-    // only after cleaving get the script's "NA" defaults and are
-    // therefore filtered out (chimera != "N"). Adding the
-    // `chimera_detection2` / `fake_taxonomic_assignment2` variants
-    // from tmp/fred_03 is a follow-up.
+    // Concat order matters for the taxonomic assignments: stampa_parse
+    // overwrites by amplicon ID, so the file listed *last* on stdin
+    // wins for an overlapping seed. Bash uses ``${TAX}{2,}`` (results2
+    // first, results last) so the pre-cleave assignment wins on
+    // overlap — that ordering is preserved here.
     publishDir params.results_folder, mode: 'link',
         enabled: params.results_folder != null
 
@@ -616,9 +689,11 @@ process build_occurrence_table {
     path stats_2,           stageAs: 'stats_cleaved'
     path swarms,            stageAs: 'swarms_global'
     path swarms_2,          stageAs: 'swarms_cleaved'
-    path uchime
+    path uchime,            stageAs: 'uchime_global'
+    path uchime_2,          stageAs: 'uchime_cleaved'
     path quality
-    path assignments
+    path assignments,       stageAs: 'assignments_global'
+    path assignments_2,     stageAs: 'assignments_cleaved'
     path distribution
     val basename
 
@@ -631,9 +706,9 @@ process build_occurrence_table {
         --representatives <(cat !{representatives} !{representatives_2}) \
         --stats           <(cat !{stats} !{stats_2}) \
         --swarms          <(cat !{swarms} !{swarms_2}) \
-        --chimera         !{uchime} \
+        --chimera         <(cat !{uchime} !{uchime_2}) \
         --quality         !{quality} \
-        --assignments     !{assignments} \
+        --assignments     <(cat !{assignments_2} !{assignments}) \
         --distribution    !{distribution} \
         > !{basename}.OTU.filtered.cleaved.table
     '''
@@ -713,6 +788,14 @@ workflow part_b_processes {
         basename
     )
 
+    // [S36]/[S37]: post-cleave taxonomy + chimera annotations.
+    fake_taxonomic_assignment2(cleaving.out[2], basename)
+    chimera_detection2(
+        global_clustering.out[3],            // pre-cleave reps
+        cleaving.out[2],                     // cleaved reps (fas2)
+        basename
+    )
+
     // [S35]: assemble the filtered occurrence table.
     build_occurrence_table(
         global_clustering.out[3],            // _1f_representatives.fas
@@ -722,8 +805,10 @@ workflow part_b_processes {
         global_clustering.out[0],            // _1f.swarms
         cleaving.out[1],                     // _1f.swarms2
         chimera_detection.out[0],            // _1f_representatives.uchime
+        chimera_detection2.out[0],           // _1f_representatives.uchime2
         build_expected_error_file.out[0],    // .qual
         fake_taxonomic_assignment.out[0],    // _1f_representatives.results
+        fake_taxonomic_assignment2.out[0],   // _1f_representatives.results2
         build_distribution_file.out[0],      // .distr
         basename,
     )

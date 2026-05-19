@@ -62,6 +62,8 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S33]`| Part B `fake_taxonomic_assignment` — placeholder taxonomy TSV              | `tests/processes/part_b/fake_taxonomic_assignment.nf.test` | done | — |
 | `[S34]`| Part B `chimera_detection` — vsearch uchime_denovo on representatives     | `tests/processes/part_b/chimera_detection.nf.test` | done | — |
 | `[S35]`| Part B `build_occurrence_table` — merge swarm/uchime/quality/stampa/distribution into the filtered occurrence table | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test` | done | — |
+| `[S36]`| Part B `fake_taxonomic_assignment2` — placeholder taxonomy TSV for cleaved representatives | `tests/processes/part_b/fake_taxonomic_assignment2.nf.test` | done | — |
+| `[S37]`| Part B `chimera_detection2` — uchime_denovo on pre-cleave + cleaved reps with dynamic --minsize | `tests/processes/part_b/chimera_detection2.nf.test` | done | — |
 
 
 ## Per-process tests
@@ -86,3 +88,5 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `chimera_detection`             | `tests/processes/part_b/chimera_detection.nf.test`            | S34          | done   |
 | `cleaving`                      | `tests/processes/part_b/cleaving.nf.test`                     | S22          | done   |
 | `build_occurrence_table`        | `tests/processes/part_b/build_occurrence_table.nf.test`       | S35          | done   |
+| `fake_taxonomic_assignment2`    | `tests/processes/part_b/fake_taxonomic_assignment2.nf.test`   | S36          | done   |
+| `chimera_detection2`            | `tests/processes/part_b/chimera_detection2.nf.test`           | S37          | done   |

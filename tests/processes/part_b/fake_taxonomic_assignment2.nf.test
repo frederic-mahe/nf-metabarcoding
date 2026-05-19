@@ -1,0 +1,71 @@
+nextflow_process {
+
+    name "fake_taxonomic_assignment2"
+    script "main.nf"
+    process "fake_taxonomic_assignment2"
+
+    test("emits one placeholder row per cleaved representative") {
+        // COVERAGE: [S36]
+        tag "ci"
+        when {
+            process {
+                """
+                // Use the cluster_cleaver fixture's expected fas2 inline
+                // — three records, byte-exact match to that test's
+                // golden so we exercise the non-empty path.
+                def fas2 = workDir.resolve("fixture.fas2")
+                fas2.text = '''>aa01;size=30
+AAAAAAAAAA
+>ee02;size=4
+GTGAGAGAGA
+>ff03;size=8
+TTTTTTTTGG
+'''
+                input[0] = file(fas2.toString())
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def outPath = process.out[0].get(0)
+            assert outPath.endsWith("proj_3_samples_1f_representatives.results2") :
+                "unexpected output filename: ${outPath}"
+            def rows = path(outPath).readLines().collect {
+                it.split("\t", -1)
+            }
+            assert rows.size() == 3 :
+                "expected 3 rows, got ${rows.size()}: ${rows}"
+            rows.each { cols ->
+                assert cols.size() == 5
+                assert cols[2] == "0.0"
+                assert cols[3] == "NA"
+                assert cols[4] == "NA"
+            }
+            assert rows[0][0] == "aa01"
+            assert rows[0][1] == "30"
+        }
+    }
+
+    test("empty fas2 yields an empty results2 file") {
+        // COVERAGE: [S36]
+        tag "ci"
+        when {
+            process {
+                """
+                def empty_fas2 = workDir.resolve("empty.fas2")
+                empty_fas2.text = ""
+                input[0] = file(empty_fas2.toString())
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def outPath = process.out[0].get(0)
+            assert outPath.endsWith("proj_3_samples_1f_representatives.results2")
+            assert file(outPath).text == "" :
+                "expected an empty results2 file"
+        }
+    }
+}
