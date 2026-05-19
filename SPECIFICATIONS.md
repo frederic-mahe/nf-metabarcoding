@@ -605,7 +605,11 @@ from placeholder values to real taxonomic assignments.
     exist, their CLI parses without error, and a smoke test
     against a tiny reference fixture produces a TSV with the
     documented shape. Real-world LCA correctness is pinned by
-    porting the legacy `stampa_merge.py` unit tests in a follow-up.
+    characterization tests against the legacy
+    `tmp/stampa/stampa_merge.py` in
+    `tests/python/test_stampa_merge_legacy.py`, which lock the
+    LCA / hit-parsing / shard-walk behaviour we promise to
+    preserve through the refactor toward `bin/stampa_merge.py`.
 - `[S50]` Part C's shadow path uses `vsearch --sintax` against
   the **same** reference dataset and emits an alternative
   taxonomy TSV with the same column shape as the primary path

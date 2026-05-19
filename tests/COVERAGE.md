@@ -75,7 +75,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S46]`| Part B publishes final occurrence table as `<basename>_table.tsv`                    | `tests/main.nf.test`, `tests/processes/part_b/rebuild_post_mumu_table.nf.test` | done   | — |
 | `[S47]`| Part C requires `--reference_dataset` (no default)                                   | `tests/main.nf.test`                            | done    | —          |
 | `[S48]`| Part C accepts either an occurrence table or a fasta file (fasta-input branch blocked)| `tests/processes/part_c/extract_fasta_sequences_from_occurrence_table.nf.test` | done   | D04        |
-| `[S49]`| Part C stampa primary path — `vsearch --usearch_global` + `bin/stampa_merge.py`     | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`, `tests/python/test_stampa_merge.py` | done | — |
+| `[S49]`| Part C stampa primary path — `vsearch --usearch_global` + `bin/stampa_merge.py`     | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`, `tests/python/test_stampa_merge.py`, `tests/python/test_stampa_merge_legacy.py` | done | — |
 | `[S50]`| Part C sintax shadow path — `vsearch --sintax` against the same reference            | `tests/processes/part_c/assign_taxonomy_sintax.nf.test` | done    | —          |
 | `[S51]`| Part C `update_occurrence_table` — splice taxonomy back onto the occurrence table   | `tests/processes/part_c/update_occurrence_table.nf.test` | done   | D04        |
 
