@@ -584,7 +584,7 @@ process chimera_detection {
     //
     // [S45] keeps this pre-cleave .log internal — the canonical
     // <basename>_chimera_detection.log is published by
-    // chimera_detection2 and contains the concatenation of both
+    // chimera_detection_post_cleave and contains the concatenation of both
     // runs' stderr. Restricting publishDir to the .uchime pattern
     // excludes the .log from the results folder while keeping it
     // as a process output for testability and for downstream log
@@ -642,7 +642,7 @@ process fake_taxonomic_assignment2 {
 }
 
 
-process chimera_detection2 {
+process chimera_detection_post_cleave {
     // [S37]: re-run uchime_denovo on cat(pre-cleave, cleaved). The
     // --minsize threshold drops to the smallest size found in the
     // cleaved fas2 so newly cleaved low-abundance clusters are still
@@ -691,13 +691,13 @@ process chimera_detection2 {
         vsearch \
             --uchime_denovo - \
             --uchimeout !{basename}_1f_representatives.uchime2 \
-            2> chimera_detection2.log
+            2> chimera_detection_post_cleave.log
 
     {
         echo "=== chimera_detection ==="
         cat !{pre_cleave_log}
-        echo "=== chimera_detection2 ==="
-        cat chimera_detection2.log
+        echo "=== chimera_detection_post_cleave ==="
+        cat chimera_detection_post_cleave.log
     } > !{basename}_chimera_detection.log
     '''
 }
@@ -1092,7 +1092,7 @@ workflow part_b_processes {
 
     // [S36]/[S37]: post-cleave taxonomy + chimera annotations.
     fake_taxonomic_assignment2(cleaving.out[2], basename)
-    chimera_detection2(
+    chimera_detection_post_cleave(
         global_clustering.out[3],            // pre-cleave reps
         cleaving.out[2],                     // cleaved reps (fas2)
         chimera_detection.out[1],            // pre-cleave stderr ([S45])
@@ -1108,7 +1108,7 @@ workflow part_b_processes {
         global_clustering.out[0],            // _1f.swarms
         cleaving.out[1],                     // _1f.swarms2
         chimera_detection.out[0],            // _1f_representatives.uchime
-        chimera_detection2.out[0],           // _1f_representatives.uchime2
+        chimera_detection_post_cleave.out[0],           // _1f_representatives.uchime2
         build_expected_error_file.out[0],    // .qual
         fake_taxonomic_assignment.out[0],    // _1f_representatives.results
         fake_taxonomic_assignment2.out[0],   // _1f_representatives.results2

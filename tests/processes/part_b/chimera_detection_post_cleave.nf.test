@@ -1,8 +1,8 @@
 nextflow_process {
 
-    name "chimera_detection2"
+    name "chimera_detection_post_cleave"
     script "main.nf"
-    process "chimera_detection2"
+    process "chimera_detection_post_cleave"
 
     setup {
         run("global_dereplication") {
@@ -76,12 +76,12 @@ nextflow_process {
             def log_text = path(log2).text
             assert log_text.contains("=== chimera_detection ===") :
                 "canonical log should announce the pre-cleave section, got:\n${log_text}"
-            assert log_text.contains("=== chimera_detection2 ===") :
+            assert log_text.contains("=== chimera_detection_post_cleave ===") :
                 "canonical log should announce the post-cleave section, got:\n${log_text}"
             // The two section headers must appear in order — pre-cleave
             // first, post-cleave second.
             assert log_text.indexOf("=== chimera_detection ===") <
-                   log_text.indexOf("=== chimera_detection2 ===") :
+                   log_text.indexOf("=== chimera_detection_post_cleave ===") :
                 "section headers must appear in order (pre-cleave before post-cleave)"
         }
     }

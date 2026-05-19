@@ -395,7 +395,7 @@ isolation.
   - **Pass when:** running on a fas2 with `K` records emits `K`
     placeholder rows; running on an empty fas2 emits an empty
     file.
-- `[S37]` Part B's `chimera_detection2` re-runs uchime_denovo on
+- `[S37]` Part B's `chimera_detection_post_cleave` re-runs uchime_denovo on
   the concatenation of pre-cleave and cleaved representatives
   (`<basename>_1f_representatives.fas` from `[S32]` plus
   `<basename>_1f_representatives.fas2` from `[S22]`). The
@@ -519,10 +519,11 @@ isolation.
     - `<basename>_chimera_detection.log` — the concatenation of
       both chimera-detection runs' stderr: the pre-cleave
       `chimera_detection` (`[S34]`) followed by the post-cleave
-      `chimera_detection2` (`[S37]`). Each fragment is preceded by
-      a one-line section header (`=== chimera_detection ===` /
-      `=== chimera_detection2 ===`) so the two runs remain
-      distinguishable
+      `chimera_detection_post_cleave` (`[S37]`). Each fragment is
+      preceded by a one-line section header
+      (`=== chimera_detection ===` /
+      `=== chimera_detection_post_cleave ===`) so the two runs
+      remain distinguishable
     - `<basename>_cleaving.log` — `cleaving`'s stderr from
       `bin/cluster_cleaver.py` (`[S22]`)
     - `<basename>_superstring_clustering.log` — combined stderr of
