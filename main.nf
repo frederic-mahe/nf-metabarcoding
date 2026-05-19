@@ -15,6 +15,14 @@ params.stripright = 30
 // [S20]: when params.no_trimming is true, forward_primer and
 // reverse_primer must be empty and the trim_primers step is skipped.
 
+// Part B parameters — required only when Part B runs.
+// [S25] / [S26] / [S27]: setting --fasta_folder switches the
+// workflow into Part B standalone mode; --project_name and
+// --results_folder become required, and Part A is skipped.
+params.fasta_folder    = null
+params.project_name    = null
+params.results_folder  = null
+
 
 process merge_fastq_pairs {
     // --fastqout_notmerged_fwd/_rev capture reads that fail to merge;
@@ -457,7 +465,7 @@ process list_all_cluster_seeds_of_size_greater_than_2 {
 
 process global_dereplication {
     // [S31]: cat every input .fas and pass it through
-    // vsearch --derep_fulllength. --sizein/--sizeout preserve the
+    // vsearch --fastx_uniques. --sizein/--sizeout preserve the
     // per-sample size annotations so vsearch sums abundances across
     // samples.
     publishDir params.results_folder, mode: 'link',
@@ -475,13 +483,13 @@ process global_dereplication {
     '''
     cat !{fastas} | \
         vsearch \
-            --derep_fulllength - \
+            --fastx_uniques - \
             --sizein \
             --sizeout \
             --fasta_width 0 \
             --quiet \
             --log !{basename}.log \
-            --output !{basename}.fas
+            --fastaout !{basename}.fas
     '''
 }
 
@@ -520,7 +528,57 @@ process global_clustering {
 }
 
 
+workflow part_b {
+    // Standalone Part B ([S25]/[S26]/[S27]): discover per-sample .fas
+    // files (skipping shadow-pipeline _notmerged artefacts), assert
+    // sample-ID uniqueness, and run the four parallel build/list/derep
+    // processes followed by global clustering. .qual and .stats are
+    // derived as sibling files of each .fas.
+    assert params.project_name :
+        "--project_name must be set when --fasta_folder is set"
+    assert params.results_folder :
+        "--results_folder must be set when --fasta_folder is set"
+
+    // [S26]: create the results folder (and any missing parents)
+    // before anything publishes into it.
+    def results_dir = new File(params.results_folder.toString())
+    results_dir.mkdirs()
+
+    discover_part_b_fasta()
+
+    def samples_ch = discover_part_b_fasta.out
+        .splitCsv(sep: '\t')
+        .map { row -> tuple(row[0], file(row[1])) }
+
+    def fasta_list = samples_ch.map { _id, f -> f }.collect()
+    def qual_list  = samples_ch
+        .map { id, f -> file("${f.parent}/${id}.qual") }
+        .collect()
+    def stats_list = samples_ch
+        .map { id, f -> file("${f.parent}/${id}.stats") }
+        .collect()
+
+    def basename = fasta_list.map { files ->
+        "${params.project_name}_${files.size()}_samples"
+    }
+
+    build_expected_error_file(qual_list, basename)
+    build_distribution_file(fasta_list, basename)
+    list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
+    global_dereplication(fasta_list, basename)
+    global_clustering(global_dereplication.out[0], basename)
+}
+
+
 workflow {
+    // [S27]: --fasta_folder switches the pipeline into Part B
+    // standalone mode. Part A's --fastq_folder requirement is lifted
+    // in that mode (Part A does not run).
+    if ( params.fasta_folder ) {
+        part_b()
+        return
+    }
+
     // required parameters (no default — supply via CLI or project config)
     assert params.fastq_folder : "--fastq_folder must be set (no default)"
 

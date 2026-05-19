@@ -280,6 +280,112 @@ nextflow_pipeline {
         }
     }
 
+    test("Part B standalone runs every pre-cleaving process on the part_b fixture") {
+        // COVERAGE: [S25], [S26], [S27]
+        tag "ci"
+        when {
+            params {
+                project_name   = "myproj"
+                results_folder = "${outputDir}/part_b_results"
+                fasta_folder   = "${projectDir}/tests/data/part_b"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+
+            // [S26]: the results folder is created on the fly.
+            def resultDir = "${outputDir}/part_b_results"
+            assert file(resultDir).exists() : "results folder should be created"
+
+            // [S27]: 2 samples (S1, S2); S1_notmerged.fas is excluded.
+            // Project-wide artefacts use the `<project>_<N>_samples`
+            // basename.
+            def base = "${resultDir}/myproj_2_samples"
+            ["${base}.qual",
+             "${base}.distr",
+             "${base}_per_sample_OTUs.stats",
+             "${base}.fas",
+             "${base}.log",
+             "${base}_1f.swarms",
+             "${base}_1f.stats",
+             "${base}_1f_representatives.fas",
+             "${base}_1f.log"].each { artefact ->
+                assert file(artefact).exists() :
+                    "missing Part B artefact: ${artefact}"
+            }
+
+            // The notmerged decoy must not appear anywhere in the
+            // global fasta.
+            def globalFasta = file("${base}.fas").text
+            assert !globalFasta.contains("9999999999") :
+                "_notmerged decoy leaked into the Part B fasta channel"
+        }
+    }
+
+    test("Part B aborts when --project_name is missing") {
+        // COVERAGE: [S25]
+        tag "ci"
+        when {
+            params {
+                results_folder = "${outputDir}/part_b_no_project"
+                fasta_folder   = "${projectDir}/tests/data/part_b"
+                threads        = 1
+                // project_name deliberately unset
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("project_name") :
+                "expected error to name project_name, got: ${msg}"
+        }
+    }
+
+    test("Part B aborts when --results_folder is missing") {
+        // COVERAGE: [S26]
+        tag "ci"
+        when {
+            params {
+                project_name = "myproj"
+                fasta_folder = "${projectDir}/tests/data/part_b"
+                threads      = 1
+                // results_folder deliberately unset
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("results_folder") :
+                "expected error to name results_folder, got: ${msg}"
+        }
+    }
+
+    test("Part B aborts when two input fastas resolve to the same sample ID") {
+        // COVERAGE: [S27], [S13], [S14]
+        tag "ci"
+        when {
+            params {
+                project_name   = "myproj"
+                results_folder = "${outputDir}/part_b_dupes"
+                // tests/data has every sample's .fas at the top level
+                // AND duplicate copies in subfolders → at least one
+                // duplicate sample ID across the two folders.
+                fasta_folder   = (
+                    "${projectDir}/tests/data/part_b," +
+                    "${projectDir}/tests/data/part_b"
+                )
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.toLowerCase().contains("duplicate") :
+                "expected error to mention duplicates, got: ${msg}"
+        }
+    }
+
     test("empty input samples travel through to the occurrence table") {
         // COVERAGE: [S09] — pending until empty-sample passthrough lands.
         // Tagged "pending" so CI (`nf-test test --tag '!pending'`) skips
