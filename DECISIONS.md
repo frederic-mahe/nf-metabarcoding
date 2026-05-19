@@ -62,17 +62,36 @@ schema in [`SPECIFICATIONS.md`](SPECIFICATIONS.md).
 
 ## D03 — Collision policy for same-named samples
 
-**Blocks:** `[S14]` (the warning bullet `[S13]` is testable today)
-**Status:** `open`
+**Blocks:** `[S13]`, `[S14]`
+**Status:** `resolved`
 
-Three plausible answers:
+**Resolution (2026-05-19):** **refuse**. Sample IDs **must** be
+unique. When `bin/discover_fastq.py` (Part A) or
+`bin/discover_fasta.py` (Part B) finds two or more input files that
+derive to the same sample ID, the workflow exits non-zero **before
+any process runs** and the error message lists every offending file
+path so the user can rename / move / remove the duplicate.
 
-1. **Merge** — concatenate reads from same-named inputs (fast,
-   destructive)
-2. **Refuse** — abort with a clear error (safest, but breaks
-   discovery if two folders happen to overlap)
-3. **Suffix-disambiguate** — append a hash or folder name to one of
-   the collisions (verbose, never silently merges)
+Rationale: silent merge (option 1) is destructive and loses
+provenance; suffix-disambiguation (option 3) hides the conflict and
+makes downstream artefacts (logs, occurrence-table columns) hard to
+trace back to the original fastq. Refusing keeps the input → sample
+mapping injective and forces the user to resolve the conflict
+explicitly.
 
-Sub-decisions follow from the choice (e.g. if (3), what suffix
-algorithm; if (1), how is provenance recorded).
+Sub-decisions:
+
+- **Where the check runs:** Part A — inside `bin/discover_fastq.py`
+  (after `check_reserved_suffix`). Part B — inside
+  `bin/discover_fasta.py`. Both expose a CLI that exits non-zero on
+  duplicates and an importable `check_unique_sample_ids()` helper.
+- **Error format:** stderr names every offending path, grouped by
+  the colliding sample ID, e.g.
+
+  ```
+  error: duplicate sample IDs (each sample ID must be unique):
+    A: /run1/A_1.fastq.gz, /run2/A_R1.fastq.gz
+  ```
+
+  This format is asserted by the unit tests, so future tweaks must
+  stay backward compatible.

@@ -154,12 +154,23 @@ isolation.
     `R1 filename → expected sample ID` produces the documented value;
     sample IDs are stable across compression variants of the same
     base name.
-- `[S13]` warns if two or more samples share a derived name
-  - **Pass when:** running with two same-named inputs prints a warning
-    to stderr and continues (does not abort)
-- `[S14]` collision policy for same-named samples
-  - **Blocked by:** [`DECISIONS.md`](DECISIONS.md) — merge / refuse /
-    suffix-disambiguate?
+- `[S13]` aborts when two or more discovered samples share a
+  derived sample ID; the error message names the colliding sample
+  ID and lists every input file path involved in the collision
+  (one group per ID). The check runs **before** any Part A / Part B
+  process starts.
+  - **Pass when:** running Part A with two fastq inputs that both
+    derive to sample ID `A` exits non-zero, stderr names `A` and
+    both fastq paths, and no Part A process appears in the
+    nextflow trace.
+- `[S14]` collision policy for same-named samples: **refuse**
+  (sample IDs must be unique). Resolved per `D03` in
+  [`DECISIONS.md`](DECISIONS.md); implemented by `[S13]`.
+  - **Pass when:** `bin/discover_fastq.py` (Part A) and
+    `bin/discover_fasta.py` (Part B) each expose a
+    `check_unique_sample_ids()` helper that raises on duplicates,
+    and each CLI exits non-zero with a stderr message listing every
+    duplicate file path.
 - `[S15]` users can choose between a single occurrence table or a
   two-part table (long-format + per-cluster metadata)
   - **Pass when:** `--split-occurrence-table` toggles between the two
@@ -180,16 +191,21 @@ isolation.
     the stderr/log identifies the missing parameter; supplying the
     parameter via either `-params-file` or `--key value` lets the
     run proceed
-- `[S19]` each Part A step emits a per-sample log file alongside its
-  data output, published to `params.fastq_folder`:
-    - merging       → `<sampleId>_merging.log`
-    - trimming      → `<sampleId>_trimming.log` (only when the
-      trimming step runs — see `[S20]`)
-    - dereplicating → `<sampleId>_dereplicating.log`
-    - clustering    → `<sampleId>_clustering.log`
-  - **Pass when:** running Part A on any sample produces all four
-    log files in `params.fastq_folder`, each non-empty (three when
-    `--no_trimming` is set: no `_trimming.log`)
+- `[S19]` every Part A per-sample artefact is published into
+  `params.fastq_folder` (the same folder(s) the input fastq files
+  came from):
+    - data files: `<sampleId>.fas`, `<sampleId>.qual`,
+      `<sampleId>.stats`
+    - per-step log files:
+        - merging       → `<sampleId>_merging.log`
+        - trimming      → `<sampleId>_trimming.log` (only when the
+          trimming step runs — see `[S20]`)
+        - dereplicating → `<sampleId>_dereplicating.log`
+        - clustering    → `<sampleId>_clustering.log`
+  - **Pass when:** running Part A on any sample produces all three
+    data files and all four log files in `params.fastq_folder`,
+    each non-empty (three logs when `--no_trimming` is set: no
+    `_trimming.log`).
 - `[S20]` `--no_trimming` toggle (default: `false`) skips the primer
   trimming step. The toggle and the primer parameters are mutually
   exclusive:
@@ -258,6 +274,95 @@ isolation.
   - **Pass when:** running `strip_reads` on a fastq with 70 nt reads
     produces 40 nt reads with the default `stripright = 30`, and 70 nt
     reads with `stripright = 0`.
+- `[S25]` Part B requires `--project_name` (no default). The value
+  is used as the filename prefix for every project-wide artefact
+  (global dereplicated fasta, quality file, distribution file,
+  per-sample-stats file, swarm outputs). The workflow aborts at
+  startup if Part B is asked to run without `--project_name`. The
+  parameter is **only** required for Part B; Part A and Part C do
+  not consume it.
+  - **Pass when:** running Part B without `--project_name` exits
+    non-zero and stderr names the missing parameter; supplying it
+    via `-params-file` or `--key value` lets the run proceed and
+    every Part B artefact filename begins with the supplied value.
+- `[S26]` Part B requires `--results_folder` (no default). The
+  value is an absolute or relative path to the folder where Part B
+  publishes every artefact. The workflow creates the folder (and
+  any missing parent directories) at startup if it does not exist;
+  an existing folder is reused as-is. Like `[S25]`, this parameter
+  is **only** required for Part B.
+  - **Pass when:** running Part B with `--results_folder` set to a
+    non-existent absolute or relative path succeeds, creates the
+    folder, and every Part B artefact lands inside it.
+- `[S27]` Part B builds its fasta channel by collecting every
+  `.fas` file that satisfies one of:
+    - produced by Part A in the same run (when Parts A and B run
+      end-to-end), or
+    - globbed from the list of `--fasta_folder` directories
+      (Part B standalone; same single-path / comma-list / Groovy-list
+      semantics as `[S10]` for `--fastq_folder`).
+
+  Files whose basename ends in `_notmerged.fas` are excluded
+  ([S04]'s shadow-pipeline artefacts are processed downstream by a
+  dedicated path, not by the regular Part B pipeline). The Part B
+  sample ID is the basename stripped of the `.fas` extension.
+  Duplicate sample IDs are an error: the workflow aborts before any
+  Part B process runs and the stderr lists every duplicated `.fas`
+  path (see `[S13]`).
+  - **Pass when:** running Part B on a folder containing `A.fas`,
+    `A_notmerged.fas`, and `B.fas` builds a fasta channel of
+    `{A.fas, B.fas}` (notmerged excluded); running on two folders
+    that both contain `A.fas` exits non-zero and stderr lists both
+    paths.
+- `[S28]` Part B's `build_expected_error_file` merges every
+  per-sample `<sampleId>.qual` from the `[S27]` fasta channel into
+  a single project-wide quality file
+  `<project_name>_<N>_samples.qual` (`N` = number of `.fas` in the
+  channel). The merge keeps one row per SHA1 (the input rows are
+  pre-sorted by length then SHA1, and `uniq --check-chars=40`
+  collapses duplicates).
+  - **Pass when:** running on two `.qual` fixtures whose SHA1 sets
+    overlap emits one row per distinct SHA1 and no SHA1 appears
+    twice; the output filename is
+    `<project_name>_<N>_samples.qual`.
+- `[S29]` Part B's `build_distribution_file` scans the FASTA
+  headers of every `.fas` in the `[S27]` channel and writes the
+  sequence ↔ sample map to `<project_name>_<N>_samples.distr`. Each
+  row is `<sha1>\t<sampleId>\t<size>` (tab-separated); the
+  `;size=N` annotation is stripped from the header.
+  - **Pass when:** running on a fixture with samples `A` (two
+    records) and `B` (one record) emits three rows, sample IDs
+    match the fasta basenames, and the `<size>` column is the
+    integer value of `;size=N`.
+- `[S30]` Part B's `list_all_cluster_seeds_of_size_greater_than_2`
+  concatenates every per-sample `.stats` (the swarm-stats files
+  published by Part A, filtered to clusters > 2 reads per `[S17]`)
+  into a single project-wide
+  `<project_name>_<N>_samples_per_sample_OTUs.stats`. Each row is
+  the original `.stats` row prefixed with `<sampleId>\t` (sample ID
+  derived from the `.stats` basename).
+  - **Pass when:** running on two `.stats` fixtures emits
+    `len(rows_A) + len(rows_B)` rows; the first column carries the
+    sample ID; the remaining columns preserve the original swarm
+    `--statistics-file` layout.
+- `[S31]` Part B's `global_dereplication` concatenates every
+  `.fas` in the `[S27]` channel and runs
+  `vsearch --derep_fulllength` with `--sizein --sizeout --fasta_width
+  0`. The output is `<project_name>_<N>_samples.fas`; the vsearch
+  log is published as `<project_name>_<N>_samples.log`.
+  - **Pass when:** running on two `.fas` fixtures that share a
+    sequence yields one record per distinct sequence; the
+    `;size=N` value is the sum of the per-sample sizes.
+- `[S32]` Part B's `global_clustering` runs swarm on the
+  globally-dereplicated fasta from `[S31]` with `--differences 1
+  --fastidious --usearch-abundance` and the four output flags
+  `--internal-structure`, `--output-file`, `--statistics-file`,
+  `--seeds`. Output filenames follow the
+  `<project_name>_<N>_samples_1f.{swarms,stats,struct}` and
+  `<project_name>_<N>_samples_1f_representatives.fas` scheme; the
+  run log is `<project_name>_<N>_samples_1f.log`.
+  - **Pass when:** the four output files plus the log exist and are
+    non-empty for the documented fixture.
 
 
 ## Common fastq file-name patterns
