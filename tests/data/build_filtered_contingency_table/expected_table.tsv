@@ -1,0 +1,4 @@
+OTU	total	cloud	amplicon	length	abundance	chimera	spread	quality	sequence	identity	taxonomy	references	s1	s2	s3	s4	s5
+1	12	2	aa01000000000000000000000000000000000000	10	8	N	2	1e-05	AAAAAAAAAA	99.9	Bacteria;Phylum1	ref1	8	4	0	0	0
+2	10	1	ee01000000000000000000000000000000000000	10	10	N	1	1e-05	TAAAAAAAAA	100.0	Bacteria;Phylum2	ref2	10	0	0	0	0
+3	2	1	ff01000000000000000000000000000000000000	10	2	N	2	1e-05	GAAAAAAAAA	95.0	Bacteria;Phylum3	ref3	0	1	1	0	0
