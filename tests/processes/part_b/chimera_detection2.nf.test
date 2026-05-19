@@ -27,16 +27,29 @@ nextflow_process {
                 """
             }
         }
+        run("chimera_detection") {
+            script "main.nf"
+            process {
+                """
+                input[0] = global_clustering.out[3]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
     }
 
     test("runs uchime_denovo on cat(pre-cleave, cleaved); empty cleaved → fallback minsize") {
-        // COVERAGE: [S37]
+        // COVERAGE: [S37], [S45]
         // We exercise the empty-cleaved branch: the part_b fixture's
         // cleaving step legitimately produces an empty .fas2 (no
         // sub-seeds in the tiny inputs), so the dynamic --minsize
         // must fall back to params.chimera_minsize and the
         // concatenated stream effectively boils down to the
         // pre-cleave representatives.
+        //
+        // [S45]: the canonical <basename>_chimera_detection.log
+        // contains the concatenation of both chimera-detection
+        // runs' stderr, each preceded by a section header.
         tag "ci"
         when {
             process {
@@ -45,7 +58,8 @@ nextflow_process {
                 empty_fas2.text = ""
                 input[0] = global_clustering.out[3]
                 input[1] = file(empty_fas2.toString())
-                input[2] = "proj_3_samples"
+                input[2] = chimera_detection.out[1]
+                input[3] = "proj_3_samples"
                 """
             }
         }
@@ -58,9 +72,17 @@ nextflow_process {
             // project-wide naming construct.
             assert log2.endsWith("proj_3_samples_chimera_detection.log")
             assert file(uchime2).exists()
-            // log2 should mention vsearch's chimera-search activity
-            assert path(log2).readLines().size() > 0 :
-                "uchime stderr log should not be empty"
+
+            def log_text = path(log2).text
+            assert log_text.contains("=== chimera_detection ===") :
+                "canonical log should announce the pre-cleave section, got:\n${log_text}"
+            assert log_text.contains("=== chimera_detection2 ===") :
+                "canonical log should announce the post-cleave section, got:\n${log_text}"
+            // The two section headers must appear in order — pre-cleave
+            // first, post-cleave second.
+            assert log_text.indexOf("=== chimera_detection ===") <
+                   log_text.indexOf("=== chimera_detection2 ===") :
+                "section headers must appear in order (pre-cleave before post-cleave)"
         }
     }
 
@@ -86,7 +108,8 @@ ACACACACAC
 '''
                 input[0] = global_clustering.out[3]
                 input[1] = file(fas2.toString())
-                input[2] = "proj_3_samples"
+                input[2] = chimera_detection.out[1]
+                input[3] = "proj_3_samples"
                 """
             }
         }

@@ -516,9 +516,13 @@ isolation.
       vsearch log (`[S31]`)
     - `<basename>_clustering.log` — `global_clustering` swarm log
       (`[S32]`)
-    - `<basename>_chimera_detection.log` — the canonical chimera
-      run's stderr (`chimera_detection2`'s output, `[S37]`);
-      `chimera_detection`'s pre-cleave stderr is kept internal
+    - `<basename>_chimera_detection.log` — the concatenation of
+      both chimera-detection runs' stderr: the pre-cleave
+      `chimera_detection` (`[S34]`) followed by the post-cleave
+      `chimera_detection2` (`[S37]`). Each fragment is preceded by
+      a one-line section header (`=== chimera_detection ===` /
+      `=== chimera_detection2 ===`) so the two runs remain
+      distinguishable
     - `<basename>_cleaving.log` — `cleaving`'s stderr from
       `bin/cluster_cleaver.py` (`[S22]`)
     - `<basename>_superstring_clustering.log` — combined stderr of

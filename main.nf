@@ -582,11 +582,13 @@ process chimera_detection {
     // hit table can be empty when no chimeras are found; the stderr
     // log captures the run.
     //
-    // [S45] keeps this pre-cleave log internal — only the canonical
-    // chimera_detection2 log is published as
-    // <basename>_chimera_detection.log. Restricting publishDir to the
-    // .uchime pattern excludes the .log from the results folder while
-    // keeping it as a process output for testability.
+    // [S45] keeps this pre-cleave .log internal — the canonical
+    // <basename>_chimera_detection.log is published by
+    // chimera_detection2 and contains the concatenation of both
+    // runs' stderr. Restricting publishDir to the .uchime pattern
+    // excludes the .log from the results folder while keeping it
+    // as a process output for testability and for downstream log
+    // concatenation.
     publishDir params.results_folder, mode: 'link', pattern: "*.uchime",
         enabled: params.results_folder != null
 
@@ -648,15 +650,18 @@ process chimera_detection2 {
     // params.chimera_minsize. An empty cleaved input falls back to
     // params.chimera_minsize.
     //
-    // [S45]: this run is the canonical chimera-detection step. Its
-    // stderr lands at <basename>_chimera_detection.log (pre-cleave
-    // chimera_detection's log is internal, see its publishDir pattern).
+    // [S45]: the canonical <basename>_chimera_detection.log is the
+    // concatenation of both chimera-detection runs' stderr (pre-cleave
+    // chimera_detection followed by this post-cleave run). Each
+    // fragment is preceded by a `=== <process_name> ===` section
+    // header so the two runs remain distinguishable.
     publishDir params.results_folder, mode: 'link',
         enabled: params.results_folder != null
 
     input:
     path representatives           // pre-cleave: <basename>_1f_representatives.fas
     path cleaved_representatives   // cleaver:    <basename>_1f_representatives.fas2
+    path pre_cleave_log            // chimera_detection's stderr (<basename>_1f_representatives.log)
     val basename
 
     output:
@@ -686,7 +691,14 @@ process chimera_detection2 {
         vsearch \
             --uchime_denovo - \
             --uchimeout !{basename}_1f_representatives.uchime2 \
-            2> !{basename}_chimera_detection.log
+            2> chimera_detection2.log
+
+    {
+        echo "=== chimera_detection ==="
+        cat !{pre_cleave_log}
+        echo "=== chimera_detection2 ==="
+        cat chimera_detection2.log
+    } > !{basename}_chimera_detection.log
     '''
 }
 
@@ -1083,6 +1095,7 @@ workflow part_b_processes {
     chimera_detection2(
         global_clustering.out[3],            // pre-cleave reps
         cleaving.out[2],                     // cleaved reps (fas2)
+        chimera_detection.out[1],            // pre-cleave stderr ([S45])
         basename
     )
 
