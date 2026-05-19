@@ -1,0 +1,47 @@
+nextflow_process {
+
+    name "update_occurrence_table"
+    script "main.nf"
+    process "update_occurrence_table"
+
+    test("splices the taxonomy columns onto the occurrence table") {
+        // COVERAGE: [S51]
+        // Skeleton phase: D04 still needs to resolve output policy
+        // (overwrite Part B's table in place vs sibling file). Until
+        // then this test pins the join behaviour: rows whose
+        // amplicon ID appears in the assignments file get their
+        // identity/taxonomy/references columns overwritten; rows
+        // missing from the assignments pass through unchanged.
+        tag "ci"
+        when {
+            process {
+                """
+                def t = workDir.resolve("input_table.tsv")
+                t.text = '''OTU\\ttotal\\tcloud\\tamplicon\\tlength\\tabundance\\tchimera\\tspread\\tquality\\tsequence\\tidentity\\ttaxonomy\\treferences\\ts1
+1\\t10\\tNA\\tamp1\\t10\\t10\\tN\\t1\\t0.001\\tACGTACGTAC\\t0.0\\tNA\\tNA\\t10
+2\\t5\\tNA\\tamp2\\t10\\t5\\tN\\t1\\t0.001\\tTTTTTTTTTT\\t0.0\\tNA\\tNA\\t5
+'''
+                def a = workDir.resolve("assignments")
+                a.text = 'amp1\\t10\\t99.0\\tBacteria|Firmicutes\\trefA\\n'
+                input[0] = file(t.toString())
+                input[1] = file(a.toString())
+                input[2] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def out = process.out[0].get(0)
+            assert out.endsWith("proj_3_samples_table.tsv")
+            def lines = path(out).readLines()
+            assert lines.size() == 3   // header + 2 rows
+            def row1 = lines[1].split("\t", -1)
+            assert row1[10] == "99.0"       // identity overwritten
+            assert row1[11] == "Bacteria|Firmicutes"
+            assert row1[12] == "refA"
+            // amp2 missing from assignments → passthrough.
+            def row2 = lines[2].split("\t", -1)
+            assert row2[11] == "NA"
+        }
+    }
+}

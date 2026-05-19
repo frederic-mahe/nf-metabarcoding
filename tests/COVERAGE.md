@@ -73,11 +73,11 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S44]`| Part B `rebuild_post_mumu_table` — splice old metadata onto mumu rows; renumber      | `tests/python/test_rebuild_table_after_mumu.py`, `tests/processes/part_b/rebuild_post_mumu_table.nf.test` | done | — |
 | `[S45]`| Part B publishes six step-level log files under `<basename>_<step>.log`              | `tests/main.nf.test`, `tests/processes/part_b/global_dereplication.nf.test`, `tests/processes/part_b/global_clustering.nf.test`, `tests/processes/part_b/chimera_detection2.nf.test`, `tests/processes/part_b/cleaving.nf.test`, `tests/processes/part_b/merge_substring_otus.nf.test`, `tests/processes/part_b/run_mumu.nf.test` | done | — |
 | `[S46]`| Part B publishes final occurrence table as `<basename>_table.tsv`                    | `tests/main.nf.test`, `tests/processes/part_b/rebuild_post_mumu_table.nf.test` | done   | — |
-| `[S47]`| Part C requires `--reference_dataset` (no default)                                   | `tests/main.nf.test`                            | red     | —          |
-| `[S48]`| Part C accepts either an occurrence table or a fasta file                            | `tests/main.nf.test`                            | TODO    | D04        |
-| `[S49]`| Part C stampa primary path — `vsearch --usearch_global` + `bin/stampa_merge.py`     | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`, `tests/python/test_stampa_merge.py` | red | — |
-| `[S50]`| Part C sintax shadow path — `vsearch --sintax` against the same reference            | `tests/processes/part_c/assign_taxonomy_sintax.nf.test` | red    | —          |
-| `[S51]`| Part C `update_occurrence_table` — splice taxonomy back onto the occurrence table   | `tests/processes/part_c/update_occurrence_table.nf.test` | TODO   | D04        |
+| `[S47]`| Part C requires `--reference_dataset` (no default)                                   | `tests/main.nf.test`                            | done    | —          |
+| `[S48]`| Part C accepts either an occurrence table or a fasta file (fasta-input branch blocked)| `tests/processes/part_c/extract_fasta_sequences_from_occurrence_table.nf.test` | done   | D04        |
+| `[S49]`| Part C stampa primary path — `vsearch --usearch_global` + `bin/stampa_merge.py`     | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`, `tests/python/test_stampa_merge.py` | done | — |
+| `[S50]`| Part C sintax shadow path — `vsearch --sintax` against the same reference            | `tests/processes/part_c/assign_taxonomy_sintax.nf.test` | done    | —          |
+| `[S51]`| Part C `update_occurrence_table` — splice taxonomy back onto the occurrence table   | `tests/processes/part_c/update_occurrence_table.nf.test` | done   | D04        |
 
 
 ## Per-process tests
@@ -112,7 +112,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `find_similar_sequences`        | `tests/processes/part_b/find_similar_sequences.nf.test`       | S42          | done   |
 | `run_mumu`                      | `tests/processes/part_b/run_mumu.nf.test`                     | S43          | done   |
 | `rebuild_post_mumu_table`       | `tests/processes/part_b/rebuild_post_mumu_table.nf.test`      | S44, S46     | done   |
-| `extract_fasta_sequences_from_occurrence_table` | `tests/processes/part_c/extract_fasta_sequences_from_occurrence_table.nf.test` | S48 | red    |
-| `assign_taxonomy_stampa`        | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`       | S49          | red    |
-| `assign_taxonomy_sintax`        | `tests/processes/part_c/assign_taxonomy_sintax.nf.test`       | S50          | red    |
-| `update_occurrence_table`       | `tests/processes/part_c/update_occurrence_table.nf.test`      | S51          | red    |
+| `extract_fasta_sequences_from_occurrence_table` | `tests/processes/part_c/extract_fasta_sequences_from_occurrence_table.nf.test` | S48 | done   |
+| `assign_taxonomy_stampa`        | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`       | S49          | done   |
+| `assign_taxonomy_sintax`        | `tests/processes/part_c/assign_taxonomy_sintax.nf.test`       | S50          | done   |
+| `update_occurrence_table`       | `tests/processes/part_c/update_occurrence_table.nf.test`      | S51          | done   |

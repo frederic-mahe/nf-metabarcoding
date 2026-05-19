@@ -27,6 +27,19 @@ params.results_folder  = null
 // dropped before uchime_denovo runs.
 params.chimera_minsize = 2
 
+// Part C parameters — required only when Part C runs.
+// [S47]: path to a reference dataset (fasta, plain / .gz / .bz2).
+// [S48]: occurrence table input (Part C standalone). When Parts B
+// and C run end-to-end the Part C workflow consumes Part B's
+// <basename>_table.tsv directly and this stays null.
+// [S49] / [S50]: 'stampa' (default) drives the primary path,
+// 'sintax' switches to the shadow path.
+// [S49]: identity-definition flag passed to vsearch (iddef).
+params.reference_dataset = null
+params.occurrence_table  = null
+params.taxonomy_method   = 'stampa'
+params.iddef             = 1
+
 
 process merge_fastq_pairs {
     // --fastqout_notmerged_fwd/_rev capture reads that fail to merge;
@@ -1111,6 +1124,228 @@ workflow part_b_processes {
 }
 
 
+// ============================================================================
+// Part C — taxonomic assignment (stampa re-implementation)
+// ============================================================================
+// Skeleton phase: the processes are wired but the test coverage is
+// tagged `pending` because D04 still needs to land before the
+// stand-alone CLI / output policy is finalised.
+
+process extract_fasta_sequences_from_occurrence_table {
+    // [S48]: extract a representatives FASTA from the occurrence
+    // table. Column 4 = amplicon ID, column 2 = abundance, column
+    // 10 = sequence (same layout as [S40]'s extract_otu_fasta).
+
+    input:
+    path occurrence_table
+
+    output:
+    path "${occurrence_table.baseName}_representatives.fas"
+
+    shell:
+    '''
+    awk 'NR > 1 {printf ">"$4";size="$2";\\n"$10"\\n"}' !{occurrence_table} \
+        > !{occurrence_table.baseName}_representatives.fas
+    '''
+}
+
+
+process assign_taxonomy_stampa {
+    // [S49]: primary taxonomic-assignment path. Run vsearch
+    // --usearch_global against the reference dataset, then collapse
+    // the top hits per amplicon with bin/stampa_merge.py.
+    //
+    // The whole representatives fasta goes through one vsearch
+    // invocation — no slurm array split (nextflow handles
+    // parallelism by process, not by job array).
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path representatives
+    path reference_dataset
+    val basename
+
+    output:
+    path "${basename}_taxonomy_stampa.tsv"
+    path "${basename}_taxonomy.log"
+
+    shell:
+    '''
+    # Rewrite vsearch-style ";size=N;" into the swarm-style "_N"
+    # abundance annotation that stampa_merge.py expects (mirrors the
+    # `sed` pass in the legacy stampa.sh).
+    sed -e '/^>/ s/;size=/_/' -e '/^>/ s/;$//' !{representatives} \
+        > stampa_input.fas
+
+    vsearch \
+        --usearch_global stampa_input.fas \
+        --threads !{params.threads} \
+        --db !{reference_dataset} \
+        --dbmask none \
+        --qmask none \
+        --rowlen 0 \
+        --notrunclabels \
+        --userfields query+id!{params.iddef}+target \
+        --maxaccepts 0 \
+        --maxrejects 32 \
+        --top_hits_only \
+        --output_no_hits \
+        --id 0.5 \
+        --iddef !{params.iddef} \
+        --userout hits \
+        --log !{basename}_taxonomy.log
+
+    stampa_merge.py hits > !{basename}_taxonomy_stampa.tsv
+    '''
+}
+
+
+process assign_taxonomy_sintax {
+    // [S50]: shadow taxonomic-assignment path. Run vsearch --sintax
+    // against the same reference dataset and reshape the output to
+    // match the stampa-style TSV
+    // (amplicon\tabundance\tidentity\ttaxonomy\treferences).
+    //
+    // Skeleton: the sed/awk reshape below is a best-effort pass
+    // that strips ;size= annotations and renames the bootstrap
+    // confidences into the references column. Pin the exact shape
+    // once D04 lands.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path representatives
+    path reference_dataset
+    val basename
+
+    output:
+    path "${basename}_taxonomy_sintax.tsv"
+    path "${basename}_taxonomy.log"
+
+    shell:
+    '''
+    vsearch \
+        --sintax !{representatives} \
+        --threads !{params.threads} \
+        --db !{reference_dataset} \
+        --sintax_cutoff 0.8 \
+        --tabbedout raw_sintax.tsv \
+        --log !{basename}_taxonomy.log
+
+    awk 'BEGIN {FS = OFS = "\t"}
+         {
+             split($1, a, ";size=")
+             amplicon = a[1]
+             gsub(/;.*$/, "", a[2])
+             abundance = a[2] + 0
+             # column 4 (sintax LCA at the cutoff) → taxonomy
+             # column 2 (raw lineage with bootstrap) → references
+             print amplicon, abundance, "0.0", $4, $2
+         }' raw_sintax.tsv > !{basename}_taxonomy_sintax.tsv
+    '''
+}
+
+
+process update_occurrence_table {
+    // [S51]: splice the taxonomy assignments back onto Part B's
+    // <basename>_table.tsv. The output overwrites Part B's file in
+    // the results folder (D04 may revisit this).
+    //
+    // The input table is staged under a transient name (`input_table`)
+    // so the output filename can reuse the project-wide basename
+    // without colliding with the staged input — Part B and Part C
+    // share the same basename when they run end-to-end.
+    publishDir params.results_folder, mode: 'link', overwrite: true,
+        enabled: params.results_folder != null
+
+    input:
+    path occurrence_table, stageAs: 'input_table'
+    path assignments
+    val basename
+
+    output:
+    path "${basename}_table.tsv"
+
+    shell:
+    '''
+    update_occurrence_table.py \
+        --occurrence_table input_table \
+        --assignments !{assignments} \
+        > !{basename}_table.tsv
+    '''
+}
+
+
+workflow part_c_processes {
+    // Re-usable Part C wiring shared by the standalone workflow and
+    // the Part B → Part C end-to-end path.
+
+    take:
+    occurrence_table   // value channel: Path to <basename>_table.tsv
+    basename           // value channel: <project>_<N>_samples
+
+    main:
+    def reference = file(params.reference_dataset)
+
+    // [S48]: extract a representatives FASTA from the occurrence
+    // table. (The fasta-input branch promised by [S48] is blocked
+    // on D04 and is not wired in this skeleton.)
+    extract_fasta_sequences_from_occurrence_table(occurrence_table)
+
+    if ( params.taxonomy_method == 'sintax' ) {
+        // [S50]: shadow path.
+        assign_taxonomy_sintax(
+            extract_fasta_sequences_from_occurrence_table.out[0],
+            reference,
+            basename,
+        )
+        update_occurrence_table(
+            occurrence_table,
+            assign_taxonomy_sintax.out[0],
+            basename,
+        )
+    } else {
+        // [S49]: primary stampa path.
+        assign_taxonomy_stampa(
+            extract_fasta_sequences_from_occurrence_table.out[0],
+            reference,
+            basename,
+        )
+        update_occurrence_table(
+            occurrence_table,
+            assign_taxonomy_stampa.out[0],
+            basename,
+        )
+    }
+}
+
+
+workflow part_c {
+    // Standalone Part C ([S47]/[S48]): the user provides
+    // --occurrence_table (Part B's <basename>_table.tsv) and
+    // --reference_dataset. The fasta-input branch is blocked on D04
+    // and is not exposed by this skeleton.
+    assert params.reference_dataset :
+        "--reference_dataset must be set when running Part C"
+    assert params.occurrence_table :
+        "--occurrence_table must be set when running Part C standalone " +
+        "(fasta input is blocked on DECISIONS.md D04)"
+    assert params.results_folder :
+        "--results_folder must be set when running Part C"
+
+    def results_dir = new File(params.results_folder.toString())
+    results_dir.mkdirs()
+
+    def table_path = file(params.occurrence_table)
+    def derived_basename = table_path.baseName.replaceFirst(/_table$/, '')
+    def basename_ch = Channel.value(derived_basename)
+    def table_ch    = Channel.fromPath(params.occurrence_table)
+
+    part_c_processes(table_ch, basename_ch)
+}
+
+
 workflow part_b {
     // Standalone Part B ([S25]/[S26]/[S27]): discover per-sample .fas
     // files (skipping shadow-pipeline _notmerged artefacts), assert
@@ -1145,9 +1380,19 @@ workflow part_b {
 
 
 workflow {
+    // [S47]/[S48]: --occurrence_table switches the pipeline into
+    // Part C standalone mode (Parts A and B do not run). The
+    // mode also requires --reference_dataset and --results_folder.
+    if ( params.occurrence_table ) {
+        part_c()
+        return
+    }
+
     // [S27]: --fasta_folder switches the pipeline into Part B
     // standalone mode. Part A's --fastq_folder requirement is lifted
-    // in that mode (Part A does not run).
+    // in that mode (Part A does not run). End-to-end Part B → Part C
+    // wiring is deferred — for now Part C runs as a separate
+    // invocation against Part B's <basename>_table.tsv.
     if ( params.fasta_folder ) {
         part_b()
         return

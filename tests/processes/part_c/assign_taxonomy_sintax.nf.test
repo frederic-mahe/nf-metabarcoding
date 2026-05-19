@@ -1,0 +1,37 @@
+nextflow_process {
+
+    name "assign_taxonomy_sintax"
+    script "main.nf"
+    process "assign_taxonomy_sintax"
+
+    test("runs vsearch --sintax + reshapes the tabbed output") {
+        // COVERAGE: [S50]
+        // Skeleton phase: pin the process wiring + output filename;
+        // the sintax-to-stampa reshape is best-effort until D04
+        // lands.
+        tag "ci"
+        when {
+            params {
+                threads = 1
+            }
+            process {
+                """
+                def reps = workDir.resolve("reps.fas")
+                reps.text = '>amp1;size=10;\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>refA;tax=d:Bacteria,p:Proteobacteria,c:Gammaproteobacteria;\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
+                input[0] = file(reps.toString())
+                input[1] = file(ref.toString())
+                input[2] = "proj_1_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def assignments = process.out[0].get(0)
+            assert assignments.endsWith("proj_1_samples_taxonomy_sintax.tsv")
+            def log = process.out[1].get(0)
+            assert log.endsWith("proj_1_samples_taxonomy.log")
+        }
+    }
+}

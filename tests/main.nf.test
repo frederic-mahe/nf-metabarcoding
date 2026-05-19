@@ -490,6 +490,71 @@ nextflow_pipeline {
         }
     }
 
+    test("Part C aborts when --reference_dataset is missing") {
+        // COVERAGE: [S47]
+        tag "ci"
+        when {
+            params {
+                occurrence_table = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                results_folder   = "${outputDir}/part_c_no_ref"
+                threads          = 1
+                // reference_dataset deliberately unset
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("reference_dataset") :
+                "expected error to name reference_dataset, got: ${msg}"
+        }
+    }
+
+    test("Part C standalone runs the stampa path end-to-end") {
+        // COVERAGE: [S47], [S48], [S49], [S51]
+        tag "ci"
+        when {
+            params {
+                threads          = 1
+                results_folder   = "${outputDir}/part_c_standalone"
+                reference_dataset = "${outputDir}/part_c_standalone_ref.fas"
+                occurrence_table  = "${outputDir}/part_c_standalone_table.tsv"
+            }
+        }
+        setup {
+            // Tiny reference + occurrence table fixtures built on the
+            // fly (kept small enough to stay inside the test file).
+            def ref = file("${outputDir}/part_c_standalone_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = ">refA Kingdom|Phylum|Class\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            def tab = file("${outputDir}/part_c_standalone_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t32\t10\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t10\n"
+            )
+        }
+        then {
+            assert workflow.success
+            // Part C derives its basename from the input table's
+            // filename by stripping the trailing `_table` suffix.
+            // Input `part_c_standalone_table.tsv` → basename
+            // `part_c_standalone` → published table
+            // `part_c_standalone_table.tsv`.
+            def updated = file(
+                "${outputDir}/part_c_standalone/part_c_standalone_table.tsv"
+            )
+            assert updated.exists() :
+                "Part C should publish <basename>_table.tsv"
+            def lines = updated.readLines()
+            assert lines.size() == 2  // header + 1 row
+            def row1 = lines[1].split("\t", -1)
+            // identity/taxonomy/references overwritten from stampa
+            assert row1[10] != "0.0" || row1[11] != "NA" :
+                "expected at least one of identity/taxonomy/references to update, got: ${row1}"
+        }
+    }
+
     test("empty input samples travel through to the occurrence table") {
         // COVERAGE: [S09] — pending until empty-sample passthrough lands.
         // Tagged "pending" so CI (`nf-test test --tag '!pending'`) skips

@@ -1,0 +1,39 @@
+nextflow_process {
+
+    name "extract_fasta_sequences_from_occurrence_table"
+    script "main.nf"
+    process "extract_fasta_sequences_from_occurrence_table"
+
+    test("emits one FASTA record per data row, reading cols 4/2/10") {
+        // COVERAGE: [S48]
+        // Part C's table-input branch: read the [S46] occurrence
+        // table and emit a representatives fasta with the header
+        // `<amplicon>;size=<abundance>;`. The fasta-input branch is
+        // deliberately not exercised here — it's blocked on D04.
+        tag "ci"
+        when {
+            process {
+                """
+                def t = workDir.resolve("proj_3_samples_table.tsv")
+                t.text = '''OTU\\ttotal\\tcloud\\tamplicon\\tlength\\tabundance\\tchimera\\tspread\\tquality\\tsequence\\tidentity\\ttaxonomy\\treferences\\ts1
+1\\t10\\tNA\\tamp1\\t10\\t10\\tN\\t1\\t0.001\\tACGTACGTAC\\t0.0\\tNA\\tNA\\t10
+2\\t5\\tNA\\tamp2\\t10\\t5\\tN\\t1\\t0.001\\tTTTTTTTTTT\\t0.0\\tNA\\tNA\\t5
+'''
+                input[0] = file(t.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def out = process.out[0].get(0)
+            assert out.endsWith("_representatives.fas")
+            def lines = path(out).readLines()
+            // 2 records → 4 lines (header + sequence per record).
+            assert lines.size() == 4
+            assert lines[0] == ">amp1;size=10;"
+            assert lines[1] == "ACGTACGTAC"
+            assert lines[2] == ">amp2;size=5;"
+            assert lines[3] == "TTTTTTTTTT"
+        }
+    }
+}

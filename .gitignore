@@ -2,6 +2,7 @@
 .nextflow.log*
 .nextflow/
 .nf-test/
+.nf-test-*.nf
 tests/data/*.fastq
 tests/data/*.fastq.gz
 tests/data/*.fastq.bz2
