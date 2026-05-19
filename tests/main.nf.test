@@ -540,12 +540,12 @@ nextflow_pipeline {
             // filename by stripping the trailing `_table` suffix.
             // Input `part_c_standalone_table.tsv` → basename
             // `part_c_standalone` → published table
-            // `part_c_standalone_table.tsv`.
+            // `part_c_standalone_table_assigned.tsv` (D04 sub-q2).
             def updated = file(
-                "${outputDir}/part_c_standalone/part_c_standalone_table.tsv"
+                "${outputDir}/part_c_standalone/part_c_standalone_table_assigned.tsv"
             )
             assert updated.exists() :
-                "Part C should publish <basename>_table.tsv"
+                "Part C should publish <basename>_table_assigned.tsv"
             def lines = updated.readLines()
             assert lines.size() == 2  // header + 1 row
             def row1 = lines[1].split("\t", -1)

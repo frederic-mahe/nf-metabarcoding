@@ -99,8 +99,22 @@ Sub-decisions:
 
 ## D04 — Part C input mode and output policy
 
-**Blocks:** `[S48]`, `[S51]`
-**Status:** `open`
+**Blocks:** `[S48]`
+**Status:** `partial` — sub-question 2 resolved, sub-question 1 still open
+
+**Resolution of sub-question 2 (2026-05-19):** Part C publishes its
+updated table as a **sibling file** named
+`<basename>_table_assigned.tsv` rather than overwriting Part B's
+`<basename>_table.tsv` in place. Rationale: keeping both artefacts in
+the results folder preserves the unannotated Part B output for
+inspection / debugging and makes the Part B → Part C handoff
+non-destructive when the two parts run end-to-end. The `_assigned`
+suffix signals that the `identity` / `taxonomy` / `references`
+columns have been populated with real assignments. `[S51]` reflects
+this output policy and is no longer blocked by D04.
+
+Sub-question 1 (the CLI flag toggling between table-input and
+fasta-input modes) is still open and continues to block `[S48]`.
 
 Two sub-questions still need a human answer before Part C can move
 beyond skeleton:

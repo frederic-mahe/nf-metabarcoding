@@ -618,13 +618,18 @@ from placeholder values to real taxonomic assignments.
   taxonomic assignment back onto the `[S46]` occurrence table by
   amplicon ID, overwriting the `identity`, `taxonomy`, and
   `references` columns. Rows are neither added nor removed. The
-  output filename is `<project>_<N>_samples_table.tsv` (same
-  construct as `[S46]`); when Part B and Part C run end-to-end,
-  Part C's output overwrites Part B's `_table.tsv` in the same
-  results folder.
-  - **Blocked by:** [`DECISIONS.md`](DECISIONS.md) D04 — whether
-    Part C overwrites in place or publishes a sibling file
-    (e.g. `<basename>_taxonomy.tsv`).
+  output filename is `<project>_<N>_samples_table_assigned.tsv`
+  — a sibling of Part B's `<project>_<N>_samples_table.tsv`,
+  **not** an overwrite (see [`DECISIONS.md`](DECISIONS.md) D04
+  sub-question 2). When Part B and Part C run end-to-end, both
+  files are present in the same results folder.
+  - **Pass when:** running on a Part B-shaped occurrence table
+    plus a stampa-shaped assignments TSV publishes
+    `<basename>_table_assigned.tsv`; rows whose amplicon ID
+    appears in the assignments get their identity / taxonomy /
+    references columns overwritten; rows missing from the
+    assignments pass through unchanged; the input `_table.tsv`
+    is not modified.
 
 
 ## Dependencies

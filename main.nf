@@ -1262,30 +1262,26 @@ process assign_taxonomy_sintax {
 
 process update_occurrence_table {
     // [S51]: splice the taxonomy assignments back onto Part B's
-    // <basename>_table.tsv. The output overwrites Part B's file in
-    // the results folder (D04 may revisit this).
-    //
-    // The input table is staged under a transient name (`input_table`)
-    // so the output filename can reuse the project-wide basename
-    // without colliding with the staged input — Part B and Part C
-    // share the same basename when they run end-to-end.
-    publishDir params.results_folder, mode: 'link', overwrite: true,
+    // <basename>_table.tsv. The output is published as a sibling
+    // file `<basename>_table_assigned.tsv` so Part B's unannotated
+    // table is preserved alongside the annotated one (D04 sub-q2).
+    publishDir params.results_folder, mode: 'link',
         enabled: params.results_folder != null
 
     input:
-    path occurrence_table, stageAs: 'input_table'
+    path occurrence_table
     path assignments
     val basename
 
     output:
-    path "${basename}_table.tsv"
+    path "${basename}_table_assigned.tsv"
 
     shell:
     '''
     update_occurrence_table.py \
-        --occurrence_table input_table \
+        --occurrence_table !{occurrence_table} \
         --assignments !{assignments} \
-        > !{basename}_table.tsv
+        > !{basename}_table_assigned.tsv
     '''
 }
 

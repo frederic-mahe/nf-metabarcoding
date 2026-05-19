@@ -6,12 +6,14 @@ nextflow_process {
 
     test("splices the taxonomy columns onto the occurrence table") {
         // COVERAGE: [S51]
-        // Skeleton phase: D04 still needs to resolve output policy
-        // (overwrite Part B's table in place vs sibling file). Until
-        // then this test pins the join behaviour: rows whose
-        // amplicon ID appears in the assignments file get their
-        // identity/taxonomy/references columns overwritten; rows
-        // missing from the assignments pass through unchanged.
+        // D04 sub-question 2 resolution (2026-05-19): publish a
+        // sibling file `<basename>_table_assigned.tsv` rather than
+        // overwriting Part B's `<basename>_table.tsv`. This test
+        // pins both the join behaviour (rows whose amplicon ID
+        // appears in the assignments file get their identity /
+        // taxonomy / references columns overwritten; rows missing
+        // from the assignments pass through unchanged) and the
+        // output filename.
         tag "ci"
         when {
             process {
@@ -32,7 +34,8 @@ nextflow_process {
         then {
             assert process.success
             def out = process.out[0].get(0)
-            assert out.endsWith("proj_3_samples_table.tsv")
+            assert out.endsWith("proj_3_samples_table_assigned.tsv") :
+                "expected <basename>_table_assigned.tsv, got: ${out}"
             def lines = path(out).readLines()
             assert lines.size() == 3   // header + 2 rows
             def row1 = lines[1].split("\t", -1)
