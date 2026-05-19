@@ -1,141 +1,135 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Rebuild an occurrence table with 13 fields of metadata after mumu.
+
+mumu (``--new_otu_table``) emits a stripped table — amplicon ID
+plus one column per sample. This script re-attaches the per-amplicon
+metadata (``length``, ``abundance``, ``quality``, ``sequence``,
+``identity``, ``taxonomy``, ``references``) from the pre-mumu OTU
+table, recomputes ``total`` (sum of mumu sample columns) and
+``spread`` (count of non-zero mumu sample columns), replaces
+``cloud`` with ``"NA"`` (mumu drops the cloud info), forces
+``chimera`` to ``"N"``, and renumbers OTUs starting at 1.
+
+The downstream ``size=0 → 1`` awk hotfix is applied by the
+nextflow `rebuild_post_mumu_table` wrapper, not by this script.
+
+Characterization tests at
+``tests/python/test_rebuild_table_after_mumu.py`` pin byte-exact
+output. Refactors must keep them green.
 """
-   rebuild a table with the usual 13 fields of metadata
-"""
+
+from __future__ import annotations
 
 __author__ = "Frédéric Mahé <frederic.mahe@cirad.fr>"
 __date__ = "2020/12/22"
-__version__ = "$Revision: 1.0"
+__version__ = "$Revision: 2.0"
 
-import sys
 import argparse
+import sys
+from dataclasses import dataclass
+from typing import Optional
 
 
-# *************************************************************************** #
-#                                                                             #
-#                                  Functions                                  #
-#                                                                             #
-# *************************************************************************** #
+# Constants the legacy bash + python pair always uses.
+CLOUD: str = "NA"        # cloud info is lost during the mumu pass
+CHIMERA: str = "N"       # mumu only sees non-chimeric OTUs already
 
-if __name__ == '__main__':
-    """
-    Parse arguments from command line.
-    """
+
+@dataclass(frozen=True)
+class AmpliconMetadata:
+    """Per-amplicon metadata sliced from the pre-mumu OTU table."""
+
+    length: str
+    abundance: str
+    quality: str
+    sequence: str
+    identity: str
+    taxonomy: str
+    references: str
+
+
+def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+    """Parse arguments from the command line."""
     parser = argparse.ArgumentParser(
-        description="rebuild an occurrence table with 13 fields of metadata.")
-
-    parser.add_argument("--mumu_table",
-                        dest="mumu_table",
-                        required=True,
-                        help="occurrence table produced by mumu")
-
-    parser.add_argument("--old_table",
-                        dest="old_table",
-                        required=True,
-                        help="occurrence table pre-mumu")
-
-    ARGS = parser.parse_args()
-
-
-def parse_old_table(old_table):
-    """
-    Map OTUs and metadata.
-    """
-    separator = '\t'
-    amplicons = [dict() for i in range(0, 256)]
-
-    with open(old_table, 'r') as old_table:
-        print("PROGRESS: parsing old table", file=sys.stderr)
-        is_first_line = True
-        for line in old_table:
-            
-            # assume sample columns in both tables are in the same order
-            if is_first_line:
-                print(line.strip(), file=sys.stdout)
-                is_first_line = False
-                continue
-
-            # index metadata (assume chimera status is always "N")
-            line = line.strip().split(separator)
-            amplicon = line[3]
-            index = int(amplicon[0:2], 16)
-            amplicons[index][amplicon] = {"length": line[4],
-                                          "abundance": line[5],
-                                          "quality": line[8],
-                                          "sequence": line[9],
-                                          "identity": line[10],
-                                          "taxonomy": line[11],
-                                          "references": line[12]}
-            
-    return amplicons
+        description=(
+            "Rebuild an occurrence table with 13 fields of metadata "
+            "from a mumu --new_otu_table output."
+        ),
+    )
+    parser.add_argument(
+        "--mumu_table",
+        required=True,
+        help="OTU table emitted by mumu (--new_otu_table)",
+    )
+    parser.add_argument(
+        "--old_table",
+        required=True,
+        help="pre-mumu OTU table (carries the per-amplicon metadata)",
+    )
+    return parser.parse_args(argv)
 
 
-def parse_mumu_table(mumu_table, amplicons):
-    """
-    Compute and merge metadata, make a new table.
-    """
-    separator = '\t'
-    cloud = "NA"  # that data is lost during the mumu step
-    chimera = "N"  # assume chimera status is always "N"
-    with open(mumu_table, 'r') as mumu_table:
-        print("PROGRESS: parsing mumu table", file=sys.stderr)
-        line_counter = 0
-        for line in mumu_table:
-            # discard mumu's header
-            if line_counter == 0:
-                line_counter += 1
-                continue
-
-            # index metadata
-            line = line.strip().split(separator)
-            amplicon = line[0]
-            index = int(amplicon[0:2], 16)
-
-            # print the new line, add old fields
-            print(line_counter,
-                  sum([int(i) for i in line[1:]]),  # new total
-                  cloud,
-                  amplicon,
-                  amplicons[index][amplicon]["length"],
-                  amplicons[index][amplicon]["abundance"],
-                  chimera,
-                  len([e for e in line[1:] if e != "0"]),  # new spread
-                  amplicons[index][amplicon]["quality"],
-                  amplicons[index][amplicon]["sequence"],
-                  amplicons[index][amplicon]["identity"],
-                  amplicons[index][amplicon]["taxonomy"],
-                  amplicons[index][amplicon]["references"],
-                  '\t'.join(line[1:]),  # occurrence values
-                  sep='\t')
-            line_counter += 1
-    
-    return None
+def parse_old_table(
+    path: str,
+) -> tuple[str, dict[str, AmpliconMetadata]]:
+    """Return ``(header_line, {amplicon: metadata})`` from the old table."""
+    print("PROGRESS: parsing old table", file=sys.stderr)
+    amplicons: dict[str, AmpliconMetadata] = {}
+    with open(path) as f:
+        header = next(f).rstrip("\n")
+        for line in f:
+            cols = line.rstrip("\n").split("\t")
+            amplicons[cols[3]] = AmpliconMetadata(
+                length=cols[4],
+                abundance=cols[5],
+                quality=cols[8],
+                sequence=cols[9],
+                identity=cols[10],
+                taxonomy=cols[11],
+                references=cols[12],
+            )
+    return header, amplicons
 
 
-def main():
-    """
-    rebuild an occurrence table with 13 fields of metadata.
-    """
-    # capture arguments
-    mumu_table = ARGS.mumu_table
-    old_table = ARGS.old_table
+def write_rebuilt_rows(
+    mumu_table_path: str,
+    amplicons: dict[str, AmpliconMetadata],
+) -> None:
+    """Stream the mumu table and emit rebuilt rows on stdout."""
+    print("PROGRESS: parsing mumu table", file=sys.stderr)
+    with open(mumu_table_path) as f:
+        next(f)  # discard mumu's header
+        for line_counter, line in enumerate(f, start=1):
+            cols = line.rstrip("\n").split("\t")
+            amplicon = cols[0]
+            samples = cols[1:]
+            meta = amplicons[amplicon]
+            print(
+                line_counter,
+                sum(int(c) for c in samples),
+                CLOUD,
+                amplicon,
+                meta.length,
+                meta.abundance,
+                CHIMERA,
+                sum(1 for c in samples if c != "0"),
+                meta.quality,
+                meta.sequence,
+                meta.identity,
+                meta.taxonomy,
+                meta.references,
+                "\t".join(samples),
+                sep="\t",
+            )
 
-    # parse and merge
-    amplicons = parse_old_table(old_table)
-    parse_mumu_table(mumu_table, amplicons)
 
-    return None
+def main(argv: Optional[list[str]] = None) -> int:
+    args = parse_args(argv)
+    header, amplicons = parse_old_table(args.old_table)
+    print(header)
+    write_rebuilt_rows(args.mumu_table, amplicons)
+    return 0
 
 
-# *************************************************************************** #
-#                                                                             #
-#                                     Body                                    #
-#                                                                             #
-# *************************************************************************** #
-
-if __name__ == '__main__':
-
-    main()
-
-sys.exit(0)
+if __name__ == "__main__":
+    sys.exit(main())
