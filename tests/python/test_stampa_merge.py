@@ -69,6 +69,30 @@ def test_parse_hits_handles_no_hit_marker(tmp_path: Path) -> None:
     assert rows == [("amp2", "5", "0.0", ["No_hit"], "No_hit")]
 
 
+def test_parse_hits_handles_multi_underscore_amplicon(tmp_path: Path) -> None:
+    # Improvement over legacy: rsplit("_", 1) splits only on the
+    # final underscore so amplicon IDs may themselves contain
+    # underscores. The legacy tmp/stampa/stampa_merge.py crashes
+    # on this input — see test_stampa_merge_legacy.
+    hits = _write(
+        tmp_path, "hits",
+        "sample_a_amp7_42\t99.0\trefX Bacteria|Firmicutes\n",
+    )
+    rows = list(parse_hits(str(hits)))
+    assert rows == [
+        ("sample_a_amp7", "42", "99.0", ["Bacteria", "Firmicutes"], "refX")
+    ]
+
+
+def test_parse_hits_malformed_hit_raises(tmp_path: Path) -> None:
+    # "Fail loud on malformed input" is preserved from legacy: a
+    # line that doesn't split into exactly 3 tab-separated fields
+    # propagates ValueError. See the matching legacy test.
+    hits = _write(tmp_path, "hits", "only\ttwo_columns\n")
+    with pytest.raises(ValueError):
+        list(parse_hits(str(hits)))
+
+
 # ---------------------------------------------------------------------------
 # End-to-end: emit_results
 # ---------------------------------------------------------------------------
