@@ -243,6 +243,14 @@ emit_part_b_fixtures() {
     {
         printf '4\t6\t%s\t4\t0\t1\t1\n' "${sha_c}"
     } > "${dir}/S2.stats"
+
+    # E — an empty sample. [S09]/[S27]: the empty .fas must travel
+    # through to the occurrence table (downstream processes must
+    # tolerate zero-record inputs). The matching .qual and .stats
+    # are also empty (a sample with no surviving reads).
+    : > "${dir}/E.fas"
+    : > "${dir}/E.qual"
+    : > "${dir}/E.stats"
 }
 
 emit_duplicate_sample_ids() {

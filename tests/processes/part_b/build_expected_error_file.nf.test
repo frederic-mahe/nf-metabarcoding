@@ -12,20 +12,21 @@ nextflow_process {
                 """
                 input[0] = [
                     file("\${projectDir}/tests/data/part_b/S1.qual"),
-                    file("\${projectDir}/tests/data/part_b/S2.qual")
+                    file("\${projectDir}/tests/data/part_b/S2.qual"),
+                    file("\${projectDir}/tests/data/part_b/E.qual")
                 ]
-                input[1] = "proj_2_samples"
+                input[1] = "proj_3_samples"
                 """
             }
         }
         then {
             assert process.success
             def outPath = process.out[0].get(0)
-            assert outPath.endsWith("proj_2_samples.qual") :
+            assert outPath.endsWith("proj_3_samples.qual") :
                 "unexpected output filename: ${outPath}"
             def lines = path(outPath).readLines()
-            // 3 distinct SHA1s across the two inputs (A shared, B and C
-            // unique).
+            // 3 distinct SHA1s across the three inputs (A shared, B and
+            // C unique; E.qual is empty so contributes nothing).
             assert lines.size() == 3 :
                 "expected 3 rows after uniq, got ${lines.size()}: ${lines}"
             def shas = lines.collect { it.split(/\s+/)[0] } as Set

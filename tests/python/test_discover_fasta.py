@@ -96,18 +96,23 @@ def test_discover_ignores_non_fasta_files(tmp_path: Path) -> None:
     assert [s.fasta.name for s in result] == ["real.fas"]
 
 
-def test_discover_skips_empty_fasta_files(tmp_path: Path) -> None:
-    # Empty .fas files (e.g. a sample where every read was filtered
-    # out) carry no records and would derive a sample ID anyway. The
-    # bash reference (`find ... ! -empty`) drops them at the channel
-    # boundary so downstream `grep "^>"` doesn't surface a phantom
-    # row. We mirror that choice for parity with the legacy pipeline.
+def test_discover_keeps_empty_fasta_files(tmp_path: Path) -> None:
+    # [S09] / [S27]: empty samples must travel through to the
+    # occurrence table — they contribute a zero-filled sample column
+    # (never a row). The fasta channel therefore keeps every .fas
+    # regardless of size; downstream processes (build_distribution_file,
+    # global_dereplication, etc.) are responsible for tolerating
+    # empty inputs.
     real = _make_fasta(tmp_path, "real.fas")
-    (tmp_path / "empty.fas").write_text("")
+    empty = tmp_path / "empty.fas"
+    empty.write_text("")
 
     result = discover([tmp_path])
 
-    assert result == [FastaSample(sample_id="real", fasta=real)]
+    assert result == [
+        FastaSample(sample_id="empty", fasta=empty),
+        FastaSample(sample_id="real", fasta=real),
+    ]
 
 
 # ---------- uniqueness ([S13]/[S14]) --------------------------------------

@@ -304,16 +304,18 @@ isolation.
 
   Files whose basename ends in `_notmerged.fas` are excluded
   ([S04]'s shadow-pipeline artefacts are processed downstream by a
-  dedicated path, not by the regular Part B pipeline). The Part B
-  sample ID is the basename stripped of the `.fas` extension.
-  Duplicate sample IDs are an error: the workflow aborts before any
-  Part B process runs and the stderr lists every duplicated `.fas`
-  path (see `[S13]`).
+  dedicated path, not by the regular Part B pipeline). **Empty
+  `.fas` files are kept** so that empty samples travel through to
+  the occurrence table (`[S09]`) — they contribute a sample column
+  filled with zeros and never a row. The Part B sample ID is the
+  basename stripped of the `.fas` extension. Duplicate sample IDs
+  are an error: the workflow aborts before any Part B process runs
+  and the stderr lists every duplicated `.fas` path (see `[S13]`).
   - **Pass when:** running Part B on a folder containing `A.fas`,
-    `A_notmerged.fas`, and `B.fas` builds a fasta channel of
-    `{A.fas, B.fas}` (notmerged excluded); running on two folders
-    that both contain `A.fas` exits non-zero and stderr lists both
-    paths.
+    `A_notmerged.fas`, `B.fas`, and an empty `C.fas` builds a fasta
+    channel of `{A.fas, B.fas, C.fas}` (notmerged excluded, empty
+    sample retained); running on two folders that both contain
+    `A.fas` exits non-zero and stderr lists both paths.
 - `[S28]` Part B's `build_expected_error_file` merges every
   per-sample `<sampleId>.qual` from the `[S27]` fasta channel into
   a single project-wide quality file

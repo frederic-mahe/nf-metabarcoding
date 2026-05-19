@@ -12,21 +12,23 @@ nextflow_process {
                 """
                 input[0] = [
                     file("\${projectDir}/tests/data/part_b/S1.fas"),
-                    file("\${projectDir}/tests/data/part_b/S2.fas")
+                    file("\${projectDir}/tests/data/part_b/S2.fas"),
+                    file("\${projectDir}/tests/data/part_b/E.fas")
                 ]
-                input[1] = "proj_2_samples"
+                input[1] = "proj_3_samples"
                 """
             }
         }
         then {
             assert process.success
             def outPath = process.out[0].get(0)
-            assert outPath.endsWith("proj_2_samples.distr") :
+            assert outPath.endsWith("proj_3_samples.distr") :
                 "unexpected output filename: ${outPath}"
             def rows = path(outPath).readLines().collect {
                 it.split("\t", -1)
             }
-            // S1 carries 2 records (A, B), S2 carries 2 records (A, C).
+            // S1 carries 2 records (A, B), S2 carries 2 records (A, C);
+            // E.fas is empty and contributes no rows ([S09]/[S27]).
             assert rows.size() == 4 :
                 "expected 4 rows, got ${rows.size()}: ${rows}"
             // Every row has exactly three columns.

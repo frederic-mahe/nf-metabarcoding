@@ -12,8 +12,9 @@ Rules (see ``[S27]`` in SPECIFICATIONS.md):
 
 * fasta files whose basename ends in ``_notmerged.fas`` are dropped
   (shadow-pipeline artefacts — see ``[S04]``);
-* empty fasta files are dropped (legacy ``find ... ! -empty``
-  parity);
+* empty fasta files are kept so empty samples reach the occurrence
+  table (``[S09]``); downstream processes tolerate zero-record
+  inputs;
 * duplicate sample IDs abort the workflow (see ``[S13]`` /
   ``[S14]``).
 """
@@ -57,15 +58,14 @@ def _is_notmerged(path: Path) -> bool:
 def discover(folders: list[Path]) -> list[FastaSample]:
     """Walk ``folders`` (no recursion) and return the Part B fasta channel.
 
-    Files whose basename ends in ``_notmerged.fas`` are skipped; so
-    are empty files (legacy ``find ... ! -empty`` parity).
+    Files whose basename ends in ``_notmerged.fas`` are skipped.
+    Empty files are kept so empty samples travel through to the
+    occurrence table ([S09]).
     """
     samples: list[FastaSample] = []
     for folder in folders:
         for path in sorted(folder.glob("*.fas")):
             if not path.is_file():
-                continue
-            if path.stat().st_size == 0:
                 continue
             if _is_notmerged(path):
                 continue

@@ -281,7 +281,7 @@ nextflow_pipeline {
     }
 
     test("Part B standalone runs every pre-cleaving process on the part_b fixture") {
-        // COVERAGE: [S25], [S26], [S27]
+        // COVERAGE: [S09], [S25], [S26], [S27]
         tag "ci"
         when {
             params {
@@ -298,10 +298,11 @@ nextflow_pipeline {
             def resultDir = "${outputDir}/part_b_results"
             assert file(resultDir).exists() : "results folder should be created"
 
-            // [S27]: 2 samples (S1, S2); S1_notmerged.fas is excluded.
-            // Project-wide artefacts use the `<project>_<N>_samples`
-            // basename.
-            def base = "${resultDir}/myproj_2_samples"
+            // [S09]/[S27]: 3 samples (S1, S2 with content + E empty);
+            // S1_notmerged.fas is excluded. Project-wide artefacts use
+            // the `<project>_<N>_samples` basename — N counts the
+            // empty sample too.
+            def base = "${resultDir}/myproj_3_samples"
             ["${base}.qual",
              "${base}.distr",
              "${base}_per_sample_OTUs.stats",

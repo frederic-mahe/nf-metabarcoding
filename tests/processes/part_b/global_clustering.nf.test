@@ -11,9 +11,10 @@ nextflow_process {
                 """
                 input[0] = [
                     file("\${projectDir}/tests/data/part_b/S1.fas"),
-                    file("\${projectDir}/tests/data/part_b/S2.fas")
+                    file("\${projectDir}/tests/data/part_b/S2.fas"),
+                    file("\${projectDir}/tests/data/part_b/E.fas")
                 ]
-                input[1] = "proj_2_samples"
+                input[1] = "proj_3_samples"
                 """
             }
         }
@@ -29,7 +30,7 @@ nextflow_process {
             process {
                 """
                 input[0] = global_dereplication.out[0]
-                input[1] = "proj_2_samples"
+                input[1] = "proj_3_samples"
                 """
             }
         }
@@ -44,11 +45,11 @@ nextflow_process {
             def repPath    = process.out[3].get(0)
             def logPath    = process.out[4].get(0)
 
-            assert swarmsPath.endsWith("proj_2_samples_1f.swarms")
-            assert statsPath.endsWith("proj_2_samples_1f.stats")
-            assert structPath.endsWith("proj_2_samples_1f.struct")
-            assert repPath.endsWith("proj_2_samples_1f_representatives.fas")
-            assert logPath.endsWith("proj_2_samples_1f.log")
+            assert swarmsPath.endsWith("proj_3_samples_1f.swarms")
+            assert statsPath.endsWith("proj_3_samples_1f.stats")
+            assert structPath.endsWith("proj_3_samples_1f.struct")
+            assert repPath.endsWith("proj_3_samples_1f_representatives.fas")
+            assert logPath.endsWith("proj_3_samples_1f.log")
 
             // every artefact is non-empty
             [swarmsPath, statsPath, repPath, logPath].each { p ->

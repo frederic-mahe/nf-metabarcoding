@@ -428,12 +428,17 @@ process build_distribution_file {
 
     shell:
     '''
+    : > !{basename}.distr
     for f in !{fastas} ; do
         sample="$(basename "${f}" .fas)"
+        # `|| true`: empty samples ([S09]/[S27]) have a zero-record
+        # .fas — grep returns 1, which would otherwise abort the
+        # process. The empty sample legitimately contributes no rows.
         grep "^>" "${f}" | \
             sed 's/^>// ; s/;size=/\t/ ; s/;$//' | \
-            awk -v s="${sample}" 'BEGIN {OFS = "\t"} {print $1, s, $2}'
-    done > !{basename}.distr
+            awk -v s="${sample}" 'BEGIN {OFS = "\t"} {print $1, s, $2}' \
+            >> !{basename}.distr || true
+    done
     '''
 }
 

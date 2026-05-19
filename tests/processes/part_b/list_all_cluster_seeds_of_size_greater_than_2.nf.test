@@ -12,21 +12,23 @@ nextflow_process {
                 """
                 input[0] = [
                     file("\${projectDir}/tests/data/part_b/S1.stats"),
-                    file("\${projectDir}/tests/data/part_b/S2.stats")
+                    file("\${projectDir}/tests/data/part_b/S2.stats"),
+                    file("\${projectDir}/tests/data/part_b/E.stats")
                 ]
-                input[1] = "proj_2_samples"
+                input[1] = "proj_3_samples"
                 """
             }
         }
         then {
             assert process.success
             def outPath = process.out[0].get(0)
-            assert outPath.endsWith("proj_2_samples_per_sample_OTUs.stats") :
+            assert outPath.endsWith("proj_3_samples_per_sample_OTUs.stats") :
                 "unexpected output filename: ${outPath}"
             def rows = path(outPath).readLines().collect {
                 it.split("\t", -1)
             }
-            // S1 has 2 stats rows, S2 has 1 → 3 rows total.
+            // S1 has 2 stats rows, S2 has 1 → 3 rows total (E.stats
+            // is empty, contributes nothing — empty-sample rule).
             assert rows.size() == 3 :
                 "expected 3 rows, got ${rows.size()}: ${rows}"
             // First column = sample ID, derived from the .stats

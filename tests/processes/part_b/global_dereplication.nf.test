@@ -12,9 +12,10 @@ nextflow_process {
                 """
                 input[0] = [
                     file("\${projectDir}/tests/data/part_b/S1.fas"),
-                    file("\${projectDir}/tests/data/part_b/S2.fas")
+                    file("\${projectDir}/tests/data/part_b/S2.fas"),
+                    file("\${projectDir}/tests/data/part_b/E.fas")
                 ]
-                input[1] = "proj_2_samples"
+                input[1] = "proj_3_samples"
                 """
             }
         }
@@ -23,18 +24,19 @@ nextflow_process {
 
             // Output fasta is the first emitted path.
             def fastaPath = process.out[0].get(0)
-            assert fastaPath.endsWith("proj_2_samples.fas") :
+            assert fastaPath.endsWith("proj_3_samples.fas") :
                 "unexpected fasta output: ${fastaPath}"
 
-            // 3 unique sequences across the two inputs (A is shared,
-            // B and C are unique).
+            // 3 unique sequences across the three inputs (A is
+            // shared, B and C are unique; E.fas is empty and
+            // contributes nothing — [S09]/[S27]).
             def lines = path(fastaPath).readLines()
             def headers = lines.findAll { it.startsWith(">") }
             assert headers.size() == 3 :
                 "expected 3 records after global dereplication, got ${headers.size()}"
 
             // Sequence A has size=3 in S1 and size=1 in S2 → sum=4.
-            // vsearch --derep_fulllength rewrites headers as
+            // vsearch --fastx_uniques rewrites headers as
             // ">SHA1;size=N;" or similar.
             def header_a = headers.find {
                 it.contains("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -45,7 +47,7 @@ nextflow_process {
 
             // log file is the second emitted path.
             def logPath = process.out[1].get(0)
-            assert logPath.endsWith("proj_2_samples.log") :
+            assert logPath.endsWith("proj_3_samples.log") :
                 "unexpected log filename: ${logPath}"
             assert path(logPath).readLines().size() > 0 :
                 "vsearch log should not be empty"
