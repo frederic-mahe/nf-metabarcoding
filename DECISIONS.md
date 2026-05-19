@@ -95,3 +95,46 @@ Sub-decisions:
 
   This format is asserted by the unit tests, so future tweaks must
   stay backward compatible.
+
+
+## D04 — Part C input mode and output policy
+
+**Blocks:** `[S48]`, `[S51]`
+**Status:** `open`
+
+Two sub-questions still need a human answer before Part C can move
+beyond skeleton:
+
+1. **Which CLI flag toggles between table-input and fasta-input
+   modes?** Two candidates:
+    - `--occurrence_table /path/to/table.tsv` to consume Part B's
+      `_table.tsv` and extract a fasta on the fly (via
+      `extract_fasta_sequences_from_occurrence_table`); else
+      `--fasta_input /path/to/representatives.fas` for a
+      stand-alone fasta input. The two flags are mutually
+      exclusive.
+    - reuse the existing `--fasta_folder` for the fasta-input
+      case; introduce a single `--occurrence_table` flag for the
+      table-input case.
+
+2. **How should Part C publish its result when the input is a
+   fasta file?** With no occurrence table to splice back onto, the
+   options are:
+    - emit a stand-alone TSV with just the taxonomy columns
+      (`amplicon\tabundance\tidentity\ttaxonomy\treferences`) —
+      same shape as the legacy `*.results` file;
+    - synthesise a minimal occurrence table from the fasta
+      headers (no per-sample columns) so the output shape is
+      identical to the table-input case;
+    - fail at startup with a message asking the user to provide
+      an occurrence table.
+
+   A separate but related question: when Part B and Part C run
+   end-to-end, should Part C **overwrite** Part B's `_table.tsv`
+   in place, or publish a sibling file (e.g.
+   `<basename>_taxonomy.tsv`) so the unannotated Part B output is
+   preserved alongside the annotated one?
+
+Until D04 lands, the Part C `[Sxx]` tests stay tagged `pending` and
+the workflow stub exposes no user-visible CLI surface for the
+ambiguous parts.

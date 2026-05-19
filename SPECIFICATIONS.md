@@ -33,8 +33,8 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
        (vsearch, swarm, and python scripts). See
        `../fred-metabarcoding-pipeline/` for the reference
        implementation
-    3. **Part C** — taxonomic assignment (stampa or sintax): update
-       the occurrence table
+    3. **Part C** — taxonomic assignment (stampa or sintax,
+       `[S47]`–`[S51]`): update the occurrence table
   - **Pass when:** running the full pipeline on a paired-end fixture
     produces, in order, per-sample `.fas` (Part A), an occurrence
     table (Part B), and a taxonomy-annotated occurrence table (Part C)
@@ -508,6 +508,115 @@ isolation.
     new-`spread` recomputation, (d) a zero-abundance row surviving
     the join (size=0 → 1 hotfix is the bash wrapper's
     responsibility).
+- `[S45]` Part B publishes one step-level log file per major step,
+  named with the project-wide basename `<project>_<N>_samples`
+  (the same construct as the final occurrence table, see `[S46]`)
+  and a step suffix. The six step logs are:
+    - `<basename>_dereplication.log` — `global_dereplication`
+      vsearch log (`[S31]`)
+    - `<basename>_clustering.log` — `global_clustering` swarm log
+      (`[S32]`)
+    - `<basename>_chimera_detection.log` — the canonical chimera
+      run's stderr (`chimera_detection2`'s output, `[S37]`);
+      `chimera_detection`'s pre-cleave stderr is kept internal
+    - `<basename>_cleaving.log` — `cleaving`'s stderr from
+      `bin/cluster_cleaver.py` (`[S22]`)
+    - `<basename>_superstring_clustering.log` — combined stderr of
+      `search_for_terminal_gaps` + `merge_substring_otus`
+      (`[S38]`, `[S39]`)
+    - `<basename>_post_clustering_curation.log` — `run_mumu`'s
+      `--log` output (`[S43]`)
+  - **Pass when:** running Part B on the documented fixture
+    publishes the six step logs above into `params.results_folder`;
+    each file is non-empty.
+- `[S46]` Part B publishes its final occurrence table as
+  `<project>_<N>_samples_table.tsv` (after `rebuild_post_mumu_table`
+  and the size=0→1 awk hotfix). Intermediate tables produced along
+  the way (`*.OTU.filtered.cleaved.table`, `*.nosubstringOTUs.table`,
+  `*_raw_mumu.table`, `*.mumu.table`) are no longer published —
+  only the final `_table.tsv` lands in `params.results_folder`.
+  - **Pass when:** running Part B on the documented fixture
+    publishes `<project>_<N>_samples_table.tsv` to
+    `params.results_folder`; the file is non-empty and starts with
+    the OTU-table header row; none of the intermediate
+    `.OTU.filtered.cleaved.table`, `.nosubstringOTUs.table`,
+    `_raw_mumu.table`, or `.mumu.table` files are present in the
+    results folder.
+
+
+## Part C — taxonomic assignment
+
+Part C re-implements the legacy
+[`stampa`](./tmp/stampa/) method on top of nextflow. Inputs: either
+the Part B occurrence table (`[S46]`) or a standalone fasta file
+of representative sequences; plus a reference dataset (fasta,
+optionally compressed). Output: an occurrence table whose
+`taxonomy` / `identity` / `references` columns have been updated
+from placeholder values to real taxonomic assignments.
+
+- `[S47]` Part C requires `--reference_dataset` (no default). The
+  value is an absolute or relative path to a fasta file (plain
+  `.fasta`/`.fas`, gzip-compressed `.gz`, or bzip2-compressed
+  `.bz2`). The workflow aborts at startup if Part C is asked to
+  run without `--reference_dataset`. The parameter is **only**
+  required for Part C; Parts A and B do not consume it.
+  - **Pass when:** running Part C without `--reference_dataset`
+    exits non-zero and stderr names the missing parameter;
+    supplying it via `-params-file` or `--key value` lets the
+    workflow proceed.
+- `[S48]` Part C accepts either an occurrence table (the
+  `[S46]` `_table.tsv`) or a fasta file as its primary input.
+  When given an occurrence table, the process
+  `extract_fasta_sequences_from_occurrence_table` reads column 4
+  (amplicon ID), column 2 (abundance), and column 10 (sequence)
+  and emits a fasta of representatives with header
+  `<amplicon>;size=<abundance>;`. When given a fasta, the
+  extraction step is skipped.
+  - **Blocked by:** [`DECISIONS.md`](DECISIONS.md) D04 — which CLI
+    flag toggles between the two modes (`--occurrence_table` vs
+    `--fasta_input`), and how the updated table is reconstructed
+    when the input is a fasta (no occurrence table to splice back
+    onto).
+- `[S49]` Part C's primary taxonomic-assignment path is a port of
+  the legacy `stampa.sh` / `stampa_merge.py` pipeline:
+    1. one `vsearch --usearch_global` self-search against the
+       reference dataset with `--top_hits_only --output_no_hits
+       --maxaccepts 0 --maxrejects 0 --notrunclabels --rowlen 0`
+       and `--userfields query+id<iddef>+target`. The whole
+       representatives fasta goes through a single vsearch
+       invocation (no slurm array split — nextflow handles
+       parallelism by process).
+    2. `bin/stampa_merge.py` parses the userout, computes the
+       last-common-ancestor taxonomy across top hits per
+       amplicon, and emits a TSV with columns
+       `amplicon\tabundance\tidentity\ttaxonomy\treferences`
+       (same shape as `fake_taxonomic_assignment`'s `[S33]`
+       output).
+  - **Pass when:** **(skeleton phase)** the process and helper
+    exist, their CLI parses without error, and a smoke test
+    against a tiny reference fixture produces a TSV with the
+    documented shape. Real-world LCA correctness is pinned by
+    porting the legacy `stampa_merge.py` unit tests in a follow-up.
+- `[S50]` Part C's shadow path uses `vsearch --sintax` against
+  the **same** reference dataset and emits an alternative
+  taxonomy TSV with the same column shape as the primary path
+  (`[S49]`). Sintax-specific columns (bootstrap confidences) are
+  collapsed into the `references` field; users opt in via
+  `--taxonomy_method sintax` (default `stampa`).
+  - **Pass when:** **(skeleton phase)** the sintax process exists
+    and runs against a tiny reference fixture without error; the
+    taxonomy column it emits is documented.
+- `[S51]` Part C's `update_occurrence_table` splices the
+  taxonomic assignment back onto the `[S46]` occurrence table by
+  amplicon ID, overwriting the `identity`, `taxonomy`, and
+  `references` columns. Rows are neither added nor removed. The
+  output filename is `<project>_<N>_samples_table.tsv` (same
+  construct as `[S46]`); when Part B and Part C run end-to-end,
+  Part C's output overwrites Part B's `_table.tsv` in the same
+  results folder.
+  - **Blocked by:** [`DECISIONS.md`](DECISIONS.md) D04 — whether
+    Part C overwrites in place or publishes a sibling file
+    (e.g. `<basename>_taxonomy.tsv`).
 
 
 ## Dependencies
