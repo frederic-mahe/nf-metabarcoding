@@ -592,6 +592,54 @@ process chimera_detection {
 }
 
 
+process build_occurrence_table {
+    // [S35]: merge swarm / uchime / quality / stampa / distribution
+    // into the filtered occurrence table. Representatives, stats,
+    // and swarms are concatenated across the pre-cleave global
+    // outputs and the cleaved (`.fas2` / `.stats2` / `.swarms2`)
+    // outputs so cleaved clusters get a row when they have
+    // downstream taxonomy / chimera annotations.
+    //
+    // For now, chimera_detection and fake_taxonomic_assignment run
+    // on the pre-cleave representatives only — clusters that exist
+    // only after cleaving get the script's "NA" defaults and are
+    // therefore filtered out (chimera != "N"). Adding the
+    // `chimera_detection2` / `fake_taxonomic_assignment2` variants
+    // from tmp/fred_03 is a follow-up.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path representatives,   stageAs: 'reps_global.fas'
+    path representatives_2, stageAs: 'reps_cleaved.fas2'
+    path stats,             stageAs: 'stats_global'
+    path stats_2,           stageAs: 'stats_cleaved'
+    path swarms,            stageAs: 'swarms_global'
+    path swarms_2,          stageAs: 'swarms_cleaved'
+    path uchime
+    path quality
+    path assignments
+    path distribution
+    val basename
+
+    output:
+    path "${basename}.OTU.filtered.cleaved.table"
+
+    shell:
+    '''
+    build_filtered_contingency_table.py \
+        --representatives <(cat !{representatives} !{representatives_2}) \
+        --stats           <(cat !{stats} !{stats_2}) \
+        --swarms          <(cat !{swarms} !{swarms_2}) \
+        --chimera         !{uchime} \
+        --quality         !{quality} \
+        --assignments     !{assignments} \
+        --distribution    !{distribution} \
+        > !{basename}.OTU.filtered.cleaved.table
+    '''
+}
+
+
 process cleaving {
     // [S22]: re-cleave global swarm clusters along sub-seed
     // boundaries. The script does all the work — this process is the
@@ -663,6 +711,21 @@ workflow part_b_processes {
         global_dereplication.out[0],         // global .fas
         list_all_cluster_seeds_of_size_greater_than_2.out[0],
         basename
+    )
+
+    // [S35]: assemble the filtered occurrence table.
+    build_occurrence_table(
+        global_clustering.out[3],            // _1f_representatives.fas
+        cleaving.out[2],                     // _1f_representatives.fas2
+        global_clustering.out[1],            // _1f.stats
+        cleaving.out[0],                     // _1f.stats2
+        global_clustering.out[0],            // _1f.swarms
+        cleaving.out[1],                     // _1f.swarms2
+        chimera_detection.out[0],            // _1f_representatives.uchime
+        build_expected_error_file.out[0],    // .qual
+        fake_taxonomic_assignment.out[0],    // _1f_representatives.results
+        build_distribution_file.out[0],      // .distr
+        basename,
     )
 }
 

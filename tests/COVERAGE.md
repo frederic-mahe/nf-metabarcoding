@@ -61,7 +61,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S32]`| Part B `global_clustering` — swarm `--fastidious` on the global fasta      | `tests/processes/part_b/global_clustering.nf.test` | done | — |
 | `[S33]`| Part B `fake_taxonomic_assignment` — placeholder taxonomy TSV              | `tests/processes/part_b/fake_taxonomic_assignment.nf.test` | done | — |
 | `[S34]`| Part B `chimera_detection` — vsearch uchime_denovo on representatives     | `tests/processes/part_b/chimera_detection.nf.test` | done | — |
-| `[S35]`| Part B `build_occurrence_table` — merge swarm/uchime/quality/stampa/distribution into the filtered occurrence table | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test` | red | — |
+| `[S35]`| Part B `build_occurrence_table` — merge swarm/uchime/quality/stampa/distribution into the filtered occurrence table | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test` | done | — |
 
 
 ## Per-process tests
@@ -85,3 +85,4 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `fake_taxonomic_assignment`     | `tests/processes/part_b/fake_taxonomic_assignment.nf.test`    | S33          | done   |
 | `chimera_detection`             | `tests/processes/part_b/chimera_detection.nf.test`            | S34          | done   |
 | `cleaving`                      | `tests/processes/part_b/cleaving.nf.test`                     | S22          | done   |
+| `build_occurrence_table`        | `tests/processes/part_b/build_occurrence_table.nf.test`       | S35          | done   |

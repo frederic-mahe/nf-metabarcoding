@@ -388,8 +388,7 @@ isolation.
     non-empty for the documented fixture (the `.uchime` table can
     legitimately be empty when no chimeras are found).
 - `[S35]` Part B's `build_occurrence_table` runs
-  `bin/build_filtered_contingency_table.py` (current name during
-  refactor: `bin/OTU_contingency_table_filtered.py`) to merge the
+  `bin/build_filtered_contingency_table.py` to merge the
   swarm representatives, swarm stats, swarm output, uchime hits,
   per-amplicon quality (`build_expected_error_file`'s
   `[S28]` output), taxonomic assignments, and the sequence ↔
@@ -399,7 +398,7 @@ isolation.
   || spread >= 2)`. Sample columns appear in sorted order; empty
   samples (`[S09]`) contribute a zero-filled column.
   - **Pass when:** golden-file characterization tests for
-    `bin/OTU_contingency_table_filtered.py` reproduce its byte-exact
+    `bin/build_filtered_contingency_table.py` reproduce its byte-exact
     stdout on a fixture covering: (a) a cluster passing every
     filter, (b) each filter individually rejecting a cluster,
     (c) the `abundance >= 3` and `spread >= 2` alternatives,

@@ -1,0 +1,45 @@
+nextflow_process {
+
+    name "build_occurrence_table"
+    script "main.nf"
+    process "build_occurrence_table"
+
+    test("merges Part B inputs into the filtered occurrence table") {
+        // COVERAGE: [S35]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/representatives.fas")
+                input[1]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/representatives.fas")
+                input[2]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/stats")
+                input[3]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/stats")
+                input[4]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/swarms")
+                input[5]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/swarms")
+                input[6]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/uchime")
+                input[7]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/quality")
+                input[8]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/assignments")
+                input[9]  = file("\${projectDir}/tests/data/build_filtered_contingency_table/distribution")
+                input[10] = "proj"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def outPath = process.out[0].get(0)
+            assert outPath.endsWith("proj.OTU.filtered.cleaved.table") :
+                "unexpected output filename: ${outPath}"
+            // The fixture concatenated with itself doubles every row,
+            // but the script keys on seed-set so duplicates collapse
+            // back to the same three passing clusters. The full
+            // golden-file content is pinned by the pytest
+            // characterization test; here we sanity-check the
+            // header + row count.
+            def lines = path(outPath).readLines()
+            assert lines.size() == 4 :
+                "expected header + 3 rows, got ${lines.size()}: ${lines}"
+            assert lines[0].startsWith("OTU\ttotal") :
+                "unexpected header: ${lines[0]}"
+        }
+    }
+}

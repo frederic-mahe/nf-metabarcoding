@@ -1,4 +1,4 @@
-"""Characterization tests for ``bin/OTU_contingency_table_filtered.py``.
+"""Characterization tests for ``bin/build_filtered_contingency_table.py``.
 
 This is the byte-exact golden-file gate that pins the legacy
 script's current behaviour before any refactor. The fixture is
@@ -43,7 +43,7 @@ from pathlib import Path
 SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "bin"
-    / "OTU_contingency_table_filtered.py"
+    / "build_filtered_contingency_table.py"
 )
 FIXTURE = (
     Path(__file__).resolve().parents[1]
