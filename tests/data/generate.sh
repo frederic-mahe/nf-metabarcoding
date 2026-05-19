@@ -167,6 +167,20 @@ emit_miseq_pair() {
     gzip --force "${r1}" "${r2}"
 }
 
+emit_e2e_part_b_fixture() {
+    # Isolated single-pair folders for the Part A → Part B end-to-end
+    # tests. Sharing tests/data/ with the rest of the fixtures would
+    # inflate N (every paired-end fastq there would be discovered as a
+    # separate sample), so the e2e tests need their own clean folders.
+    local -r ok="e2e_part_b/ok"
+    local -r fail="e2e_part_b/fail"
+    mkdir -p "${ok}" "${fail}"
+    cp paired_merge_ok_1.fastq.gz   "${ok}/sampleA_1.fastq.gz"
+    cp paired_merge_ok_2.fastq.gz   "${ok}/sampleA_2.fastq.gz"
+    cp paired_merge_fail_1.fastq.gz "${fail}/sampleB_1.fastq.gz"
+    cp paired_merge_fail_2.fastq.gz "${fail}/sampleB_2.fastq.gz"
+}
+
 emit_reserved_keyword() {
     # [S23] — a paired-end fixture whose R1 name resolves to the
     # reserved sample ID `X_notmerged`. Isolated in its own folder so
@@ -291,6 +305,7 @@ emit_miseq_pair
 emit_reserved_keyword
 emit_duplicate_sample_ids
 emit_part_b_fixtures
+emit_e2e_part_b_fixture
 emit_n_containing_fasta
 
 echo "Wrote fixtures to ${DATA_DIR}"

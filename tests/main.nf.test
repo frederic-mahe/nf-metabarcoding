@@ -324,6 +324,76 @@ nextflow_pipeline {
         }
     }
 
+    test("Part A → Part B end-to-end on the paired_merge_ok fixture") {
+        // COVERAGE: [S01], [S27]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data/e2e_part_b/ok"
+                fastq_pattern  = ""
+                project_name   = "e2e"
+                results_folder = "${outputDir}/e2e_results"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+
+            def resultDir = "${outputDir}/e2e_results"
+            assert file(resultDir).exists() : "results folder should be created"
+
+            // Part A's regular sample → Part B with N=1 (the
+            // _notmerged shadow sample is dropped from the Part B
+            // channel).
+            def base = "${resultDir}/e2e_1_samples"
+            ["${base}.qual",
+             "${base}.distr",
+             "${base}_per_sample_OTUs.stats",
+             "${base}.fas",
+             "${base}.log",
+             "${base}_1f.swarms",
+             "${base}_1f.stats",
+             "${base}_1f_representatives.fas",
+             "${base}_1f.log"].each { artefact ->
+                assert file(artefact).exists() :
+                    "missing Part B artefact: ${artefact}"
+            }
+        }
+    }
+
+    test("Part A → Part B drops the _notmerged shadow sample from the Part B channel") {
+        // COVERAGE: [S04], [S27]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data/e2e_part_b/fail"
+                fastq_pattern  = ""
+                project_name   = "shadow_e2e"
+                results_folder = "${outputDir}/shadow_e2e_results"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            // sampleB.fastq.gz produces *two* Part A sample IDs (the
+            // regular `sampleB` and the shadow `sampleB_notmerged`).
+            // Only the regular one feeds Part B → N=1.
+            def base = "${outputDir}/shadow_e2e_results/shadow_e2e_1_samples"
+            assert file("${base}.fas").exists() : "Part B fasta should exist"
+            // The shadow sample's published .fas stays in fastq_folder
+            // (Part A's publishDir target) — not in the Part B results.
+            def shadowInResults = file(
+                "${outputDir}/shadow_e2e_results/sampleB_notmerged.fas"
+            )
+            assert !shadowInResults.exists() :
+                "shadow .fas must not be published into the Part B results folder"
+        }
+    }
+
     test("Part B aborts when --project_name is missing") {
         // COVERAGE: [S25]
         tag "ci"

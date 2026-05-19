@@ -533,12 +533,35 @@ process global_clustering {
 }
 
 
+workflow part_b_processes {
+    // Runs the five Part B pre-cleaving processes on already-collected
+    // lists of per-sample fasta / qual / stats files. Shared by the
+    // standalone (`workflow part_b`) and end-to-end paths so the
+    // process wiring lives in one place.
+
+    take:
+    fasta_list   // value channel: List<Path>, one .fas per sample
+    qual_list    // value channel: List<Path>, one .qual per sample (same order)
+    stats_list   // value channel: List<Path>, one .stats per sample (same order)
+
+    main:
+    def basename = fasta_list.map { files ->
+        "${params.project_name}_${files.size()}_samples"
+    }
+
+    build_expected_error_file(qual_list, basename)
+    build_distribution_file(fasta_list, basename)
+    list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
+    global_dereplication(fasta_list, basename)
+    global_clustering(global_dereplication.out[0], basename)
+}
+
+
 workflow part_b {
     // Standalone Part B ([S25]/[S26]/[S27]): discover per-sample .fas
     // files (skipping shadow-pipeline _notmerged artefacts), assert
-    // sample-ID uniqueness, and run the four parallel build/list/derep
-    // processes followed by global clustering. .qual and .stats are
-    // derived as sibling files of each .fas.
+    // sample-ID uniqueness, and run the pre-cleaving processes. .qual
+    // and .stats are derived as sibling files of each .fas.
     assert params.project_name :
         "--project_name must be set when --fasta_folder is set"
     assert params.results_folder :
@@ -563,15 +586,7 @@ workflow part_b {
         .map { id, f -> file("${f.parent}/${id}.stats") }
         .collect()
 
-    def basename = fasta_list.map { files ->
-        "${params.project_name}_${files.size()}_samples"
-    }
-
-    build_expected_error_file(qual_list, basename)
-    build_distribution_file(fasta_list, basename)
-    list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
-    global_dereplication(fasta_list, basename)
-    global_clustering(global_dereplication.out[0], basename)
+    part_b_processes(fasta_list, qual_list, stats_list)
 }
 
 
@@ -716,4 +731,39 @@ workflow {
         }
 
     list_local_clusters(ready_for_swarm.id, ready_for_swarm.file)
+
+    // ----- Part A → Part B handoff ([S27]) -----
+    // When --project_name is set, Part B runs on the Part A outputs
+    // (without going through disk discovery). The shadow path's
+    // outputs are dropped from the Part B channel: [S04] specifies
+    // they belong to a separate downstream path, not the regular
+    // Part B fasta channel. They remain published to params.fastq_folder.
+    if ( params.project_name ) {
+        assert params.results_folder :
+            "--results_folder must be set when --project_name is set"
+        def results_dir = new File(params.results_folder.toString())
+        results_dir.mkdirs()
+
+        def regular_fasta = dereplicate_fasta.out[0]
+            .merge(dereplicate_fasta.out[1])
+            .filter { id, _f -> !id.endsWith("_notmerged") }
+        def regular_qual = extract_expected_error_values.out[0]
+            .merge(extract_expected_error_values.out[1])
+            .filter { id, _f -> !id.endsWith("_notmerged") }
+        def regular_stats = list_local_clusters.out[0]
+            .merge(list_local_clusters.out[1])
+            .filter { id, _f -> !id.endsWith("_notmerged") }
+
+        // join the three streams on sample ID so the lists stay
+        // aligned even when processes complete out of order.
+        def joined_b = regular_fasta
+            .join(regular_qual)
+            .join(regular_stats)
+
+        def b_fasta = joined_b.map { _id, f, _q, _s -> f }.collect()
+        def b_qual  = joined_b.map { _id, _f, q, _s -> q }.collect()
+        def b_stats = joined_b.map { _id, _f, _q, s -> s }.collect()
+
+        part_b_processes(b_fasta, b_qual, b_stats)
+    }
 }
