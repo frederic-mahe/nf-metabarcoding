@@ -70,10 +70,10 @@ def test_parse_hits_handles_no_hit_marker(tmp_path: Path) -> None:
 
 
 def test_parse_hits_handles_multi_underscore_amplicon(tmp_path: Path) -> None:
-    # Improvement over legacy: rsplit("_", 1) splits only on the
-    # final underscore so amplicon IDs may themselves contain
-    # underscores. The legacy tmp/stampa/stampa_merge.py crashes
-    # on this input — see test_stampa_merge_legacy.
+    # rsplit("_", 1) splits only on the final underscore so amplicon
+    # IDs may themselves contain underscores (e.g. SHA1-derived
+    # sample-prefixed IDs). The slurm-era stampa_merge.py used
+    # plain split("_") and crashed on these.
     hits = _write(
         tmp_path, "hits",
         "sample_a_amp7_42\t99.0\trefX Bacteria|Firmicutes\n",
@@ -85,9 +85,9 @@ def test_parse_hits_handles_multi_underscore_amplicon(tmp_path: Path) -> None:
 
 
 def test_parse_hits_malformed_hit_raises(tmp_path: Path) -> None:
-    # "Fail loud on malformed input" is preserved from legacy: a
-    # line that doesn't split into exactly 3 tab-separated fields
-    # propagates ValueError. See the matching legacy test.
+    # Fail-loud on malformed input: a line that doesn't split into
+    # exactly 3 tab-separated fields raises ValueError so upstream
+    # silent data corruption is impossible to miss.
     hits = _write(tmp_path, "hits", "only\ttwo_columns\n")
     with pytest.raises(ValueError):
         list(parse_hits(str(hits)))

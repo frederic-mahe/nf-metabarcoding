@@ -612,15 +612,15 @@ from placeholder values to real taxonomic assignments.
        `collectFile(sort: { ... })` operator, which publishes
        the merged `<basename>_taxonomy_stampa.tsv` directly to
        the results folder. No separate merge process.
-  - **Pass when:** **(skeleton phase)** the process and helper
-    exist, their CLI parses without error, and a smoke test
-    against a tiny reference fixture produces a TSV with the
-    documented shape. Real-world LCA correctness is pinned by
-    characterization tests against the legacy
-    `tmp/stampa/stampa_merge.py` in
-    `tests/python/test_stampa_merge_legacy.py`, which lock the
-    LCA / hit-parsing / shard-walk behaviour we promise to
-    preserve through the refactor toward `bin/stampa_merge.py`.
+  - **Pass when:** the scatter-gather smoke tests in
+    `tests/main.nf.test` (one with `params.stampa_chunk_size=1`
+    that forces a split, one with `=0` for the no-split branch)
+    publish the expected `<basename>_taxonomy_stampa.tsv` sorted
+    by abundance desc then amplicon asc; the per-chunk process
+    test in `tests/processes/part_c/assign_taxonomy_stampa.nf.test`
+    confirms one chunk's vsearch + `bin/stampa_merge.py` wiring;
+    and LCA correctness is pinned at the helper level by
+    `tests/python/test_stampa_merge.py`.
 - `[S50]` Part C's shadow path uses `vsearch --sintax` against
   the **same** reference dataset and emits an alternative
   taxonomy TSV with the same column shape as the primary path
