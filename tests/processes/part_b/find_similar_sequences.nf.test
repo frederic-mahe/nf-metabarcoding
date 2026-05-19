@@ -1,0 +1,46 @@
+nextflow_process {
+
+    name "find_similar_sequences"
+    script "main.nf"
+    process "find_similar_sequences"
+
+    test("vsearch --usearch_global self-search; ;size= stripped from output") {
+        // COVERAGE: [S42]
+        tag "ci"
+        when {
+            params {
+                threads = 1
+            }
+            process {
+                """
+                def f = workDir.resolve("otus.fas")
+                // Two near-identical sequences (>= 84% identity) so
+                // vsearch finds the self-similarity pair.
+                f.text = '''>amp1;size=10;
+ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
+>amp2;size=5;
+ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGA
+'''
+                input[0] = file(f.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def out = process.out[0].get(0)
+            assert out.endsWith(".match_list")
+            def lines = path(out).readLines()
+            // self-search → expect at least one similarity hit
+            assert lines.size() >= 1
+            // each row is 3 tab-separated columns: query, target, id
+            lines.each { line ->
+                def cols = line.split("\t")
+                assert cols.size() == 3 :
+                    "expected query\\ttarget\\tid, got: ${line}"
+                // ;size= annotation must have been stripped
+                assert !line.contains(";size=") :
+                    "expected ;size= to be removed, got: ${line}"
+            }
+        }
+    }
+}

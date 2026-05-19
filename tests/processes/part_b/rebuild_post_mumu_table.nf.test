@@ -1,0 +1,52 @@
+nextflow_process {
+
+    name "rebuild_post_mumu_table"
+    script "main.nf"
+    process "rebuild_post_mumu_table"
+
+    test("splices old metadata onto mumu rows + applies the size=0→1 hotfix") {
+        // COVERAGE: [S44]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/data/rebuild_table_after_mumu/mumu_table")
+                input[1] = file("\${projectDir}/tests/data/rebuild_table_after_mumu/old_table")
+                """
+            }
+        }
+        then {
+            assert process.success
+            def out = process.out[0].get(0)
+            assert out.endsWith(".mumu.table")
+            def lines = path(out).readLines()
+            // Header + 4 rebuilt rows
+            assert lines.size() == 5
+
+            // Compare every row except OTU 4 to the pytest golden
+            // (the awk hotfix only touches OTU 4's total column).
+            def expected = file(
+                "${projectDir}/tests/data/rebuild_table_after_mumu/expected_output"
+            ).readLines()
+            assert lines[0] == expected[0]                : "header changed: ${lines[0]}"
+            assert lines[1] == expected[1]                : "row 1 changed"
+            assert lines[2] == expected[2]                : "row 2 changed"
+            assert lines[3] == expected[3]                : "row 3 changed"
+
+            // size=0 → size=1 hotfix: OTU 4's total column flipped
+            // from 0 (in expected_output) to 1 here.
+            def expected4 = expected[4].split("\t", -1)
+            def actual4   = lines[4].split("\t", -1)
+            assert expected4[1] == "0"
+            assert actual4[1]   == "1" :
+                "expected total column to be 1 after the awk hotfix, got: ${actual4[1]}"
+            // every other column is identical to the python-only output
+            (0..(expected4.size() - 1)).each { i ->
+                if (i != 1) {
+                    assert actual4[i] == expected4[i] :
+                        "col ${i} mismatch: ${actual4[i]} vs ${expected4[i]}"
+                }
+            }
+        }
+    }
+}

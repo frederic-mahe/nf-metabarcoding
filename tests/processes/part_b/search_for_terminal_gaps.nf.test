@@ -1,0 +1,47 @@
+nextflow_process {
+
+    name "search_for_terminal_gaps"
+    script "main.nf"
+    process "search_for_terminal_gaps"
+
+    test("emits ^H lines from a self-clustering uc stream") {
+        // COVERAGE: [S38]
+        tag "ci"
+        when {
+            params {
+                threads = 1
+            }
+            process {
+                """
+                // Hand-crafted OTU table where row 2's sequence is a
+                // strict prefix of row 1's → vsearch --cluster_smallmem
+                // --id 1.0 (modulo terminal gaps) collapses them into
+                // one cluster and emits an H line.
+                // Both sequences >= vsearch's default minseqlength=32.
+                // amp2 is a 40-nt prefix of amp1 (50 nt) → terminal-
+                // gap match at id=1.0 → vsearch emits an H line.
+                def t = workDir.resolve("table")
+                t.text = '''OTU\\ttotal\\tcloud\\tamplicon\\tlength\\tabundance\\tchimera\\tspread\\tquality\\tsequence\\tidentity\\ttaxonomy\\treferences\\ts1
+1\\t10\\t1\\tamp1\\t50\\t10\\tN\\t1\\t0.001\\tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\\t99.0\\tT1\\tr1\\t10
+2\\t8\\t1\\tamp2\\t40\\t8\\tN\\t1\\t0.001\\tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\\t99.0\\tT2\\tr2\\t8
+'''
+                input[0] = file(t.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def uc = process.out[0].get(0)
+            assert uc.endsWith("table.uc")
+            def lines = path(uc).readLines()
+            // Every output line is an `H` row.
+            lines.each { l ->
+                assert l.startsWith("H") :
+                    "expected H-line, got: ${l}"
+            }
+            // At least one hit (the prefix sequence joins its
+            // longer parent).
+            assert lines.size() >= 1
+        }
+    }
+}

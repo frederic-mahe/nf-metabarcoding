@@ -311,7 +311,16 @@ nextflow_pipeline {
              "${base}_1f.swarms",
              "${base}_1f.stats",
              "${base}_1f_representatives.fas",
-             "${base}_1f.log"].each { artefact ->
+             "${base}_1f.log",
+             // [S35]/[S39]/[S43]/[S44]: occurrence-table + substring-merge
+             // + mumu + post-mumu artefacts.
+             "${base}.OTU.filtered.cleaved.table",
+             "${base}.OTU.filtered.cleaved.nosubstringOTUs.table",
+             "${base}.OTU.filtered.cleaved.nosubstringOTUs.fas",
+             "${base}.OTU.filtered.cleaved.nosubstringOTUs_raw_mumu.table",
+             "${base}.OTU.filtered.cleaved.nosubstringOTUs.mumu.log",
+             "${base}.OTU.filtered.cleaved.nosubstringOTUs.mumu.table",
+             "${base}.OTU.filtered.cleaved.nosubstringOTUs.mumu.fas"].each { artefact ->
                 assert file(artefact).exists() :
                     "missing Part B artefact: ${artefact}"
             }

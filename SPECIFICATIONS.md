@@ -458,14 +458,22 @@ isolation.
     (b) a master with a single pupil, (c) a master with two pupils,
     (d) an overlap where one OTU is both master and pupil → script
     exits non-zero and prints WARNING to stderr.
-- `[S40]` Part B's `extract_table_fasta` emits a FASTA from an OTU
-  table by reading column 4 as the amplicon ID, column 2 as the
-  abundance, and column 10 as the sequence (header
-  `<amplicon>;size=<abundance>;`). A `skip_zero_abundance`
-  parameter toggles whether rows with `total == 0` are dropped
-  (used after mumu, where merged-out OTUs have a zero row).
-  - **Pass when:** the FASTA contains one record per kept row;
-    headers use the documented format.
+- `[S40]` Part B exposes two FASTA-extraction processes that both
+  read column 4 as the amplicon ID, column 2 as the abundance,
+  and column 10 as the sequence (header
+  `<amplicon>;size=<abundance>;`):
+    - `extract_otu_fasta` — keeps every data row (`awk 'NR > 1'`)
+      and is used before the mumu pass to feed
+      `find_similar_sequences`;
+    - `extract_mumu_fasta` — adds an `$2 != 0` filter so rows
+      whose `total` is zero are dropped; used after `rebuild_post_mumu_table`
+      to produce the project's final post-mumu fasta. The legacy
+      bash uses `extract_fasta_sequences_from_occurrence_table`
+      and `extract_fasta_sequences_from_occurrence_table2`
+      respectively; these are the workflow's shorter names.
+  - **Pass when:** the pre-mumu FASTA contains one record per data
+    row (zero-abundance rows kept verbatim); the post-mumu FASTA
+    contains one record per non-zero row.
 - `[S41]` Part B's `trim_metadata_for_mumu` reduces the OTU table
   to two slices that mumu accepts: the amplicon column
   (column 4) followed by every sample column (columns 14 onward).

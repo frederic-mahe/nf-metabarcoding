@@ -1,0 +1,40 @@
+nextflow_process {
+
+    name "run_mumu"
+    script "main.nf"
+    process "run_mumu"
+
+    test("invokes mumu >=1.1.1 and emits new_otu_table + log") {
+        // COVERAGE: [S43]
+        tag "ci"
+        when {
+            process {
+                """
+                def t = workDir.resolve("input_reduced.table")
+                t.text = '''amplicon\\ts1\\ts2
+aa01\\t10\\t5
+bb02\\t3\\t0
+'''
+                def m = workDir.resolve("input.match_list")
+                m.text = 'aa01\\tbb02\\t99.0\\n'
+                input[0] = file(t.toString())
+                input[1] = file(m.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def new_table = process.out[0].get(0)
+            def log       = process.out[1].get(0)
+            assert new_table.endsWith("input_raw_mumu.table") :
+                "unexpected new table filename: ${new_table}"
+            assert log.endsWith("input.mumu.log") :
+                "unexpected log filename: ${log}"
+            // log captures the analysis report and is non-empty
+            assert path(log).readLines().size() > 0
+            // new table preserves the (amplicon + samples) shape
+            def lines = path(new_table).readLines()
+            assert lines[0] == "amplicon\ts1\ts2"
+        }
+    }
+}

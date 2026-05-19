@@ -1,0 +1,32 @@
+nextflow_process {
+
+    name "extract_mumu_fasta"
+    script "main.nf"
+    process "extract_mumu_fasta"
+
+    test("drops zero-abundance rows; keeps the rest with cols 4 (amplicon), 2 (size), 10 (sequence)") {
+        // COVERAGE: [S40]
+        tag "ci"
+        when {
+            process {
+                """
+                def t = workDir.resolve("input.mumu.table")
+                t.text = '''OTU\\ttotal\\tcloud\\tamplicon\\tlength\\tabundance\\tchimera\\tspread\\tquality\\tsequence\\tidentity\\ttaxonomy\\treferences\\ts1
+1\\t10\\t1\\tamp1\\t10\\t10\\tN\\t1\\t0.001\\tACGTACGTAC\\t99.0\\tT1\\tr1\\t10
+2\\t0\\t1\\tamp2\\t10\\t0\\tN\\t0\\t0.001\\tTTTTTTTTTT\\t99.0\\tT2\\tr2\\t0
+'''
+                input[0] = file(t.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[0].get(0)).readLines()
+            // The zero-abundance row (amp2) is dropped; only amp1
+            // survives → 2 lines (header + sequence).
+            assert lines.size() == 2
+            assert lines[0] == ">amp1;size=10;"
+            assert lines[1] == "ACGTACGTAC"
+        }
+    }
+}

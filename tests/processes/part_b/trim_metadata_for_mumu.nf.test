@@ -1,0 +1,33 @@
+nextflow_process {
+
+    name "trim_metadata_for_mumu"
+    script "main.nf"
+    process "trim_metadata_for_mumu"
+
+    test("keeps the amplicon column + every sample column") {
+        // COVERAGE: [S41]
+        tag "ci"
+        when {
+            process {
+                """
+                def t = workDir.resolve("input.table")
+                t.text = '''OTU\\ttotal\\tcloud\\tamplicon\\tlength\\tabundance\\tchimera\\tspread\\tquality\\tsequence\\tidentity\\ttaxonomy\\treferences\\ts1\\ts2
+1\\t10\\t1\\tamp1\\t10\\t10\\tN\\t1\\t0.001\\tACGT\\t99.0\\tT1\\tr1\\t7\\t3
+2\\t8\\t1\\tamp2\\t10\\t8\\tN\\t1\\t0.001\\tACGT\\t99.0\\tT2\\tr2\\t8\\t0
+'''
+                input[0] = file(t.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[0].get(0)).readLines()
+            // 3 lines: header + 2 data rows
+            assert lines.size() == 3
+            // header: amplicon\ts1\ts2
+            assert lines[0] == "amplicon\ts1\ts2"
+            assert lines[1] == "amp1\t7\t3"
+            assert lines[2] == "amp2\t8\t0"
+        }
+    }
+}

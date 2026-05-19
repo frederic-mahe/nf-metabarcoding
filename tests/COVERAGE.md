@@ -64,13 +64,13 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S35]`| Part B `build_occurrence_table` — merge swarm/uchime/quality/stampa/distribution into the filtered occurrence table | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test` | done | — |
 | `[S36]`| Part B `fake_taxonomic_assignment2` — placeholder taxonomy TSV for cleaved representatives | `tests/processes/part_b/fake_taxonomic_assignment2.nf.test` | done | — |
 | `[S37]`| Part B `chimera_detection2` — uchime_denovo on pre-cleave + cleaved reps with dynamic --minsize | `tests/processes/part_b/chimera_detection2.nf.test` | done | — |
-| `[S38]`| Part B `search_for_terminal_gaps` — vsearch self-cluster (id=1.0) for sub/super-string OTUs | `tests/processes/part_b/search_for_terminal_gaps.nf.test` | red | — |
-| `[S39]`| Part B `merge_substring_otus` — merge pupil OTUs onto masters; sort; assert reads conserved | `tests/python/test_merge_sub_superstring_otus.py`, `tests/processes/part_b/merge_substring_otus.nf.test` | red | — |
-| `[S40]`| Part B `extract_table_fasta` — FASTA from OTU table cols (4, 2, 10); optional zero-abundance skip | `tests/processes/part_b/extract_table_fasta.nf.test` | red | — |
-| `[S41]`| Part B `trim_metadata_for_mumu` — keep amplicon + sample cols (cut -f 4,14-)         | `tests/processes/part_b/trim_metadata_for_mumu.nf.test` | red | — |
-| `[S42]`| Part B `find_similar_sequences` — vsearch --usearch_global self-search; strip ;size= | `tests/processes/part_b/find_similar_sequences.nf.test` | red | — |
-| `[S43]`| Part B `run_mumu` — mumu binary (>=1.1.1) post-clustering filter                     | `tests/processes/part_b/run_mumu.nf.test` | red | — |
-| `[S44]`| Part B `rebuild_post_mumu_table` — splice old metadata onto mumu rows; renumber      | `tests/python/test_rebuild_table_after_mumu.py`, `tests/processes/part_b/rebuild_post_mumu_table.nf.test` | red | — |
+| `[S38]`| Part B `search_for_terminal_gaps` — vsearch self-cluster (id=1.0) for sub/super-string OTUs | `tests/processes/part_b/search_for_terminal_gaps.nf.test` | done | — |
+| `[S39]`| Part B `merge_substring_otus` — merge pupil OTUs onto masters; sort; assert reads conserved | `tests/python/test_merge_sub_superstring_otus.py`, `tests/processes/part_b/merge_substring_otus.nf.test` | done | — |
+| `[S40]`| Part B `extract_otu_fasta` / `extract_mumu_fasta` — FASTA from OTU table cols (4, 2, 10); the latter skips `$2==0` | `tests/processes/part_b/extract_otu_fasta.nf.test`, `tests/processes/part_b/extract_mumu_fasta.nf.test` | done | — |
+| `[S41]`| Part B `trim_metadata_for_mumu` — keep amplicon + sample cols (cut -f 4,14-)         | `tests/processes/part_b/trim_metadata_for_mumu.nf.test` | done | — |
+| `[S42]`| Part B `find_similar_sequences` — vsearch --usearch_global self-search; strip ;size= | `tests/processes/part_b/find_similar_sequences.nf.test` | done | — |
+| `[S43]`| Part B `run_mumu` — mumu binary (>=1.1.1) post-clustering filter                     | `tests/processes/part_b/run_mumu.nf.test` | done | — |
+| `[S44]`| Part B `rebuild_post_mumu_table` — splice old metadata onto mumu rows; renumber      | `tests/python/test_rebuild_table_after_mumu.py`, `tests/processes/part_b/rebuild_post_mumu_table.nf.test` | done | — |
 
 
 ## Per-process tests
@@ -97,10 +97,11 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `build_occurrence_table`        | `tests/processes/part_b/build_occurrence_table.nf.test`       | S35          | done   |
 | `fake_taxonomic_assignment2`    | `tests/processes/part_b/fake_taxonomic_assignment2.nf.test`   | S36          | done   |
 | `chimera_detection2`            | `tests/processes/part_b/chimera_detection2.nf.test`           | S37          | done   |
-| `search_for_terminal_gaps`      | `tests/processes/part_b/search_for_terminal_gaps.nf.test`     | S38          | red    |
-| `merge_substring_otus`          | `tests/processes/part_b/merge_substring_otus.nf.test`         | S39          | red    |
-| `extract_table_fasta`           | `tests/processes/part_b/extract_table_fasta.nf.test`          | S40          | red    |
-| `trim_metadata_for_mumu`        | `tests/processes/part_b/trim_metadata_for_mumu.nf.test`       | S41          | red    |
-| `find_similar_sequences`        | `tests/processes/part_b/find_similar_sequences.nf.test`       | S42          | red    |
-| `run_mumu`                      | `tests/processes/part_b/run_mumu.nf.test`                     | S43          | red    |
-| `rebuild_post_mumu_table`       | `tests/processes/part_b/rebuild_post_mumu_table.nf.test`      | S44          | red    |
+| `search_for_terminal_gaps`      | `tests/processes/part_b/search_for_terminal_gaps.nf.test`     | S38          | done   |
+| `merge_substring_otus`          | `tests/processes/part_b/merge_substring_otus.nf.test`         | S39          | done   |
+| `extract_otu_fasta`             | `tests/processes/part_b/extract_otu_fasta.nf.test`            | S40          | done   |
+| `extract_mumu_fasta`            | `tests/processes/part_b/extract_mumu_fasta.nf.test`           | S40          | done   |
+| `trim_metadata_for_mumu`        | `tests/processes/part_b/trim_metadata_for_mumu.nf.test`       | S41          | done   |
+| `find_similar_sequences`        | `tests/processes/part_b/find_similar_sequences.nf.test`       | S42          | done   |
+| `run_mumu`                      | `tests/processes/part_b/run_mumu.nf.test`                     | S43          | done   |
+| `rebuild_post_mumu_table`       | `tests/processes/part_b/rebuild_post_mumu_table.nf.test`      | S44          | done   |

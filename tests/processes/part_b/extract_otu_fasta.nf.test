@@ -1,0 +1,34 @@
+nextflow_process {
+
+    name "extract_otu_fasta"
+    script "main.nf"
+    process "extract_otu_fasta"
+
+    test("emits one FASTA record per row, using cols 4 (amplicon), 2 (size), 10 (sequence)") {
+        // COVERAGE: [S40]
+        tag "ci"
+        when {
+            process {
+                """
+                def t = workDir.resolve("input.table")
+                t.text = '''OTU\\ttotal\\tcloud\\tamplicon\\tlength\\tabundance\\tchimera\\tspread\\tquality\\tsequence\\tidentity\\ttaxonomy\\treferences\\ts1
+1\\t10\\t1\\tamp1\\t10\\t10\\tN\\t1\\t0.001\\tACGTACGTAC\\t99.0\\tT1\\tr1\\t10
+2\\t0\\t1\\tamp2\\t10\\t0\\tN\\t0\\t0.001\\tTTTTTTTTTT\\t99.0\\tT2\\tr2\\t0
+'''
+                input[0] = file(t.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[0].get(0)).readLines()
+            // 2 records → 4 lines; zero-abundance row IS kept (unlike
+            // extract_mumu_fasta).
+            assert lines.size() == 4
+            assert lines[0] == ">amp1;size=10;"
+            assert lines[1] == "ACGTACGTAC"
+            assert lines[2] == ">amp2;size=0;"
+            assert lines[3] == "TTTTTTTTTT"
+        }
+    }
+}

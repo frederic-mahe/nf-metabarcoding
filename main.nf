@@ -751,6 +751,229 @@ process cleaving {
 }
 
 
+process search_for_terminal_gaps {
+    // [S38]: self-cluster the OTU table at id=1.0 to find OTU pairs
+    // that are identical modulo terminal gaps (sub-strings or
+    // super-strings). The output is the `H` lines of vsearch's
+    // `--uc` stream — `merge_substring_otus` consumes those to
+    // collapse pupil OTUs onto their masters.
+    //
+    // grep "^H" returns exit 1 when there are no hits; `|| true`
+    // keeps the process green (an empty .uc is a legitimate outcome).
+
+    input:
+    path otu_table
+
+    output:
+    path "${otu_table.baseName}.uc"
+
+    shell:
+    '''
+    awk 'NR > 1 {printf ">"$1"\\n"$10"\\n"}' !{otu_table} | \
+        vsearch \
+            --threads !{params.threads} \
+            --cluster_smallmem - \
+            --id 1.0 \
+            --qmask none \
+            --usersort \
+            --quiet \
+            --uc - | \
+        grep "^H" > !{otu_table.baseName}.uc || true
+    '''
+}
+
+
+process merge_substring_otus {
+    // [S39]: wraps merge_sub_superstring_OTUs_with_larger_OTUs.py
+    // + the legacy bash `sort_occurrence_table` step
+    // + the read-count invariant check. Pupil OTUs are merged into
+    // their masters (samples summed, spread/total/cloud updated),
+    // the resulting table is sorted by the OTU column, and we
+    // assert that the global read count is conserved.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path otu_table
+    path matches
+
+    output:
+    path "${otu_table.baseName}.nosubstringOTUs.table"
+
+    shell:
+    '''
+    #!/bin/bash
+    set -euo pipefail
+
+    out="!{otu_table.baseName}.nosubstringOTUs.table"
+    tmp_table="$(mktemp)"
+    trap 'rm -f "${tmp_table}"' EXIT
+
+    merge_sub_superstring_OTUs_with_larger_OTUs.py \
+        -t !{otu_table} \
+        -m !{matches} \
+        -o "${tmp_table}"
+
+    (head -n 1 "${tmp_table}"
+     tail -n +2 "${tmp_table}" | sort -k1,1n) > "${out}"
+
+    before="$(awk 'NR > 1 {t += $2} END {print t + 0}' !{otu_table})"
+    after="$(awk 'NR > 1 {t += $2} END {print t + 0}' "${out}")"
+    if (( before != after )) ; then
+        echo "merge_substring_otus: read count changed (${before} -> ${after})" >&2
+        exit 1
+    fi
+    '''
+}
+
+
+process extract_otu_fasta {
+    // [S40]: emit a FASTA from an OTU table (every data row).
+    // Header `<amplicon>;size=<total>;`; column 4 is the amplicon,
+    // column 2 the total abundance, column 10 the sequence.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path table
+
+    output:
+    path "${table.baseName}.fas"
+
+    shell:
+    '''
+    awk 'NR > 1 {printf ">"$4";size="$2";\\n"$10"\\n"}' !{table} \
+        > !{table.baseName}.fas
+    '''
+}
+
+
+process extract_mumu_fasta {
+    // [S40]: post-mumu sibling of `extract_otu_fasta` — same column
+    // layout, but skips rows whose `total == 0`. After the
+    // size=0 → 1 awk hotfix in `rebuild_post_mumu_table` ([S44]) no
+    // row carries `$2 == 0` anymore, so the filter is a no-op
+    // safety net retained for byte parity with the legacy bash.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path table
+
+    output:
+    path "${table.baseName}.fas"
+
+    shell:
+    '''
+    awk 'NR > 1 && $2 != 0 {printf ">"$4";size="$2";\\n"$10"\\n"}' !{table} \
+        > !{table.baseName}.fas
+    '''
+}
+
+
+process trim_metadata_for_mumu {
+    // [S41]: keep the amplicon column (col 4) and every sample
+    // column (cols 14+). mumu's --otu_table consumes this shape.
+
+    input:
+    path table
+
+    output:
+    path "${table.baseName}_reduced.table"
+
+    shell:
+    '''
+    cut -f 4,14- !{table} > !{table.baseName}_reduced.table
+    '''
+}
+
+
+process find_similar_sequences {
+    // [S42]: vsearch --usearch_global self-search; lulu-recommended
+    // parameters. The legacy bash strips `;size=N;` from every
+    // column with a sed pass — that's the format mumu accepts.
+
+    input:
+    path otu_fasta
+
+    output:
+    path "${otu_fasta.baseName}.match_list"
+
+    shell:
+    '''
+    vsearch \
+        --usearch_global !{otu_fasta} \
+        --db !{otu_fasta} \
+        --self \
+        --threads !{params.threads} \
+        --id 0.84 \
+        --iddef 1 \
+        --userfields query+target+id \
+        --maxaccepts 0 \
+        --query_cov 0.9 \
+        --maxhits 10 \
+        --quiet \
+        --userout - | \
+        sed -r 's/;size=[0-9]+;//g' > !{otu_fasta.baseName}.match_list
+    '''
+}
+
+
+process run_mumu {
+    // [S43]: mumu (>=1.1.1) post-clustering filter. Inputs are the
+    // reduced OTU table (amplicon + sample cols) and the self-search
+    // match list; outputs are the new OTU table and the analysis log.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path reduced_table
+    path match_list
+
+    output:
+    path "${reduced_table.baseName.replaceFirst(/_reduced$/, '_raw_mumu')}.table"
+    path "${reduced_table.baseName.replaceFirst(/_reduced$/, '')}.mumu.log"
+
+    shell:
+    def new_table = "${reduced_table.baseName.replaceFirst(/_reduced$/, '_raw_mumu')}.table"
+    def log_file  = "${reduced_table.baseName.replaceFirst(/_reduced$/, '')}.mumu.log"
+    """
+    mumu \\
+        --threads ${params.threads} \\
+        --otu_table ${reduced_table} \\
+        --match_list ${match_list} \\
+        --new_otu_table ${new_table} \\
+        --log ${log_file}
+    """
+}
+
+
+process rebuild_post_mumu_table {
+    // [S44]: wraps rebuild_table_after_mumu.py + the legacy
+    // size=0 → 1 awk hotfix (so downstream `vsearch --sizein`
+    // consumers don't choke on a zero-abundance row).
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path mumu_table
+    path old_table
+
+    output:
+    path "${mumu_table.baseName.replaceFirst(/_raw_mumu$/, '')}.mumu.table"
+
+    shell:
+    def out_name = "${mumu_table.baseName.replaceFirst(/_raw_mumu$/, '')}.mumu.table"
+    """
+    rebuild_table_after_mumu.py \\
+        --mumu_table ${mumu_table} \\
+        --old_table  ${old_table} | \\
+        awk 'BEGIN {FS = OFS = "\\t"} {if (\$2 == 0) {\$2 = 1} ; print \$0}' \\
+        > ${out_name}
+    """
+}
+
+
 workflow part_b_processes {
     // Runs the five Part B pre-cleaving processes on already-collected
     // lists of per-sample fasta / qual / stats files. Shared by the
@@ -812,6 +1035,21 @@ workflow part_b_processes {
         build_distribution_file.out[0],      // .distr
         basename,
     )
+
+    // [S38]/[S39]: collapse sub- and super-string OTUs.
+    search_for_terminal_gaps(build_occurrence_table.out[0])
+    merge_substring_otus(
+        build_occurrence_table.out[0],
+        search_for_terminal_gaps.out[0],
+    )
+
+    // [S40]–[S44]: mumu (ex-lulu) post-clustering filter pass.
+    extract_otu_fasta(merge_substring_otus.out[0])
+    trim_metadata_for_mumu(merge_substring_otus.out[0])
+    find_similar_sequences(extract_otu_fasta.out[0])
+    run_mumu(trim_metadata_for_mumu.out[0], find_similar_sequences.out[0])
+    rebuild_post_mumu_table(run_mumu.out[0], merge_substring_otus.out[0])
+    extract_mumu_fasta(rebuild_post_mumu_table.out[0])
 }
 
 
