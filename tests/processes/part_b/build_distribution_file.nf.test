@@ -1,0 +1,52 @@
+nextflow_process {
+
+    name "build_distribution_file"
+    script "main.nf"
+    process "build_distribution_file"
+
+    test("emits <sha1>\\t<sampleId>\\t<size> per fasta record") {
+        // COVERAGE: [S29]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/data/part_b/S1.fas"),
+                    file("\${projectDir}/tests/data/part_b/S2.fas")
+                ]
+                input[1] = "proj_2_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def outPath = process.out[0].get(0)
+            assert outPath.endsWith("proj_2_samples.distr") :
+                "unexpected output filename: ${outPath}"
+            def rows = path(outPath).readLines().collect {
+                it.split("\t", -1)
+            }
+            // S1 carries 2 records (A, B), S2 carries 2 records (A, C).
+            assert rows.size() == 4 :
+                "expected 4 rows, got ${rows.size()}: ${rows}"
+            // Every row has exactly three columns.
+            rows.each { cols ->
+                assert cols.size() == 3 :
+                    "expected 3 tab-separated cols, got ${cols.size()}: ${cols}"
+            }
+            def shaA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            def shaB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            def shaC = "cccccccccccccccccccccccccccccccccccccccc"
+            // Expected (sha1, sample, size) tuples — order-insensitive.
+            def expected = [
+                [shaA, "S1", "3"],
+                [shaB, "S1", "2"],
+                [shaA, "S2", "1"],
+                [shaC, "S2", "4"],
+            ] as Set
+            def actual = rows.collect { it.toList() } as Set
+            assert actual == expected :
+                "rows mismatch: got ${actual}, expected ${expected}"
+        }
+    }
+}

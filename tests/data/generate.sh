@@ -178,6 +178,73 @@ emit_reserved_keyword() {
     cp paired_merge_ok_2.fastq.gz "${dir}/X_notmerged_2.fastq.gz"
 }
 
+emit_part_b_fixtures() {
+    # Hand-crafted per-sample Part A outputs for Part B's process
+    # tests. Two samples (S1, S2) plus a shadow-pipeline artefact
+    # (S1_notmerged.fas) that must be filtered out of the fasta
+    # channel ([S27]).
+    #
+    # Sequence A is shared between S1 (size=3) and S2 (size=1) so
+    # global_dereplication has something to collapse; sequences B
+    # (S1) and C (S2) are unique to their sample.
+    #
+    # SHA1-shaped IDs are constructed from a single letter so tests
+    # can assert on them readably.
+    local -r dir="part_b"
+    mkdir -p "${dir}"
+
+    local -r sha_a="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    local -r sha_b="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    local -r sha_c="cccccccccccccccccccccccccccccccccccccccc"
+    local -r sha_n="9999999999999999999999999999999999999999"
+
+    local -r seq_a="ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT"
+    local -r seq_b="TTTTCCCCAAAAGGGGTTTTCCCCAAAAGGGGTTTTCCCC"
+    local -r seq_c="GGGGTTTTAAAACCCCGGGGTTTTAAAACCCCGGGGTTTT"
+    local -r seq_n="NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"
+
+    # Per-sample .fas — vsearch-style "SHA1;size=N" header, no
+    # trailing semicolon, --fasta_width 0 (one-line sequence).
+    {
+        printf '>%s;size=3\n%s\n' "${sha_a}" "${seq_a}"
+        printf '>%s;size=2\n%s\n' "${sha_b}" "${seq_b}"
+    } > "${dir}/S1.fas"
+    {
+        printf '>%s;size=1\n%s\n' "${sha_a}" "${seq_a}"
+        printf '>%s;size=4\n%s\n' "${sha_c}" "${seq_c}"
+    } > "${dir}/S2.fas"
+    # Shadow-pipeline output — must be excluded from the Part B
+    # channel ([S27]). Content is intentionally bogus so a leak
+    # would surface in dedup / distribution assertions.
+    {
+        printf '>%s;size=99\n%s\n' "${sha_n}" "${seq_n}"
+    } > "${dir}/S1_notmerged.fas"
+
+    # Per-sample .qual — extract_ee.awk format
+    # "<SHA1> <ee> <length>", sorted by length / SHA1 / ee. S2 carries
+    # a lower ee for sequence A so the merge picks S2's row.
+    {
+        printf '%s 0.010000 40\n' "${sha_a}"
+        printf '%s 0.020000 40\n' "${sha_b}"
+    } > "${dir}/S1.qual"
+    {
+        printf '%s 0.005000 40\n' "${sha_a}"
+        printf '%s 0.030000 40\n' "${sha_c}"
+    } > "${dir}/S2.qual"
+
+    # Per-sample .stats — swarm --statistics-file rows
+    # (unique amplicons, total abundance, seed, seed-abundance,
+    # singletons, max-generation, max-radius). Two rows in S1, one
+    # in S2.
+    {
+        printf '3\t5\t%s\t3\t0\t1\t1\n' "${sha_a}"
+        printf '2\t4\t%s\t2\t0\t1\t1\n' "${sha_b}"
+    } > "${dir}/S1.stats"
+    {
+        printf '4\t6\t%s\t4\t0\t1\t1\n' "${sha_c}"
+    } > "${dir}/S2.stats"
+}
+
 emit_duplicate_sample_ids() {
     # [S13]/[S14]: two folders that both resolve to the same sample
     # ID `A` (one via canonical pattern row 5, the other via row 6),
@@ -215,6 +282,7 @@ emit_unpaired_only
 emit_miseq_pair
 emit_reserved_keyword
 emit_duplicate_sample_ids
+emit_part_b_fixtures
 emit_n_containing_fasta
 
 echo "Wrote fixtures to ${DATA_DIR}"

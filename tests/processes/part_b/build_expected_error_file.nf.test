@@ -1,0 +1,48 @@
+nextflow_process {
+
+    name "build_expected_error_file"
+    script "main.nf"
+    process "build_expected_error_file"
+
+    test("merges per-sample .qual files and uniqs by SHA1") {
+        // COVERAGE: [S28]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/data/part_b/S1.qual"),
+                    file("\${projectDir}/tests/data/part_b/S2.qual")
+                ]
+                input[1] = "proj_2_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def outPath = process.out[0].get(0)
+            assert outPath.endsWith("proj_2_samples.qual") :
+                "unexpected output filename: ${outPath}"
+            def lines = path(outPath).readLines()
+            // 3 distinct SHA1s across the two inputs (A shared, B and C
+            // unique).
+            assert lines.size() == 3 :
+                "expected 3 rows after uniq, got ${lines.size()}: ${lines}"
+            def shas = lines.collect { it.split(/\s+/)[0] } as Set
+            assert shas == [
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "cccccccccccccccccccccccccccccccccccccccc",
+            ] as Set
+            // S2 carries the lower ee for sequence A (0.005000) and
+            // sorts ahead of S1 (0.010000), so it must be the row
+            // that survives uniq.
+            def rowA = lines.find {
+                it.startsWith("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            }
+            assert rowA != null
+            assert rowA.contains("0.005000") :
+                "expected the lower-ee row to win, got: ${rowA}"
+        }
+    }
+}

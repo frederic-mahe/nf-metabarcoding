@@ -1,0 +1,76 @@
+nextflow_process {
+
+    name "global_dereplication"
+    script "main.nf"
+    process "global_dereplication"
+
+    test("collapses identical sequences across samples and sums sizes") {
+        // COVERAGE: [S31]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/data/part_b/S1.fas"),
+                    file("\${projectDir}/tests/data/part_b/S2.fas")
+                ]
+                input[1] = "proj_2_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+
+            // Output fasta is the first emitted path.
+            def fastaPath = process.out[0].get(0)
+            assert fastaPath.endsWith("proj_2_samples.fas") :
+                "unexpected fasta output: ${fastaPath}"
+
+            // 3 unique sequences across the two inputs (A is shared,
+            // B and C are unique).
+            def lines = path(fastaPath).readLines()
+            def headers = lines.findAll { it.startsWith(">") }
+            assert headers.size() == 3 :
+                "expected 3 records after global dereplication, got ${headers.size()}"
+
+            // Sequence A has size=3 in S1 and size=1 in S2 → sum=4.
+            // vsearch --derep_fulllength rewrites headers as
+            // ">SHA1;size=N;" or similar.
+            def header_a = headers.find {
+                it.contains("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            }
+            assert header_a != null : "missing record for sequence A"
+            assert header_a ==~ /.*;size=4;?.*/ :
+                "expected size=4 for shared sequence A, got: ${header_a}"
+
+            // log file is the second emitted path.
+            def logPath = process.out[1].get(0)
+            assert logPath.endsWith("proj_2_samples.log") :
+                "unexpected log filename: ${logPath}"
+            assert path(logPath).readLines().size() > 0 :
+                "vsearch log should not be empty"
+        }
+    }
+
+    test("aborts when --project_name is not set") {
+        // COVERAGE: [S25]
+        tag "pending"
+        // The assertion that --project_name is required is enforced
+        // at the workflow level (main.nf "workflow { assert ... }"),
+        // not in the process itself; covered end-to-end by
+        // tests/main.nf.test once Part B is wired into the main
+        // workflow. This placeholder keeps the [S25] coverage row
+        // visible.
+        when {
+            process {
+                """
+                input[0] = []
+                input[1] = ""
+                """
+            }
+        }
+        then {
+            assert process.failed
+        }
+    }
+}

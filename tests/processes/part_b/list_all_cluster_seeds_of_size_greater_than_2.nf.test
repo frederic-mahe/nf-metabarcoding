@@ -1,0 +1,45 @@
+nextflow_process {
+
+    name "list_all_cluster_seeds_of_size_greater_than_2"
+    script "main.nf"
+    process "list_all_cluster_seeds_of_size_greater_than_2"
+
+    test("prepends sample ID to every row of every input .stats") {
+        // COVERAGE: [S30]
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/data/part_b/S1.stats"),
+                    file("\${projectDir}/tests/data/part_b/S2.stats")
+                ]
+                input[1] = "proj_2_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def outPath = process.out[0].get(0)
+            assert outPath.endsWith("proj_2_samples_per_sample_OTUs.stats") :
+                "unexpected output filename: ${outPath}"
+            def rows = path(outPath).readLines().collect {
+                it.split("\t", -1)
+            }
+            // S1 has 2 stats rows, S2 has 1 → 3 rows total.
+            assert rows.size() == 3 :
+                "expected 3 rows, got ${rows.size()}: ${rows}"
+            // First column = sample ID, derived from the .stats
+            // basename.
+            def sampleIDs = rows.collect { it[0] } as Set
+            assert sampleIDs == ["S1", "S2"] as Set :
+                "unexpected sample IDs: ${sampleIDs}"
+            // Remaining seven columns preserve the swarm
+            // --statistics-file layout.
+            rows.each { cols ->
+                assert cols.size() == 8 :
+                    "expected 8 columns (sample + 7 stats), got ${cols.size()}: ${cols}"
+            }
+        }
+    }
+}

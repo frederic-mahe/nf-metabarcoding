@@ -348,6 +348,178 @@ process discover_inputs {
 }
 
 
+// ============================================================================
+// Part B — global clustering / occurrence table
+// ============================================================================
+// Each process below receives the per-sample artefacts collected by
+// the Part B fasta channel ([S27]) and a project-wide `basename`
+// string of the shape `<project_name>_<N>_samples` (see [S25]). The
+// processes can run in parallel — they do not depend on each other.
+
+process discover_part_b_fasta {
+    // [S27]: walk params.fasta_folder, drop *_notmerged.fas, assert
+    // unique sample IDs. Emits TSV `sample_id<TAB>fasta_path`.
+
+    output:
+    path "fastas.tsv"
+
+    script:
+    def folders = (params.fasta_folder instanceof List)
+        ? params.fasta_folder
+        : params.fasta_folder
+            .toString()
+            .split(',')
+            .collect { it.trim() }
+            .findAll { it }
+    def folder_args = folders.collect { "'${it}'" }.join(' ')
+    """
+    discover_fasta.py ${folder_args} > fastas.tsv
+    """
+}
+
+
+process build_expected_error_file {
+    // [S28]: merge every per-sample <sampleId>.qual into one
+    // project-wide <basename>.qual. The input files are already sorted
+    // by length / SHA1 / ee (see extract_expected_error_values), so
+    // `sort --merge` is a straight k-way merge; uniq --check-chars=40
+    // keeps the lowest-ee row per SHA1.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path quals
+    val basename
+
+    output:
+    path "${basename}.qual"
+
+    shell:
+    '''
+    sort --key=3,3n --key=1,1d --key=2,2n --merge !{quals} | \
+        uniq --check-chars=40 > !{basename}.qual
+    '''
+}
+
+
+process build_distribution_file {
+    // [S29]: scan FASTA headers of every input .fas and emit the
+    // sequence-to-sample mapping as tab-separated rows
+    // <sha1>\t<sampleId>\t<size>. The sample ID is derived from the
+    // fasta basename so the channel can be built without an explicit
+    // sample-ID side car.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path fastas
+    val basename
+
+    output:
+    path "${basename}.distr"
+
+    shell:
+    '''
+    for f in !{fastas} ; do
+        sample="$(basename "${f}" .fas)"
+        grep "^>" "${f}" | \
+            sed 's/^>// ; s/;size=/\t/ ; s/;$//' | \
+            awk -v s="${sample}" 'BEGIN {OFS = "\t"} {print $1, s, $2}'
+    done > !{basename}.distr
+    '''
+}
+
+
+process list_all_cluster_seeds_of_size_greater_than_2 {
+    // [S30]: concatenate every per-sample <sampleId>.stats (already
+    // filtered to clusters > 2 reads by Part A's list_local_clusters)
+    // into a single project-wide file. Each row is prefixed with the
+    // sample ID derived from the .stats filename.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path stats_files
+    val basename
+
+    output:
+    path "${basename}_per_sample_OTUs.stats"
+
+    shell:
+    '''
+    for f in !{stats_files} ; do
+        sample="$(basename "${f}" .stats)"
+        awk -v s="${sample}" 'BEGIN {OFS = "\t"} {print s, $0}' "${f}"
+    done > !{basename}_per_sample_OTUs.stats
+    '''
+}
+
+
+process global_dereplication {
+    // [S31]: cat every input .fas and pass it through
+    // vsearch --derep_fulllength. --sizein/--sizeout preserve the
+    // per-sample size annotations so vsearch sums abundances across
+    // samples.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path fastas
+    val basename
+
+    output:
+    path "${basename}.fas"
+    path "${basename}.log"
+
+    shell:
+    '''
+    cat !{fastas} | \
+        vsearch \
+            --derep_fulllength - \
+            --sizein \
+            --sizeout \
+            --fasta_width 0 \
+            --quiet \
+            --log !{basename}.log \
+            --output !{basename}.fas
+    '''
+}
+
+
+process global_clustering {
+    // [S32]: swarm on the globally-dereplicated fasta. Output
+    // filenames carry the `_1f` suffix (resolution=1, --fastidious)
+    // to mirror the bash-reference naming scheme.
+    publishDir params.results_folder, mode: 'link',
+        enabled: params.results_folder != null
+
+    input:
+    path global_fasta
+    val basename
+
+    output:
+    path "${basename}_1f.swarms"
+    path "${basename}_1f.stats"
+    path "${basename}_1f.struct"
+    path "${basename}_1f_representatives.fas"
+    path "${basename}_1f.log"
+
+    shell:
+    '''
+    swarm \
+        --threads !{params.threads} \
+        --differences 1 \
+        --fastidious \
+        --usearch-abundance \
+        --internal-structure !{basename}_1f.struct \
+        --output-file !{basename}_1f.swarms \
+        --statistics-file !{basename}_1f.stats \
+        --seeds !{basename}_1f_representatives.fas \
+        !{global_fasta} 2> !{basename}_1f.log
+    '''
+}
+
+
 workflow {
     // required parameters (no default — supply via CLI or project config)
     assert params.fastq_folder : "--fastq_folder must be set (no default)"

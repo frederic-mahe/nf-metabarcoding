@@ -1,0 +1,63 @@
+nextflow_process {
+
+    name "global_clustering"
+    script "main.nf"
+    process "global_clustering"
+
+    setup {
+        run("global_dereplication") {
+            script "main.nf"
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/data/part_b/S1.fas"),
+                    file("\${projectDir}/tests/data/part_b/S2.fas")
+                ]
+                input[1] = "proj_2_samples"
+                """
+            }
+        }
+    }
+
+    test("runs swarm --fastidious and emits the four swarm outputs + log") {
+        // COVERAGE: [S32]
+        tag "ci"
+        when {
+            params {
+                threads = 1
+            }
+            process {
+                """
+                input[0] = global_dereplication.out[0]
+                input[1] = "proj_2_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+
+            // The process emits five paths, in order:
+            //   swarms, stats, struct, representatives, log
+            def swarmsPath = process.out[0].get(0)
+            def statsPath  = process.out[1].get(0)
+            def structPath = process.out[2].get(0)
+            def repPath    = process.out[3].get(0)
+            def logPath    = process.out[4].get(0)
+
+            assert swarmsPath.endsWith("proj_2_samples_1f.swarms")
+            assert statsPath.endsWith("proj_2_samples_1f.stats")
+            assert structPath.endsWith("proj_2_samples_1f.struct")
+            assert repPath.endsWith("proj_2_samples_1f_representatives.fas")
+            assert logPath.endsWith("proj_2_samples_1f.log")
+
+            // every artefact is non-empty
+            [swarmsPath, statsPath, repPath, logPath].each { p ->
+                assert path(p).readLines().size() > 0 :
+                    "expected ${p} to be non-empty"
+            }
+            // .struct can be empty for clusters with no internal structure;
+            // just assert the file exists.
+            assert file(structPath).exists()
+        }
+    }
+}

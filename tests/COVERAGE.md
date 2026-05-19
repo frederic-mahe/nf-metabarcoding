@@ -54,11 +54,11 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S25]`| Part B requires `--project_name` (no default)                              | `tests/processes/part_b/global_dereplication.nf.test`, `tests/main.nf.test` | red | — |
 | `[S26]`| Part B requires `--results_folder` (no default); auto-created if missing   | `tests/main.nf.test`                            | red     | —          |
 | `[S27]`| Part B fasta channel excludes `_notmerged.fas`; sample IDs must be unique  | `tests/python/test_discover_fasta.py`, `tests/bin/discover_fasta.bats`, `tests/main.nf.test` | red | — |
-| `[S28]`| Part B `build_expected_error_file` — merge per-sample `.qual` into project-wide file | `tests/processes/part_b/build_expected_error_file.nf.test` | red | — |
-| `[S29]`| Part B `build_distribution_file` — sequence ↔ sample mapping from `.fas` headers | `tests/processes/part_b/build_distribution_file.nf.test` | red | — |
-| `[S30]`| Part B `list_all_cluster_seeds_of_size_greater_than_2` — concatenate per-sample `.stats` | `tests/processes/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf.test` | red | — |
-| `[S31]`| Part B `global_dereplication` — vsearch --derep_fulllength across every input `.fas` | `tests/processes/part_b/global_dereplication.nf.test` | red | — |
-| `[S32]`| Part B `global_clustering` — swarm `--fastidious` on the global fasta      | `tests/processes/part_b/global_clustering.nf.test` | red | — |
+| `[S28]`| Part B `build_expected_error_file` — merge per-sample `.qual` into project-wide file | `tests/processes/part_b/build_expected_error_file.nf.test` | done | — |
+| `[S29]`| Part B `build_distribution_file` — sequence ↔ sample mapping from `.fas` headers | `tests/processes/part_b/build_distribution_file.nf.test` | done | — |
+| `[S30]`| Part B `list_all_cluster_seeds_of_size_greater_than_2` — concatenate per-sample `.stats` | `tests/processes/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf.test` | done | — |
+| `[S31]`| Part B `global_dereplication` — vsearch --derep_fulllength across every input `.fas` | `tests/processes/part_b/global_dereplication.nf.test` | done | — |
+| `[S32]`| Part B `global_clustering` — swarm `--fastidious` on the global fasta      | `tests/processes/part_b/global_clustering.nf.test` | done | — |
 
 
 ## Per-process tests
