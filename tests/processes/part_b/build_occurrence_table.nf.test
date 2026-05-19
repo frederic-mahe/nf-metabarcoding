@@ -16,7 +16,7 @@ nextflow_process {
                 """
                 def empty = workDir.resolve("empty")
                 empty.text = ""
-                def reps = file("\${projectDir}/tests/data/build_filtered_contingency_table/representatives.fas")
+                def reps = file("\${projectDir}/tests/data/build_filtered_contingency_table/representatives")
                 def stats = file("\${projectDir}/tests/data/build_filtered_contingency_table/stats")
                 def swarms = file("\${projectDir}/tests/data/build_filtered_contingency_table/swarms")
                 def uchime = file("\${projectDir}/tests/data/build_filtered_contingency_table/uchime")

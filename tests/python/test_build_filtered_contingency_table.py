@@ -56,7 +56,7 @@ def test_golden_table(tmp_path: Path) -> None:
     cmd = [
         sys.executable,
         str(SCRIPT),
-        "--representatives", str(FIXTURE / "representatives.fas"),
+        "--representatives", str(FIXTURE / "representatives"),
         "--stats",           str(FIXTURE / "stats"),
         "--swarms",          str(FIXTURE / "swarms"),
         "--chimera",         str(FIXTURE / "uchime"),
