@@ -433,6 +433,86 @@ isolation.
     strings.
 
 
+- `[S38]` Part B's `search_for_terminal_gaps` extracts the
+  representative sequences from the post-`build_occurrence_table`
+  OTU table and runs `vsearch --cluster_smallmem --id 1.0
+  --qmask none --usersort` to find OTU pairs that are 100% identical
+  modulo terminal gaps (sub- and super-strings). Output: the `^H`
+  lines from vsearch's `--uc` stream (the hits). The legacy bash
+  name for this step is
+  `extract_fasta_and_search_for_identical_sequences`; the workflow
+  uses the shorter name.
+  - **Pass when:** running on a small OTU table produces a non-empty
+    `.uc`-style stream containing one row per identical-modulo-gaps
+    OTU pair; rows start with the literal `H`.
+- `[S39]` Part B's `merge_substring_otus` runs
+  `bin/merge_sub_superstring_OTUs_with_larger_OTUs.py` to merge
+  pupil OTUs into their masters (sample columns summed,
+  ``spread`` recomputed from non-zero merged columns, ``total``
+  summed, ``cloud`` incremented by ``pupil_cloud + 1`` per merged
+  pupil), then sorts the resulting table by the OTU column and
+  asserts that the total read count is conserved.
+  - **Pass when:** golden-file characterization tests for
+    `bin/merge_sub_superstring_OTUs_with_larger_OTUs.py` reproduce
+    byte-exact output on a fixture covering: (a) a pass-through OTU,
+    (b) a master with a single pupil, (c) a master with two pupils,
+    (d) an overlap where one OTU is both master and pupil → script
+    exits non-zero and prints WARNING to stderr.
+- `[S40]` Part B's `extract_table_fasta` emits a FASTA from an OTU
+  table by reading column 4 as the amplicon ID, column 2 as the
+  abundance, and column 10 as the sequence (header
+  `<amplicon>;size=<abundance>;`). A `skip_zero_abundance`
+  parameter toggles whether rows with `total == 0` are dropped
+  (used after mumu, where merged-out OTUs have a zero row).
+  - **Pass when:** the FASTA contains one record per kept row;
+    headers use the documented format.
+- `[S41]` Part B's `trim_metadata_for_mumu` reduces the OTU table
+  to two slices that mumu accepts: the amplicon column
+  (column 4) followed by every sample column (columns 14 onward).
+  - **Pass when:** the output has the amplicon column as column 1
+    and the sample columns preserved verbatim from column 2 onward.
+- `[S42]` Part B's `find_similar_sequences` runs
+  `vsearch --usearch_global` self-search on the OTU FASTA with the
+  legacy lulu-recommended parameters (`--id 0.84 --iddef 1
+  --maxaccepts 0 --query_cov 0.9 --maxhits 10
+  --userfields query+target+id`). The output is the userout stream
+  with the `;size=N;` annotation stripped from every column.
+  - **Pass when:** the output is a 3-column TSV
+    (`query\ttarget\tid`); no `;size=` annotations remain.
+- `[S43]` Part B's `run_mumu` invokes the `mumu` binary
+  (`>= 1.1.1`) with `--otu_table`, `--match_list`,
+  `--new_otu_table`, and `--log`. The cleaned-up intermediate
+  inputs (`_reduced.table`, `.match_list`) are not kept.
+  - **Pass when:** the `_raw_mumu.table` and the `.mumu.log` are
+    produced and the log is non-empty.
+- `[S44]` Part B's `rebuild_post_mumu_table` runs
+  `bin/rebuild_table_after_mumu.py` to splice the per-amplicon
+  metadata (`length`, `abundance`, `quality`, `sequence`,
+  `identity`, `taxonomy`, `references`) from the pre-mumu OTU
+  table back onto every row mumu emits, then renumbers OTUs
+  starting at 1 (`cloud` becomes `"NA"`; `chimera` is forced to
+  `"N"`). A downstream awk hotfix replaces `total == 0` with `1`
+  to satisfy `vsearch --sizein` consumers.
+  - **Pass when:** golden-file characterization tests for
+    `bin/rebuild_table_after_mumu.py` reproduce byte-exact output
+    on a fixture covering: (a) header passthrough, (b) per-row
+    metadata join keyed on amplicon ID, (c) new-`total` /
+    new-`spread` recomputation, (d) a zero-abundance row surviving
+    the join (size=0 → 1 hotfix is the bash wrapper's
+    responsibility).
+
+
+## Dependencies
+
+In addition to the upstream-tested tools used by Part A
+(`vsearch`, `cutadapt`, `swarm`), Part B's "mumu (ex-lulu)"
+post-processing step requires
+[`mumu >= 1.1.1`](https://github.com/frederic-mahe/mumu) on
+`PATH`. mumu is a daughter-cluster filter that detects unreliable
+OTUs by comparing per-sample co-occurrence with a parent OTU's
+distribution.
+
+
 ## Common fastq file-name patterns
 
 The pattern detector walks this table top-to-bottom and uses the

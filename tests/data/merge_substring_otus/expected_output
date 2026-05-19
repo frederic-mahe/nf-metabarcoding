@@ -1,0 +1,5 @@
+OTU	total	cloud	amplicon	length	abundance	chimera	spread	quality	sequence	identity	taxonomy	references	s1	s2
+2	8	1	amp2	10	8	N	1	0.001	ACGTACGTAC	99.0	Taxo2	ref2	8	0
+4	5	1	amp4	10	5	N	1	0.001	ACGTACGTAC	99.0	Taxo4	ref4	0	5
+1	18	4	amp1	10	10	N	2	0.001	ACGTACGTAC	99.0	Taxo1	ref1	13	5
+5	13	6	amp5	10	8	N	2	0.001	ACGTACGTAC	99.0	Taxo5	ref5	6	7
