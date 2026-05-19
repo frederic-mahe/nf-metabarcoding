@@ -65,7 +65,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S36]`| Part B `fake_taxonomic_assignment2` — placeholder taxonomy TSV for cleaved representatives | `tests/processes/part_b/fake_taxonomic_assignment2.nf.test` | done | — |
 | `[S37]`| Part B `chimera_detection2` — uchime_denovo on pre-cleave + cleaved reps with dynamic --minsize | `tests/processes/part_b/chimera_detection2.nf.test` | done | — |
 | `[S38]`| Part B `search_for_terminal_gaps` — vsearch self-cluster (id=1.0) for sub/super-string OTUs | `tests/processes/part_b/search_for_terminal_gaps.nf.test` | done | — |
-| `[S39]`| Part B `merge_substring_otus` — merge pupil OTUs onto masters; sort; assert reads conserved | `tests/python/test_merge_sub_superstring_otus.py`, `tests/processes/part_b/merge_substring_otus.nf.test` | done | — |
+| `[S39]`| Part B `merge_substring_otus` — merge pupil OTUs onto masters; sort; assert reads conserved | `tests/python/test_merge_substring_otus.py`, `tests/processes/part_b/merge_substring_otus.nf.test` | done | — |
 | `[S40]`| Part B `extract_otu_fasta` / `extract_mumu_fasta` — FASTA from OTU table cols (4, 2, 10); the latter skips `$2==0` | `tests/processes/part_b/extract_otu_fasta.nf.test`, `tests/processes/part_b/extract_mumu_fasta.nf.test` | done | — |
 | `[S41]`| Part B `trim_metadata_for_mumu` — keep amplicon + sample cols (cut -f 4,14-)         | `tests/processes/part_b/trim_metadata_for_mumu.nf.test` | done | — |
 | `[S42]`| Part B `find_similar_sequences` — vsearch --usearch_global self-search; strip ;size= | `tests/processes/part_b/find_similar_sequences.nf.test` | done | — |

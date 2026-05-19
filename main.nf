@@ -809,7 +809,7 @@ process merge_substring_otus {
     tmp_table="$(mktemp)"
     trap 'rm -f "${tmp_table}"' EXIT
 
-    merge_sub_superstring_OTUs_with_larger_OTUs.py \
+    merge_substring_otus.py \
         -t !{otu_table} \
         -m !{matches} \
         -o "${tmp_table}"

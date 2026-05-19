@@ -1,4 +1,4 @@
-"""Characterization tests for ``bin/merge_sub_superstring_OTUs_with_larger_OTUs.py``.
+"""Characterization tests for ``bin/merge_substring_otus.py``.
 
 Byte-exact golden-file gate that pins the legacy script's current
 behaviour before any refactor. The main fixture exercises:
@@ -34,7 +34,7 @@ from pathlib import Path
 SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "bin"
-    / "merge_sub_superstring_OTUs_with_larger_OTUs.py"
+    / "merge_substring_otus.py"
 )
 FIXTURE = (
     Path(__file__).resolve().parents[1]

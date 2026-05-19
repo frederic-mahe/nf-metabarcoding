@@ -446,14 +446,14 @@ isolation.
     `.uc`-style stream containing one row per identical-modulo-gaps
     OTU pair; rows start with the literal `H`.
 - `[S39]` Part B's `merge_substring_otus` runs
-  `bin/merge_sub_superstring_OTUs_with_larger_OTUs.py` to merge
+  `bin/merge_substring_otus.py` to merge
   pupil OTUs into their masters (sample columns summed,
   ``spread`` recomputed from non-zero merged columns, ``total``
   summed, ``cloud`` incremented by ``pupil_cloud + 1`` per merged
   pupil), then sorts the resulting table by the OTU column and
   asserts that the total read count is conserved.
   - **Pass when:** golden-file characterization tests for
-    `bin/merge_sub_superstring_OTUs_with_larger_OTUs.py` reproduce
+    `bin/merge_substring_otus.py` reproduce
     byte-exact output on a fixture covering: (a) a pass-through OTU,
     (b) a master with a single pupil, (c) a master with two pupils,
     (d) an overlap where one OTU is both master and pupil → script
