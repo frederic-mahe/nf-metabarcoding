@@ -587,20 +587,31 @@ from placeholder values to real taxonomic assignments.
     when the input is a fasta (no occurrence table to splice back
     onto).
 - `[S49]` Part C's primary taxonomic-assignment path is a port of
-  the legacy `stampa.sh` / `stampa_merge.py` pipeline:
-    1. one `vsearch --usearch_global` self-search against the
+  the legacy `stampa.sh` / `stampa_merge.py` pipeline, expressed
+  as a Nextflow scatter-gather:
+    1. the representatives fasta is split into chunks of
+       `params.stampa_chunk_size` sequences via Nextflow's
+       `splitFasta(by: N, file: true)` operator. The sentinel
+       value `0` (set by the `local` profile) bypasses the
+       split — the full fasta becomes a single chunk. The
+       slurm-tuned default is `1000`.
+    2. each chunk feeds `vsearch --usearch_global` against the
        reference dataset with `--top_hits_only --output_no_hits
-       --maxaccepts 0 --maxrejects 0 --notrunclabels --rowlen 0`
-       and `--userfields query+id<iddef>+target`. The whole
-       representatives fasta goes through a single vsearch
-       invocation (no slurm array split — nextflow handles
-       parallelism by process).
-    2. `bin/stampa_merge.py` parses the userout, computes the
+       --maxaccepts 0 --maxrejects 32 --notrunclabels --rowlen 0`
+       and `--userfields query+id<iddef>+target`, then
+       `bin/stampa_merge.py` parses the userout and computes the
        last-common-ancestor taxonomy across top hits per
-       amplicon, and emits a TSV with columns
+       amplicon. Each chunk emits a `stampa_chunk.tsv` slice
+       with columns
        `amplicon\tabundance\tidentity\ttaxonomy\treferences`
        (same shape as `fake_taxonomic_assignment`'s `[S33]`
        output).
+    3. the per-chunk slices are concatenated and sorted (by
+       abundance desc, amplicon asc — i.e. legacy
+       `sort -k2,2nr -k1,1d`) via Nextflow's
+       `collectFile(sort: { ... })` operator, which publishes
+       the merged `<basename>_taxonomy_stampa.tsv` directly to
+       the results folder. No separate merge process.
   - **Pass when:** **(skeleton phase)** the process and helper
     exist, their CLI parses without error, and a smoke test
     against a tiny reference fixture produces a TSV with the

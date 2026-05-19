@@ -35,10 +35,17 @@ params.chimera_minsize = 2
 // [S49] / [S50]: 'stampa' (default) drives the primary path,
 // 'sintax' switches to the shadow path.
 // [S49]: identity-definition flag passed to vsearch (iddef).
+// [S49]: chunk size for the stampa scatter-gather. Each chunk of
+// this many sequences runs vsearch + stampa_merge.py as a
+// separate process. The default (1000) is slurm-tuned; the
+// `local` profile in nextflow.config overrides this to 0
+// (sentinel: bypass splitFasta and feed the whole fasta into
+// one task).
 params.reference_dataset = null
 params.occurrence_table  = null
 params.taxonomy_method   = 'stampa'
 params.iddef             = 1
+params.stampa_chunk_size = 1000
 
 
 process merge_fastq_pairs {
@@ -1164,31 +1171,27 @@ process extract_fasta_sequences_from_occurrence_table {
 
 
 process assign_taxonomy_stampa {
-    // [S49]: primary taxonomic-assignment path. Run vsearch
-    // --usearch_global against the reference dataset, then collapse
-    // the top hits per amplicon with bin/stampa_merge.py.
-    //
-    // The whole representatives fasta goes through one vsearch
-    // invocation — no slurm array split (nextflow handles
-    // parallelism by process, not by job array).
-    publishDir params.results_folder, mode: 'link',
-        enabled: params.results_folder != null
+    // [S49]: per-chunk step of the stampa scatter-gather. Run
+    // vsearch --usearch_global against the reference dataset on
+    // one fasta chunk, then collapse the top hits per amplicon
+    // with bin/stampa_merge.py. The workflow uses splitFasta
+    // upstream to produce chunks and collectFile downstream to
+    // gather + sort the slices into the final
+    // <basename>_taxonomy_stampa.tsv.
 
     input:
-    path representatives
+    path chunk
     path reference_dataset
-    val basename
 
     output:
-    path "${basename}_taxonomy_stampa.tsv"
-    path "${basename}_taxonomy.log"
+    path "stampa_chunk.tsv"
 
     shell:
     '''
     # Rewrite vsearch-style ";size=N;" into the swarm-style "_N"
-    # abundance annotation that stampa_merge.py expects (mirrors the
-    # `sed` pass in the legacy stampa.sh).
-    sed -e '/^>/ s/;size=/_/' -e '/^>/ s/;$//' !{representatives} \
+    # abundance annotation that stampa_merge.py expects (mirrors
+    # the `sed` pass in the legacy stampa.sh).
+    sed -e '/^>/ s/;size=/_/' -e '/^>/ s/;$//' !{chunk} \
         > stampa_input.fas
 
     vsearch \
@@ -1207,9 +1210,9 @@ process assign_taxonomy_stampa {
         --id 0.5 \
         --iddef !{params.iddef} \
         --userout hits \
-        --log !{basename}_taxonomy.log
+        2> vsearch.log
 
-    stampa_merge.py hits > !{basename}_taxonomy_stampa.tsv
+    stampa_merge.py hits > stampa_chunk.tsv
     '''
 }
 
@@ -1315,15 +1318,57 @@ workflow part_c_processes {
             basename,
         )
     } else {
-        // [S49]: primary stampa path.
-        assign_taxonomy_stampa(
-            extract_fasta_sequences_from_occurrence_table.out[0],
-            reference,
-            basename,
-        )
+        // [S49]: stampa scatter-gather. Split the representatives
+        // fasta into chunks (or pass it through unchanged when
+        // params.stampa_chunk_size == 0), fan each chunk through
+        // assign_taxonomy_stampa in parallel, then concatenate +
+        // sort the slices via collectFile.
+        //
+        // Each chunk's TSV is paired with the basename value
+        // channel via `combine` so the collectFile closure can
+        // build "${basename}_taxonomy_stampa.tsv" per-item
+        // (basename can't be interpolated into collectFile's
+        // `name:` String at workflow-build time).
+        //
+        // Note on the sort closure: collectFile sorts in JVM heap,
+        // which is fine for nf-metabarcoding's representative
+        // counts (typically < a few million OTUs). If a real run
+        // ever hits the OOM line, swap this for an external
+        // `sort_taxonomy` process running `LC_ALL=C sort -k2,2nr
+        // -k1,1d` on an unsorted collectFile output. See Plan B
+        // (2026-05-19) for the fallback writeup.
+        def reps_ch = extract_fasta_sequences_from_occurrence_table.out[0]
+        def chunks = (params.stampa_chunk_size > 0)
+            ? reps_ch.splitFasta(by: params.stampa_chunk_size, file: true)
+            : reps_ch
+
+        def merged = assign_taxonomy_stampa(chunks, reference)
+            .combine(basename)
+            .collectFile(
+                storeDir: params.results_folder,
+                sort: { line ->
+                    // -k2,2nr -k1,1d == abundance desc, amplicon asc.
+                    // collectFile's sort closure takes one argument
+                    // (a line) and must return a Comparable key.
+                    // ArrayLists aren't Comparable on the JVM side,
+                    // so we build a single String key: width-13 inverted
+                    // abundance (so descending becomes ascending under
+                    // lexicographic ordering), then a tab, then the
+                    // amplicon name (already ascending).
+                    def f = line.tokenize('\t')
+                    String.format(
+                        "%013d\t%s",
+                        9999999999999L - (f[1] as Long),
+                        f[0],
+                    )
+                },
+            ) { chunk_tsv, bn ->
+                ["${bn}_taxonomy_stampa.tsv", chunk_tsv.text]
+            }
+
         update_occurrence_table(
             occurrence_table,
-            assign_taxonomy_stampa.out[0],
+            merged,
             basename,
         )
     }

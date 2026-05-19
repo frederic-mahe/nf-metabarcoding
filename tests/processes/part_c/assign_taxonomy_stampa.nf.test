@@ -4,13 +4,17 @@ nextflow_process {
     script "main.nf"
     process "assign_taxonomy_stampa"
 
-    test("runs vsearch --usearch_global + stampa_merge.py on a tiny reference") {
+    test("runs vsearch --usearch_global + stampa_merge.py on a single chunk") {
         // COVERAGE: [S49]
-        // Skeleton phase: this exercises the process wiring end-to-
-        // end against a 2-sequence reference dataset so we know
-        // vsearch's command line and bin/stampa_merge.py's invocation
-        // glue work. The LCA correctness is pinned by the pytest
-        // suite (test_stampa_merge.py).
+        // [S49] (revised, 2026-05-19): assign_taxonomy_stampa is the
+        // per-chunk step of a scatter-gather. It consumes one fasta
+        // chunk + the reference and emits one stampa_chunk.tsv slice;
+        // the workflow uses splitFasta/collectFile around it. The
+        // basename input is gone — the gather step (collectFile)
+        // owns the final filename.
+        //
+        // Real-world LCA correctness is pinned by the pytest suite
+        // (test_stampa_merge.py, test_stampa_merge_legacy.py).
         tag "ci"
         when {
             params {
@@ -25,17 +29,15 @@ nextflow_process {
                 ref.text = '>refA Kingdom|Phylum|Class\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
                 input[0] = file(reps.toString())
                 input[1] = file(ref.toString())
-                input[2] = "proj_1_samples"
                 """
             }
         }
         then {
             assert process.success
-            def assignments = process.out[0].get(0)
-            def log = process.out[1].get(0)
-            assert assignments.endsWith("proj_1_samples_taxonomy_stampa.tsv")
-            assert log.endsWith("proj_1_samples_taxonomy.log")
-            def rows = path(assignments).readLines()
+            def chunk_tsv = process.out[0].get(0)
+            assert chunk_tsv.endsWith("stampa_chunk.tsv") :
+                "expected stampa_chunk.tsv, got: ${chunk_tsv}"
+            def rows = path(chunk_tsv).readLines()
             assert rows.size() >= 1
             // expected shape: amplicon\tabundance\tidentity\ttaxonomy\treferences
             def fields = rows[0].split("\t")

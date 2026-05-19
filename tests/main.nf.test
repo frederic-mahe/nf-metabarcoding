@@ -555,6 +555,127 @@ nextflow_pipeline {
         }
     }
 
+    test("Part C stampa path scatters the representatives via splitFasta") {
+        // COVERAGE: [S49]
+        // [S49] revised (2026-05-19): with params.stampa_chunk_size
+        // small enough to force a split, Nextflow's splitFasta
+        // operator fans the representatives into N chunks, each
+        // chunk runs vsearch + stampa_merge.py, and collectFile
+        // gathers + sorts the slices by (-abundance, amplicon).
+        // The merged TSV must contain every input amplicon exactly
+        // once, sorted by abundance desc then amplicon asc.
+        tag "ci"
+        when {
+            params {
+                threads           = 1
+                results_folder    = "${outputDir}/part_c_scatter"
+                reference_dataset = "${outputDir}/part_c_scatter_ref.fas"
+                occurrence_table  = "${outputDir}/part_c_scatter_table.tsv"
+                stampa_chunk_size = 1   // force one chunk per record
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_scatter_ref.fas")
+            ref.parentFile.mkdirs()
+            // Single reference that all three reps will top-hit
+            // against (50% identity is the vsearch threshold and we
+            // pad the queries to match).
+            ref.text = (
+                ">refA Kingdom|Phylum|Class\n" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            )
+            def tab = file("${outputDir}/part_c_scatter_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t5\tNA\tamp1\t32\t5\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t5\n" +
+                "2\t20\tNA\tamp2\t32\t20\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t20\n" +
+                "3\t10\tNA\tamp3\t32\t10\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t10\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def merged = file(
+                "${outputDir}/part_c_scatter/part_c_scatter_taxonomy_stampa.tsv"
+            )
+            assert merged.exists() :
+                "collectFile should publish <basename>_taxonomy_stampa.tsv"
+            def rows = merged.readLines()
+            assert rows.size() == 3 :
+                "expected exactly one row per input amplicon, got: ${rows}"
+            // Rows must be sorted by abundance desc, amplicon asc:
+            // amp2 (20), amp3 (10), amp1 (5).
+            def amplicons = rows.collect { it.split("\t", -1)[0] }
+            assert amplicons == ["amp2", "amp3", "amp1"] :
+                "sort order wrong: ${amplicons}"
+            def abundances = rows.collect { it.split("\t", -1)[1] }
+            assert abundances == ["20", "10", "5"] :
+                "sort order wrong: ${abundances}"
+            // The final occurrence table also receives the assignments.
+            def updated = file(
+                "${outputDir}/part_c_scatter/part_c_scatter_table_assigned.tsv"
+            )
+            assert updated.exists() :
+                "Part C should publish <basename>_table_assigned.tsv"
+            def tab_rows = updated.readLines()
+            assert tab_rows.size() == 4  // header + 3 rows
+        }
+    }
+
+    test("Part C stampa path with chunk_size=0 runs as a single chunk") {
+        // COVERAGE: [S49]
+        // params.stampa_chunk_size == 0 is the "no split" sentinel
+        // used by the `local` profile. The workflow must bypass
+        // splitFasta and feed the full representatives fasta into
+        // a single assign_taxonomy_stampa invocation; collectFile
+        // is still in the path (now with one input) so the final
+        // filename is unchanged.
+        tag "ci"
+        when {
+            params {
+                threads           = 1
+                results_folder    = "${outputDir}/part_c_nosplit"
+                reference_dataset = "${outputDir}/part_c_nosplit_ref.fas"
+                occurrence_table  = "${outputDir}/part_c_nosplit_table.tsv"
+                stampa_chunk_size = 0
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_nosplit_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA Kingdom|Phylum|Class\n" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            )
+            def tab = file("${outputDir}/part_c_nosplit_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t7\tNA\tamp1\t32\t7\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t7\n" +
+                "2\t3\tNA\tamp2\t32\t3\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t3\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def merged = file(
+                "${outputDir}/part_c_nosplit/part_c_nosplit_taxonomy_stampa.tsv"
+            )
+            assert merged.exists() :
+                "collectFile should publish <basename>_taxonomy_stampa.tsv even without split"
+            def rows = merged.readLines()
+            assert rows.size() == 2
+            // Sort still applies: amp1 (7) before amp2 (3).
+            def amplicons = rows.collect { it.split("\t", -1)[0] }
+            assert amplicons == ["amp1", "amp2"] :
+                "sort order wrong: ${amplicons}"
+        }
+    }
+
     test("empty input samples travel through to the occurrence table") {
         // COVERAGE: [S09] — pending until empty-sample passthrough lands.
         // Tagged "pending" so CI (`nf-test test --tag '!pending'`) skips
