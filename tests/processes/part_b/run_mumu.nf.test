@@ -5,7 +5,7 @@ nextflow_process {
     process "run_mumu"
 
     test("invokes mumu >=1.1.1 and emits new_otu_table + log") {
-        // COVERAGE: [S43]
+        // COVERAGE: [S43], [S45]
         tag "ci"
         when {
             process {
@@ -19,6 +19,7 @@ bb02\\t3\\t0
                 m.text = 'aa01\\tbb02\\t99.0\\n'
                 input[0] = file(t.toString())
                 input[1] = file(m.toString())
+                input[2] = "proj_3_samples"
                 """
             }
         }
@@ -28,7 +29,9 @@ bb02\\t3\\t0
             def log       = process.out[1].get(0)
             assert new_table.endsWith("input_raw_mumu.table") :
                 "unexpected new table filename: ${new_table}"
-            assert log.endsWith("input.mumu.log") :
+            // [S45]: post_clustering_curation log uses the project-
+            // wide naming construct.
+            assert log.endsWith("proj_3_samples_post_clustering_curation.log") :
                 "unexpected log filename: ${log}"
             // log captures the analysis report and is non-empty
             assert path(log).readLines().size() > 0

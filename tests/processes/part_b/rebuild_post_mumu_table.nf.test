@@ -5,20 +5,23 @@ nextflow_process {
     process "rebuild_post_mumu_table"
 
     test("splices old metadata onto mumu rows + applies the size=0→1 hotfix") {
-        // COVERAGE: [S44]
+        // COVERAGE: [S44], [S46]
         tag "ci"
         when {
             process {
                 """
                 input[0] = file("\${projectDir}/tests/data/rebuild_table_after_mumu/mumu_table")
                 input[1] = file("\${projectDir}/tests/data/rebuild_table_after_mumu/old_table")
+                input[2] = "proj_3_samples"
                 """
             }
         }
         then {
             assert process.success
             def out = process.out[0].get(0)
-            assert out.endsWith(".mumu.table")
+            // [S46]: the final occurrence table uses the project-wide
+            // basename construct + `_table.tsv` suffix.
+            assert out.endsWith("proj_3_samples_table.tsv")
             def lines = path(out).readLines()
             // Header + 4 rebuilt rows
             assert lines.size() == 5

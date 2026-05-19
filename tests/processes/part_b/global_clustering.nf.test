@@ -49,7 +49,8 @@ nextflow_process {
             assert statsPath.endsWith("proj_3_samples_1f.stats")
             assert structPath.endsWith("proj_3_samples_1f.struct")
             assert repPath.endsWith("proj_3_samples_1f_representatives.fas")
-            assert logPath.endsWith("proj_3_samples_1f.log")
+            // [S45]: clustering step log uses the project-wide naming.
+            assert logPath.endsWith("proj_3_samples_clustering.log")
 
             // every artefact is non-empty
             [swarmsPath, statsPath, repPath, logPath].each { p ->

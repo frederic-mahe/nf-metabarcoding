@@ -281,7 +281,7 @@ nextflow_pipeline {
     }
 
     test("Part B standalone runs every pre-cleaving process on the part_b fixture") {
-        // COVERAGE: [S09], [S25], [S26], [S27]
+        // COVERAGE: [S09], [S25], [S26], [S27], [S45], [S46]
         tag "ci"
         when {
             params {
@@ -303,24 +303,47 @@ nextflow_pipeline {
             // the `<project>_<N>_samples` basename — N counts the
             // empty sample too.
             def base = "${resultDir}/myproj_3_samples"
+
+            // [S45]: six step-level log files, all named under the
+            // project-wide basename construct.
+            ["${base}_dereplication.log",
+             "${base}_clustering.log",
+             "${base}_chimera_detection.log",
+             "${base}_cleaving.log",
+             "${base}_superstring_clustering.log",
+             "${base}_post_clustering_curation.log"].each { log ->
+                def f = file(log)
+                assert f.exists() : "missing Part B step log: ${log}"
+                assert f.size() > 0 : "empty Part B step log: ${log}"
+            }
+
+            // [S46]: the final occurrence table is published as
+            // <basename>_table.tsv; intermediate tables are not
+            // published.
+            def finalTable = file("${base}_table.tsv")
+            assert finalTable.exists() : "missing final occurrence table"
+            assert finalTable.size() > 0
+            assert finalTable.text.split("\n", 2)[0].startsWith("OTU\ttotal") :
+                "unexpected header in final occurrence table"
+
+            ["${base}.OTU.filtered.cleaved.table",
+             "${base}.OTU.filtered.cleaved.nosubstringOTUs.table",
+             "${base}.OTU.filtered.cleaved.nosubstringOTUs_raw_mumu.table",
+             "${base}.OTU.filtered.cleaved.nosubstringOTUs.mumu.table"].each { intermediate ->
+                assert !file(intermediate).exists() :
+                    "intermediate table leaked into results folder: ${intermediate}"
+            }
+
+            // Non-table intermediates (.qual, .distr, .stats, swarm
+            // artefacts) remain published for debugging — the
+            // restriction in [S46] is on intermediate *tables* only.
             ["${base}.qual",
              "${base}.distr",
              "${base}_per_sample_OTUs.stats",
              "${base}.fas",
-             "${base}.log",
              "${base}_1f.swarms",
              "${base}_1f.stats",
-             "${base}_1f_representatives.fas",
-             "${base}_1f.log",
-             // [S35]/[S39]/[S43]/[S44]: occurrence-table + substring-merge
-             // + mumu + post-mumu artefacts.
-             "${base}.OTU.filtered.cleaved.table",
-             "${base}.OTU.filtered.cleaved.nosubstringOTUs.table",
-             "${base}.OTU.filtered.cleaved.nosubstringOTUs.fas",
-             "${base}.OTU.filtered.cleaved.nosubstringOTUs_raw_mumu.table",
-             "${base}.OTU.filtered.cleaved.nosubstringOTUs.mumu.log",
-             "${base}.OTU.filtered.cleaved.nosubstringOTUs.mumu.table",
-             "${base}.OTU.filtered.cleaved.nosubstringOTUs.mumu.fas"].each { artefact ->
+             "${base}_1f_representatives.fas"].each { artefact ->
                 assert file(artefact).exists() :
                     "missing Part B artefact: ${artefact}"
             }
@@ -361,11 +384,12 @@ nextflow_pipeline {
              "${base}.distr",
              "${base}_per_sample_OTUs.stats",
              "${base}.fas",
-             "${base}.log",
+             "${base}_dereplication.log",
              "${base}_1f.swarms",
              "${base}_1f.stats",
              "${base}_1f_representatives.fas",
-             "${base}_1f.log"].each { artefact ->
+             "${base}_clustering.log",
+             "${base}_table.tsv"].each { artefact ->
                 assert file(artefact).exists() :
                     "missing Part B artefact: ${artefact}"
             }

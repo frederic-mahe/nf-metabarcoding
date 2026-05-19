@@ -42,8 +42,8 @@ nextflow_process {
         }
     }
 
-    test("wraps bin/cluster_cleaver.py and emits .stats2, .swarms2, .fas2") {
-        // COVERAGE: [S22]
+    test("wraps bin/cluster_cleaver.py and emits .stats2, .swarms2, .fas2, .log") {
+        // COVERAGE: [S22], [S45]
         tag "ci"
         when {
             process {
@@ -60,11 +60,12 @@ nextflow_process {
         then {
             assert process.success
 
-            // The process emits three paths: .stats2, .swarms2,
-            // _representatives.fas2.
+            // The process emits four paths: .stats2, .swarms2,
+            // _representatives.fas2, and the [S45] cleaving log.
             def stats2 = process.out[0].get(0)
             def swarms2 = process.out[1].get(0)
             def fas2 = process.out[2].get(0)
+            def log = process.out[3].get(0)
 
             assert stats2.endsWith("proj_3_samples_1f.stats2") :
                 "unexpected .stats2 filename: ${stats2}"
@@ -72,13 +73,19 @@ nextflow_process {
                 "unexpected .swarms2 filename: ${swarms2}"
             assert fas2.endsWith("proj_3_samples_1f_representatives.fas2") :
                 "unexpected .fas2 filename: ${fas2}"
+            assert log.endsWith("proj_3_samples_cleaving.log") :
+                "unexpected log filename: ${log}"
 
-            // All three files must exist (they may be empty when the
-            // fixture's clusters carry no sub-seeds — that is a valid
-            // outcome per the cleaver's contract).
+            // All three data files must exist (they may be empty when
+            // the fixture's clusters carry no sub-seeds — that is a
+            // valid outcome per the cleaver's contract).
             [stats2, swarms2, fas2].each { p ->
                 assert file(p).exists() : "missing cleaver output: ${p}"
             }
+            // bin/cluster_cleaver.py emits INFO-level progress on
+            // stderr, so the log is always non-empty.
+            assert path(log).readLines().size() > 0 :
+                "cleaving log should not be empty"
         }
     }
 }

@@ -5,13 +5,17 @@ nextflow_process {
     process "merge_substring_otus"
 
     test("merges pupil OTUs onto masters, sorts, conserves the read count") {
-        // COVERAGE: [S39]
+        // COVERAGE: [S39], [S45]
         tag "ci"
         when {
             process {
                 """
+                def searchLog = workDir.resolve("search.log")
+                searchLog.text = "vsearch v2.x.y — placeholder search log\\n"
                 input[0] = file("\${projectDir}/tests/data/merge_substring_otus/otu_table")
                 input[1] = file("\${projectDir}/tests/data/merge_substring_otus/matches")
+                input[2] = file(searchLog.toString())
+                input[3] = "proj_3_samples"
                 """
             }
         }
@@ -30,6 +34,14 @@ nextflow_process {
             def otus = lines[1..-1].collect { it.split("\t")[0] }
             assert otus == ["1", "2", "4", "5"] :
                 "expected sort by OTU column, got: ${otus}"
+
+            // [S45]: combined superstring_clustering log = vsearch
+            // search log + python/invariant stderr.
+            def log = process.out[1].get(0)
+            assert log.endsWith("proj_3_samples_superstring_clustering.log")
+            def logText = path(log).text
+            assert logText.contains("search_for_terminal_gaps")
+            assert logText.contains("read count conserved")
         }
     }
 
@@ -65,8 +77,12 @@ nextflow_process {
 '''
                 def m = workDir.resolve("matches")
                 m.text = ""
+                def searchLog = workDir.resolve("search.log")
+                searchLog.text = ""
                 input[0] = file(t.toString())
                 input[1] = file(m.toString())
+                input[2] = file(searchLog.toString())
+                input[3] = "proj_3_samples"
                 """
             }
         }

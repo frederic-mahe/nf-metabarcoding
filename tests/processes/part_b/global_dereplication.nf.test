@@ -45,9 +45,10 @@ nextflow_process {
             assert header_a ==~ /.*;size=4;?.*/ :
                 "expected size=4 for shared sequence A, got: ${header_a}"
 
-            // log file is the second emitted path.
+            // log file is the second emitted path; [S45] pins the
+            // step-specific suffix.
             def logPath = process.out[1].get(0)
-            assert logPath.endsWith("proj_3_samples.log") :
+            assert logPath.endsWith("proj_3_samples_dereplication.log") :
                 "unexpected log filename: ${logPath}"
             assert path(logPath).readLines().size() > 0 :
                 "vsearch log should not be empty"

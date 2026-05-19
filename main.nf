@@ -476,7 +476,8 @@ process global_dereplication {
     // [S31]: cat every input .fas and pass it through
     // vsearch --fastx_uniques. --sizein/--sizeout preserve the
     // per-sample size annotations so vsearch sums abundances across
-    // samples.
+    // samples. The vsearch log lands at <basename>_dereplication.log
+    // ([S45]).
     publishDir params.results_folder, mode: 'link',
         enabled: params.results_folder != null
 
@@ -486,7 +487,7 @@ process global_dereplication {
 
     output:
     path "${basename}.fas"
-    path "${basename}.log"
+    path "${basename}_dereplication.log"
 
     shell:
     '''
@@ -497,7 +498,7 @@ process global_dereplication {
             --sizeout \
             --fasta_width 0 \
             --quiet \
-            --log !{basename}.log \
+            --log !{basename}_dereplication.log \
             --fastaout !{basename}.fas
     '''
 }
@@ -506,7 +507,8 @@ process global_dereplication {
 process global_clustering {
     // [S32]: swarm on the globally-dereplicated fasta. Output
     // filenames carry the `_1f` suffix (resolution=1, --fastidious)
-    // to mirror the bash-reference naming scheme.
+    // to mirror the bash-reference naming scheme. The swarm log
+    // lands at <basename>_clustering.log ([S45]).
     publishDir params.results_folder, mode: 'link',
         enabled: params.results_folder != null
 
@@ -519,7 +521,7 @@ process global_clustering {
     path "${basename}_1f.stats"
     path "${basename}_1f.struct"
     path "${basename}_1f_representatives.fas"
-    path "${basename}_1f.log"
+    path "${basename}_clustering.log"
 
     shell:
     '''
@@ -532,7 +534,7 @@ process global_clustering {
         --output-file !{basename}_1f.swarms \
         --statistics-file !{basename}_1f.stats \
         --seeds !{basename}_1f_representatives.fas \
-        !{global_fasta} 2> !{basename}_1f.log
+        !{global_fasta} 2> !{basename}_clustering.log
     '''
 }
 
@@ -566,7 +568,13 @@ process chimera_detection {
     // (default 2), then run vsearch --uchime_denovo. The .uchime
     // hit table can be empty when no chimeras are found; the stderr
     // log captures the run.
-    publishDir params.results_folder, mode: 'link',
+    //
+    // [S45] keeps this pre-cleave log internal — only the canonical
+    // chimera_detection2 log is published as
+    // <basename>_chimera_detection.log. Restricting publishDir to the
+    // .uchime pattern excludes the .log from the results folder while
+    // keeping it as a process output for testability.
+    publishDir params.results_folder, mode: 'link', pattern: "*.uchime",
         enabled: params.results_folder != null
 
     input:
@@ -626,6 +634,10 @@ process chimera_detection2 {
     // searched for chimeras, but it never goes below
     // params.chimera_minsize. An empty cleaved input falls back to
     // params.chimera_minsize.
+    //
+    // [S45]: this run is the canonical chimera-detection step. Its
+    // stderr lands at <basename>_chimera_detection.log (pre-cleave
+    // chimera_detection's log is internal, see its publishDir pattern).
     publishDir params.results_folder, mode: 'link',
         enabled: params.results_folder != null
 
@@ -636,7 +648,7 @@ process chimera_detection2 {
 
     output:
     path "${basename}_1f_representatives.uchime2"
-    path "${basename}_1f_representatives.log2"
+    path "${basename}_chimera_detection.log"
 
     shell:
     '''
@@ -661,7 +673,7 @@ process chimera_detection2 {
         vsearch \
             --uchime_denovo - \
             --uchimeout !{basename}_1f_representatives.uchime2 \
-            2> !{basename}_1f_representatives.log2
+            2> !{basename}_chimera_detection.log
     '''
 }
 
@@ -679,8 +691,10 @@ process build_occurrence_table {
     // wins for an overlapping seed. Bash uses ``${TAX}{2,}`` (results2
     // first, results last) so the pre-cleave assignment wins on
     // overlap — that ordering is preserved here.
-    publishDir params.results_folder, mode: 'link',
-        enabled: params.results_folder != null
+    //
+    // [S46]: this is an intermediate OTU table — it is **not**
+    // published; only the final <basename>_table.tsv reaches the
+    // results folder.
 
     input:
     path representatives,   stageAs: 'reps_global.fas'
@@ -722,6 +736,10 @@ process cleaving {
     // names follow the legacy `<input>2` / `<basename>_1f_representatives.fas2`
     // convention so downstream concatenations (used by the
     // occurrence-table builder) keep working unchanged.
+    //
+    // [S45]: bin/cluster_cleaver.py uses python's logging module to
+    // emit INFO-level progress to stderr; the redirect captures that
+    // as the canonical cleaving log.
     publishDir params.results_folder, mode: 'link',
         enabled: params.results_folder != null
 
@@ -737,6 +755,7 @@ process cleaving {
     path "${basename}_1f.stats2"
     path "${basename}_1f.swarms2"
     path "${basename}_1f_representatives.fas2"
+    path "${basename}_cleaving.log"
 
     shell:
     '''
@@ -746,7 +765,8 @@ process cleaving {
         --struct !{struct} \
         --swarms !{swarms} \
         --fasta !{global_fasta} \
-        --fastidious
+        --fastidious \
+        2> !{basename}_cleaving.log
     '''
 }
 
@@ -760,12 +780,17 @@ process search_for_terminal_gaps {
     //
     // grep "^H" returns exit 1 when there are no hits; `|| true`
     // keeps the process green (an empty .uc is a legitimate outcome).
+    //
+    // [S45]: vsearch's --log captures the search step's stderr; the
+    // merge_substring_otus process cats it together with the merge
+    // step's stderr to produce <basename>_superstring_clustering.log.
 
     input:
     path otu_table
 
     output:
     path "${otu_table.baseName}.uc"
+    path "search.log"
 
     shell:
     '''
@@ -776,7 +801,7 @@ process search_for_terminal_gaps {
             --id 1.0 \
             --qmask none \
             --usersort \
-            --quiet \
+            --log search.log \
             --uc - | \
         grep "^H" > !{otu_table.baseName}.uc || true
     '''
@@ -790,15 +815,24 @@ process merge_substring_otus {
     // their masters (samples summed, spread/total/cloud updated),
     // the resulting table is sorted by the OTU column, and we
     // assert that the global read count is conserved.
-    publishDir params.results_folder, mode: 'link',
+    //
+    // [S45]: cat the upstream vsearch search.log with the merge
+    // step's stderr to produce the combined
+    // <basename>_superstring_clustering.log. The merged OTU table
+    // itself is **not** published ([S46]).
+    publishDir path: { params.results_folder }, mode: 'link',
+        pattern: "*_superstring_clustering.log",
         enabled: params.results_folder != null
 
     input:
     path otu_table
     path matches
+    path search_log
+    val basename
 
     output:
     path "${otu_table.baseName}.nosubstringOTUs.table"
+    path "${basename}_superstring_clustering.log"
 
     shell:
     '''
@@ -806,23 +840,36 @@ process merge_substring_otus {
     set -euo pipefail
 
     out="!{otu_table.baseName}.nosubstringOTUs.table"
+    log="!{basename}_superstring_clustering.log"
     tmp_table="$(mktemp)"
-    trap 'rm -f "${tmp_table}"' EXIT
+    merge_stderr="$(mktemp)"
+    trap 'rm -f "${tmp_table}" "${merge_stderr}"' EXIT
 
-    merge_substring_otus.py \
-        -t !{otu_table} \
-        -m !{matches} \
-        -o "${tmp_table}"
+    {
+        echo "=== search_for_terminal_gaps (vsearch --cluster_smallmem) ==="
+        cat !{search_log}
+        echo
+        echo "=== merge_substring_otus + invariant check ==="
+    } > "${log}"
 
-    (head -n 1 "${tmp_table}"
-     tail -n +2 "${tmp_table}" | sort -k1,1n) > "${out}"
+    {
+        merge_substring_otus.py \
+            -t !{otu_table} \
+            -m !{matches} \
+            -o "${tmp_table}"
 
-    before="$(awk 'NR > 1 {t += $2} END {print t + 0}' !{otu_table})"
-    after="$(awk 'NR > 1 {t += $2} END {print t + 0}' "${out}")"
-    if (( before != after )) ; then
-        echo "merge_substring_otus: read count changed (${before} -> ${after})" >&2
-        exit 1
-    fi
+        (head -n 1 "${tmp_table}"
+         tail -n +2 "${tmp_table}" | sort -k1,1n) > "${out}"
+
+        before="$(awk 'NR > 1 {t += $2} END {print t + 0}' !{otu_table})"
+        after="$(awk 'NR > 1 {t += $2} END {print t + 0}' "${out}")"
+        if (( before != after )) ; then
+            echo "merge_substring_otus: read count changed (${before} -> ${after})" >&2
+            exit 1
+        fi
+        echo "merge_substring_otus: read count conserved (${before})" >&2
+    } 2> "${merge_stderr}"
+    cat "${merge_stderr}" >> "${log}"
     '''
 }
 
@@ -923,27 +970,31 @@ process run_mumu {
     // [S43]: mumu (>=1.1.1) post-clustering filter. Inputs are the
     // reduced OTU table (amplicon + sample cols) and the self-search
     // match list; outputs are the new OTU table and the analysis log.
-    publishDir params.results_folder, mode: 'link',
+    //
+    // [S45]: the mumu --log output is the canonical post-clustering
+    // curation log. The intermediate _raw_mumu.table is **not**
+    // published ([S46]); the publishDir pattern keeps the log only.
+    publishDir path: { params.results_folder }, mode: 'link', pattern: "*.log",
         enabled: params.results_folder != null
 
     input:
     path reduced_table
     path match_list
+    val basename
 
     output:
     path "${reduced_table.baseName.replaceFirst(/_reduced$/, '_raw_mumu')}.table"
-    path "${reduced_table.baseName.replaceFirst(/_reduced$/, '')}.mumu.log"
+    path "${basename}_post_clustering_curation.log"
 
     shell:
     def new_table = "${reduced_table.baseName.replaceFirst(/_reduced$/, '_raw_mumu')}.table"
-    def log_file  = "${reduced_table.baseName.replaceFirst(/_reduced$/, '')}.mumu.log"
     """
     mumu \\
         --threads ${params.threads} \\
         --otu_table ${reduced_table} \\
         --match_list ${match_list} \\
         --new_otu_table ${new_table} \\
-        --log ${log_file}
+        --log ${basename}_post_clustering_curation.log
     """
 }
 
@@ -952,24 +1003,27 @@ process rebuild_post_mumu_table {
     // [S44]: wraps rebuild_table_after_mumu.py + the legacy
     // size=0 → 1 awk hotfix (so downstream `vsearch --sizein`
     // consumers don't choke on a zero-abundance row).
+    //
+    // [S46]: emits the final occurrence table as
+    // <basename>_table.tsv.
     publishDir params.results_folder, mode: 'link',
         enabled: params.results_folder != null
 
     input:
     path mumu_table
     path old_table
+    val basename
 
     output:
-    path "${mumu_table.baseName.replaceFirst(/_raw_mumu$/, '')}.mumu.table"
+    path "${basename}_table.tsv"
 
     shell:
-    def out_name = "${mumu_table.baseName.replaceFirst(/_raw_mumu$/, '')}.mumu.table"
     """
     rebuild_table_after_mumu.py \\
         --mumu_table ${mumu_table} \\
         --old_table  ${old_table} | \\
         awk 'BEGIN {FS = OFS = "\\t"} {if (\$2 == 0) {\$2 = 1} ; print \$0}' \\
-        > ${out_name}
+        > ${basename}_table.tsv
     """
 }
 
@@ -1036,19 +1090,23 @@ workflow part_b_processes {
         basename,
     )
 
-    // [S38]/[S39]: collapse sub- and super-string OTUs.
+    // [S38]/[S39]: collapse sub- and super-string OTUs. The combined
+    // vsearch + python step emits <basename>_superstring_clustering.log
+    // ([S45]).
     search_for_terminal_gaps(build_occurrence_table.out[0])
     merge_substring_otus(
         build_occurrence_table.out[0],
-        search_for_terminal_gaps.out[0],
+        search_for_terminal_gaps.out[0],   // .uc hits
+        search_for_terminal_gaps.out[1],   // vsearch search.log
+        basename,
     )
 
     // [S40]–[S44]: mumu (ex-lulu) post-clustering filter pass.
     extract_otu_fasta(merge_substring_otus.out[0])
     trim_metadata_for_mumu(merge_substring_otus.out[0])
     find_similar_sequences(extract_otu_fasta.out[0])
-    run_mumu(trim_metadata_for_mumu.out[0], find_similar_sequences.out[0])
-    rebuild_post_mumu_table(run_mumu.out[0], merge_substring_otus.out[0])
+    run_mumu(trim_metadata_for_mumu.out[0], find_similar_sequences.out[0], basename)
+    rebuild_post_mumu_table(run_mumu.out[0], merge_substring_otus.out[0], basename)
     extract_mumu_fasta(rebuild_post_mumu_table.out[0])
 }
 

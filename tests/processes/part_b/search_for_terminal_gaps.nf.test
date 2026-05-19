@@ -42,6 +42,13 @@ nextflow_process {
             // At least one hit (the prefix sequence joins its
             // longer parent).
             assert lines.size() >= 1
+
+            // [S45]: vsearch --log captures the search step's stderr;
+            // merge_substring_otus consumes it to build the combined
+            // superstring_clustering log.
+            def searchLog = process.out[1].get(0)
+            assert searchLog.endsWith("search.log")
+            assert path(searchLog).readLines().size() > 0
         }
     }
 }

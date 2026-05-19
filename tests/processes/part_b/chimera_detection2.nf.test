@@ -54,7 +54,9 @@ nextflow_process {
             def uchime2 = process.out[0].get(0)
             def log2    = process.out[1].get(0)
             assert uchime2.endsWith("proj_3_samples_1f_representatives.uchime2")
-            assert log2.endsWith("proj_3_samples_1f_representatives.log2")
+            // [S45]: the canonical chimera_detection log uses the
+            // project-wide naming construct.
+            assert log2.endsWith("proj_3_samples_chimera_detection.log")
             assert file(uchime2).exists()
             // log2 should mention vsearch's chimera-search activity
             assert path(log2).readLines().size() > 0 :

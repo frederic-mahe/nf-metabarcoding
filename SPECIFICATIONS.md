@@ -531,10 +531,14 @@ isolation.
     each file is non-empty.
 - `[S46]` Part B publishes its final occurrence table as
   `<project>_<N>_samples_table.tsv` (after `rebuild_post_mumu_table`
-  and the size=0→1 awk hotfix). Intermediate tables produced along
-  the way (`*.OTU.filtered.cleaved.table`, `*.nosubstringOTUs.table`,
-  `*_raw_mumu.table`, `*.mumu.table`) are no longer published —
-  only the final `_table.tsv` lands in `params.results_folder`.
+  and the size=0→1 awk hotfix). Among the OTU tables produced
+  along the way, only this final `_table.tsv` is published; the
+  intermediate tables (`*.OTU.filtered.cleaved.table`,
+  `*.nosubstringOTUs.table`, `*_raw_mumu.table`, `*.mumu.table`)
+  stay in the work directory. Non-table artefacts (`.qual`,
+  `.distr`, `_per_sample_OTUs.stats`, the global `.fas`, swarm
+  outputs, `.uchime` hit tables, extracted `.fas` files) continue
+  to be published.
   - **Pass when:** running Part B on the documented fixture
     publishes `<project>_<N>_samples_table.tsv` to
     `params.results_folder`; the file is non-empty and starts with
