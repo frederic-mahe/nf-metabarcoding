@@ -46,4 +46,86 @@ nextflow_process {
             assert fields[1] == "10"
         }
     }
+
+    test("respects --stampa_id override (No_hit when threshold is too strict)") {
+        // COVERAGE: [S49]
+        // Pins the wiring of params.stampa_id onto vsearch's --id flag.
+        // Fixture: 80-nt non-repetitive sequences (the periodic ACGT
+        // pattern used in the smoke test above is too low-complexity
+        // for vsearch's default --minwordmatches 12 seeding). The
+        // query shares its first 67 nt with the reference and ends in
+        // 13 `G`s; vsearch reports ~87.7% identity. Under the default
+        // --stampa_id=0.5 vsearch returns the reference as the top
+        // hit; raising --stampa_id to 0.95 pushes the alignment below
+        // threshold and stampa_merge.py emits "No_hit".
+        tag "ci"
+        when {
+            params {
+                threads   = 1
+                iddef     = 1
+                stampa_id = 0.95
+            }
+            process {
+                """
+                def REF = 'ACGGAATTCAGTATTCGATGCAATCAGTAGCATGCAGTTAATCGATGCATTAGCATGCAGTCATGCAATCGAGCATTAGC'
+                def QRY = 'ACGGAATTCAGTATTCGATGCAATCAGTAGCATGCAGTTAATCGATGCATTAGCATGCAGTCATGCAAGGGGGGGGGGGGG'
+                def reps = workDir.resolve("reps.fas")
+                reps.text = '>amp1;size=10;\\n' + QRY + '\\n'
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>refA Kingdom|Phylum|Class\\n' + REF + '\\n'
+                input[0] = file(reps.toString())
+                input[1] = file(ref.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def chunk_tsv = process.out[0].get(0)
+            def rows = path(chunk_tsv).readLines()
+            assert rows.size() == 1
+            def fields = rows[0].split("\t", -1)
+            assert fields[3] == "No_hit" :
+                "stampa_id=0.95 should reject a 87.5%-identity hit, got: ${rows[0]}"
+            assert fields[4] == "No_hit" :
+                "expected No_hit accession when threshold rejects the hit, got: ${rows[0]}"
+        }
+    }
+
+    test("respects --stampa_maxrejects override (param threads through to vsearch)") {
+        // COVERAGE: [S49]
+        // The behavioural effect of --maxrejects only shows up against
+        // a reference dataset large enough that vsearch would stop
+        // scanning before finding the true best hit. That is hard to
+        // express as a tiny fixture, so this test pins the *wiring* —
+        // setting params.stampa_maxrejects to a small non-default
+        // value must not break the process and must still produce the
+        // expected top hit on a single-reference DB.
+        tag "ci"
+        when {
+            params {
+                threads            = 1
+                iddef              = 1
+                stampa_maxrejects  = 1
+            }
+            process {
+                """
+                def reps = workDir.resolve("reps.fas")
+                reps.text = '>amp1;size=10;\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>refA Kingdom|Phylum|Class\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
+                input[0] = file(reps.toString())
+                input[1] = file(ref.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def chunk_tsv = process.out[0].get(0)
+            def rows = path(chunk_tsv).readLines()
+            assert rows.size() == 1
+            def fields = rows[0].split("\t", -1)
+            assert fields[3] == "Kingdom|Phylum|Class" :
+                "expected the single ref to be the top hit, got: ${rows[0]}"
+        }
+    }
 }

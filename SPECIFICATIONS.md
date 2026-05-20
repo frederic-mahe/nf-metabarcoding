@@ -611,9 +611,17 @@ from placeholder values to real taxonomic assignments.
        slurm-tuned default is `1000`.
     2. each chunk feeds `vsearch --usearch_global` against the
        reference dataset with `--top_hits_only --output_no_hits
-       --maxaccepts 0 --maxrejects 32 --notrunclabels --rowlen 0`
-       and `--userfields query+id<iddef>+target`, then
-       `bin/stampa_merge.py` parses the userout and computes the
+       --maxaccepts 0 --maxrejects ${params.stampa_maxrejects}
+       --id ${params.stampa_id} --notrunclabels --rowlen 0`
+       and `--userfields query+id<iddef>+target`. The two
+       tunables expose the vsearch flags directly:
+       `params.stampa_maxrejects` (default `0` = vsearch's
+       "no limit" sentinel: exhaustive search, every reference
+       seq is considered as a potential top hit) and
+       `params.stampa_id` (default `0.5`, identity threshold
+       below which a hit is dropped — `stampa_merge.py` then
+       emits `No_hit` for the amplicon). Each chunk is then
+       parsed by `bin/stampa_merge.py`, which computes the
        last-common-ancestor taxonomy across top hits per
        amplicon. Each chunk emits a `stampa_chunk.tsv` slice
        with columns

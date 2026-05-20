@@ -58,6 +58,13 @@ params.occurrence_table  = null
 params.taxonomy_method   = 'stampa'
 params.iddef             = 1
 params.stampa_chunk_size = 1000
+// [S49]: vsearch knobs exposed for the stampa scatter step.
+// stampa_maxrejects=0 is vsearch's "no limit" sentinel — exhaustive
+// search, slower but every reference seq is considered as a potential
+// top hit. stampa_id is the --id threshold below which a hit is
+// dropped (stampa_merge.py then emits "No_hit" for the amplicon).
+params.stampa_maxrejects = 0
+params.stampa_id         = 0.5
 
 
 def normalize_path(value) {
@@ -193,6 +200,11 @@ Part C — taxonomic assignment:
   --iddef INT                 vsearch --iddef value (default: ${params.iddef})
   --stampa_chunk_size INT     sequences per stampa scatter chunk;
                               0 disables the split (default: ${params.stampa_chunk_size})
+  --stampa_maxrejects INT     vsearch --maxrejects for the stampa
+                              scatter step; 0 = no limit
+                              (default: ${params.stampa_maxrejects})
+  --stampa_id FLOAT           vsearch --id threshold for the stampa
+                              scatter step (default: ${params.stampa_id})
 
 Runtime:
   --threads INT               threads per process (default: ${params.threads})
@@ -1551,10 +1563,10 @@ process assign_taxonomy_stampa {
         --notrunclabels \
         --userfields query+id!{params.iddef}+target \
         --maxaccepts 0 \
-        --maxrejects 32 \
+        --maxrejects !{params.stampa_maxrejects} \
         --top_hits_only \
         --output_no_hits \
-        --id 0.5 \
+        --id !{params.stampa_id} \
         --iddef !{params.iddef} \
         --userout hits \
         2> vsearch.log
