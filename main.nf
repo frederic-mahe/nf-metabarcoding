@@ -60,6 +60,94 @@ params.iddef             = 1
 params.stampa_chunk_size = 1000
 
 
+def normalize_path(value) {
+    // [S60]: expand a leading shell-style `~` in a path string. Nextflow's
+    // `file()` does not perform tilde expansion (that is a shell
+    // construct), so a quoted '~/...' on the CLI or a '~/...' read from
+    // a -params-file would otherwise be joined to launchDir and yield a
+    // dangling work-dir symlink. Handles four shapes:
+    //   - null         -> null   (preserve "unset")
+    //   - List         -> recurse element-wise
+    //   - String       -> expand if it starts with `~` (or `~/`, `~user/`);
+    //                     comma-separated strings are split, expanded
+    //                     per-segment, and re-joined so the downstream
+    //                     `split(',')` callers keep working.
+    //   - other        -> coerce to String and apply the rules above
+    if ( value == null ) {
+        return null
+    }
+    if ( value instanceof List ) {
+        return value.collect { normalize_path(it) }
+    }
+    def s = value.toString()
+    if ( s.contains(',') ) {
+        return s.split(',')
+            .collect { it.trim() }
+            .findAll { it }
+            .collect { normalize_path(it) }
+            .join(',')
+    }
+    if ( s == '~' ) {
+        return System.getProperty('user.home')
+    }
+    if ( s.startsWith('~/') ) {
+        return System.getProperty('user.home') + s.substring(1)
+    }
+    if ( s.startsWith('~') ) {
+        // `~user` or `~user/<rest>` — best-effort lookup.
+        def slash = s.indexOf('/')
+        def user
+        def rest
+        if ( slash < 0 ) {
+            user = s.substring(1)
+            rest = ''
+        } else {
+            user = s.substring(1, slash)
+            rest = s.substring(slash)
+        }
+        def home = lookup_user_home(user)
+        if ( home ) {
+            return home + rest
+        }
+        // unknown user — pass through unchanged
+    }
+    return s
+}
+
+
+def lookup_user_home(String user) {
+    // [S60] helper: resolve `~user` by trying `getent passwd <user>`
+    // first, then falling back to a /etc/passwd scan. Returns null
+    // when the user can't be found.
+    // tokenize(':') drops empty fields, which shifts the home-dir
+    // index when the GECOS column is blank (a common configuration).
+    // split(':', -1) preserves every column, so fields[5] is always the
+    // home directory per the passwd(5) layout.
+    try {
+        def proc = ['getent', 'passwd', user].execute()
+        proc.waitFor()
+        if ( proc.exitValue() == 0 ) {
+            def fields = proc.text.trim().split(':', -1)
+            if ( fields.size() >= 6 ) {
+                return fields[5]
+            }
+        }
+    } catch (Exception ignored) {
+        // getent unavailable (e.g. non-Linux host) — fall through.
+    }
+    def passwd = new File('/etc/passwd')
+    if ( passwd.canRead() ) {
+        def match = passwd.readLines()
+            .collect { it.split(':', -1) }
+            .find { it.size() >= 6 && it[0] == user }
+        if ( match ) {
+            return match[5]
+        }
+    }
+    return null
+}
+
+
 def usage() {
     // [S57]: usage block printed on --help. Group flags by the part
     // that consumes them; the three entry-point flags up top double
@@ -124,7 +212,7 @@ process merge_fastq_pairs {
     // --fastqout_notmerged_fwd/_rev capture reads that fail to merge;
     // they feed the shadow Part A pipeline ([S04]). Fwd and rev are
     // kept in sync by vsearch.
-    publishDir path: { params.fastq_folder }, mode: params.publish_mode, pattern: "*.log",
+    publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode, pattern: "*.log",
         enabled: params.fastq_folder != null
 
     input:
@@ -284,7 +372,7 @@ process trim_primers {
     // are in the same orientation. Matching leftmost is the default.
     // Length and N-count filtering are delegated to
     // filter_and_convert_to_fasta (vsearch --fastq_minlen / --fastq_maxns).
-    publishDir path: { params.fastq_folder }, mode: params.publish_mode, pattern: "*.log",
+    publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode, pattern: "*.log",
         enabled: params.fastq_folder != null
 
     input:
@@ -386,7 +474,7 @@ process filter_and_convert_to_fasta {
 process extract_expected_error_values {
     // extract ee for future quality filtering (keep the lowest
     // observed expected error value for each unique sequence)
-    publishDir params.fastq_folder, mode: params.publish_mode
+    publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode
 
     input:
     val sampleId
@@ -408,7 +496,7 @@ process extract_expected_error_values {
 
 process dereplicate_fasta {
     // dereplicate and discard expected error values (ee)
-    publishDir params.fastq_folder, mode: params.publish_mode
+    publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode
 
     input:
     val sampleId
@@ -442,7 +530,7 @@ process dereplicate_fasta {
 process list_local_clusters {
     // retain only clusters with more than 2 reads
     // (do not use the fastidious option here)
-    publishDir params.fastq_folder, mode: params.publish_mode
+    publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode
 
     input:
     val sampleId
@@ -483,12 +571,13 @@ process discover_inputs {
 
     script:
     def folders = (params.fastq_folder instanceof List)
-        ? params.fastq_folder
+        ? params.fastq_folder.collect { normalize_path(it) }
         : params.fastq_folder
             .toString()
             .split(',')
             .collect { it.trim() }
             .findAll { it }
+            .collect { normalize_path(it) }
     def folder_args = folders.collect { "'${it}'" }.join(' ')
     def extra_arg = (params.fastq_pattern
         && !params.fastq_pattern.toString().isEmpty())
@@ -522,12 +611,13 @@ process discover_part_b_fasta {
 
     script:
     def folders = (params.fasta_folder instanceof List)
-        ? params.fasta_folder
+        ? params.fasta_folder.collect { normalize_path(it) }
         : params.fasta_folder
             .toString()
             .split(',')
             .collect { it.trim() }
             .findAll { it }
+            .collect { normalize_path(it) }
     def folder_args = folders.collect { "'${it}'" }.join(' ')
     """
     discover_fasta.py          ${folder_args} > fastas.tsv
@@ -630,7 +720,7 @@ process global_dereplication {
     //
     // [S59]: only the log reaches the results folder; the
     // dereplicated .fas is an internal intermediate.
-    publishDir params.results_folder, mode: params.publish_mode, pattern: "*.log",
+    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode, pattern: "*.log",
         enabled: params.results_folder != null
 
     input:
@@ -665,7 +755,7 @@ process global_clustering {
     // [S59]: only the log reaches the results folder; the
     // .swarms / .stats / .struct / _representatives.fas are
     // internal intermediates.
-    publishDir params.results_folder, mode: params.publish_mode, pattern: "*.log",
+    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode, pattern: "*.log",
         enabled: params.results_folder != null
 
     input:
@@ -803,7 +893,7 @@ process chimera_detection_post_cleave {
     // [S59]: only the log reaches the results folder; the .uchime2
     // hit table is an internal intermediate consumed by
     // build_occurrence_table.
-    publishDir params.results_folder, mode: params.publish_mode, pattern: "*.log",
+    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode, pattern: "*.log",
         enabled: params.results_folder != null
 
     input:
@@ -917,7 +1007,7 @@ process cleaving {
     // [S59]: only the log reaches the results folder; the .stats2 /
     // .swarms2 / _representatives.fas2 cleaver outputs are internal
     // intermediates consumed by build_occurrence_table.
-    publishDir params.results_folder, mode: params.publish_mode, pattern: "*.log",
+    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode, pattern: "*.log",
         enabled: params.results_folder != null
 
     input:
@@ -997,7 +1087,7 @@ process merge_substring_otus {
     // step's stderr to produce the combined
     // <basename>_superstring_clustering.log. The merged OTU table
     // itself is **not** published ([S46]).
-    publishDir path: { params.results_folder }, mode: params.publish_mode,
+    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
         pattern: "*_superstring_clustering.log",
         enabled: params.results_folder != null
 
@@ -1081,7 +1171,7 @@ process extract_mumu_fasta {
     // size=0 → 1 awk hotfix in `rebuild_post_mumu_table` ([S44]) no
     // row carries `$2 == 0` anymore, so the filter is a no-op
     // safety net retained for byte parity with the legacy bash.
-    publishDir params.results_folder, mode: params.publish_mode,
+    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -1154,7 +1244,7 @@ process run_mumu {
     // [S45]: the mumu --log output is the canonical post-clustering
     // curation log. The intermediate _raw_mumu.table is **not**
     // published ([S46]); the publishDir pattern keeps the log only.
-    publishDir path: { params.results_folder }, mode: params.publish_mode, pattern: "*.log",
+    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode, pattern: "*.log",
         enabled: params.results_folder != null
 
     input:
@@ -1186,7 +1276,7 @@ process rebuild_post_mumu_table {
     //
     // [S46]: emits the final occurrence table as
     // <basename>_table.tsv.
-    publishDir params.results_folder, mode: params.publish_mode,
+    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -1484,7 +1574,7 @@ process assign_taxonomy_sintax {
     // that strips ;size= annotations and renames the bootstrap
     // confidences into the references column. Pin the exact shape
     // once D04 lands.
-    publishDir params.results_folder, mode: params.publish_mode,
+    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -1525,7 +1615,7 @@ process update_occurrence_table {
     // <basename>_table.tsv. The output is published as a sibling
     // file `<basename>_table_assigned.tsv` so Part B's unannotated
     // table is preserved alongside the annotated one (D04 sub-q2).
-    publishDir params.results_folder, mode: params.publish_mode,
+    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -1555,7 +1645,7 @@ workflow part_C {
     basename           // value channel: <project>_<N>_samples
 
     main:
-    def reference = file(params.reference_dataset)
+    def reference = file(normalize_path(params.reference_dataset))
 
     // [S48]: extract a representatives FASTA from the occurrence
     // table. (The fasta-input branch promised by [S48] is blocked
@@ -1602,7 +1692,7 @@ workflow part_C {
         def merged = assign_taxonomy_stampa(chunks, reference)
             .combine(basename)
             .collectFile(
-                storeDir: params.results_folder,
+                storeDir: normalize_path(params.results_folder),
                 sort: { line ->
                     // -k2,2nr -k1,1d == abundance desc, amplicon asc.
                     // collectFile's sort closure takes one argument
@@ -1660,13 +1750,13 @@ workflow part_c {
     assert params.results_folder :
         "--results_folder must be set when running Part C"
 
-    def results_dir = new File(params.results_folder.toString())
+    def results_dir = new File(normalize_path(params.results_folder).toString())
     results_dir.mkdirs()
 
-    def table_path = file(params.occurrence_table)
+    def table_path = file(normalize_path(params.occurrence_table))
     def derived_basename = table_path.baseName.replaceFirst(/_table$/, '')
     def basename_ch = Channel.value(derived_basename)
-    def table_ch    = Channel.fromPath(params.occurrence_table)
+    def table_ch    = Channel.fromPath(normalize_path(params.occurrence_table))
 
     part_C(table_ch, basename_ch)
 }
@@ -1693,7 +1783,7 @@ workflow part_b {
 
     // [S26]: create the results folder (and any missing parents)
     // before anything publishes into it.
-    def results_dir = new File(params.results_folder.toString())
+    def results_dir = new File(normalize_path(params.results_folder).toString())
     results_dir.mkdirs()
 
     discover_part_b_fasta()
@@ -1892,6 +1982,12 @@ workflow {
     assert params.publish_mode in allowed_modes :
         "--publish_mode must be one of ${allowed_modes}, got '${params.publish_mode}'"
 
+    // [S60]: every path-typed param is read through `normalize_path()`
+    // at its use site (file(), publishDir, etc.) — see the helper at the
+    // top of this file. Nextflow 25's `params` map is read-only from
+    // inside a workflow body, so a one-shot mutation here is silently
+    // dropped; the wrap-at-use-site pattern is the workaround.
+
     // [S47]/[S48]: --occurrence_table switches the pipeline into
     // Part C standalone mode (Parts A and B do not run). The
     // mode also requires --reference_dataset and --results_folder.
@@ -1940,7 +2036,7 @@ workflow {
     if ( params.project_name ) {
         assert params.results_folder :
             "--results_folder must be set when --project_name is set"
-        def results_dir = new File(params.results_folder.toString())
+        def results_dir = new File(normalize_path(params.results_folder).toString())
         results_dir.mkdirs()
 
         def regular_fasta = part_A.out.fasta.filter { id, _f -> !id.endsWith("_notmerged") }

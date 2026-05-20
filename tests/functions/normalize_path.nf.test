@@ -1,0 +1,175 @@
+nextflow_function {
+
+    name "normalize_path"
+    script "main.nf"
+    function "normalize_path"
+
+    test("null in, null out") {
+        // COVERAGE: [S60]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = null
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == null
+        }
+    }
+
+    test("path without a tilde passes through unchanged") {
+        // COVERAGE: [S60]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = '/absolute/path/to/file.fas'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == '/absolute/path/to/file.fas'
+        }
+    }
+
+    test("relative path without a tilde passes through unchanged") {
+        // COVERAGE: [S60]
+        // The workflow leaves Nextflow's launchDir-resolution alone for
+        // genuine relative paths; only `~` prefixes are touched.
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = 'sub/dir/file.fas'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == 'sub/dir/file.fas'
+        }
+    }
+
+    test("bare ~ expands to \$HOME") {
+        // COVERAGE: [S60]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = '~'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == System.getProperty('user.home')
+        }
+    }
+
+    test("leading ~/ expands to \$HOME/") {
+        // COVERAGE: [S60]
+        // This is the case the user hit: a quoted '~/foo' that Nextflow
+        // would otherwise join to launchDir.
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = '~/Documents/refs/unite.fas'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result ==
+                System.getProperty('user.home') + '/Documents/refs/unite.fas'
+        }
+    }
+
+    test("leading ~user/ expands to that user's home when resolvable") {
+        // COVERAGE: [S60]
+        // Best-effort: we look up the *current* user (always present
+        // in passwd), so the test is portable. An unknown user would
+        // fall through unchanged — that branch is exercised by the
+        // next test.
+        tag "ci"
+        when {
+            function {
+                """
+                def me = System.getProperty('user.name')
+                input[0] = "~\${me}/tail.fas"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result ==
+                System.getProperty('user.home') + '/tail.fas'
+        }
+    }
+
+    test("unknown ~user prefix is left untouched") {
+        // COVERAGE: [S60]
+        // Sentinel user name unlikely to exist on any test host.
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = '~nf_metabarcoding_no_such_user_x9q/foo.fas'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == '~nf_metabarcoding_no_such_user_x9q/foo.fas'
+        }
+    }
+
+    test("list values are normalised element-wise") {
+        // COVERAGE: [S60]
+        // `--fastq_folder dir1,dir2` arrives either as a comma-string
+        // (handled by the next test) or, depending on the caller, as a
+        // List. The helper must walk a List and expand each element.
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = ['~/a.fas', '/abs/b.fas', '~']
+                """
+            }
+        }
+        then {
+            assert function.success
+            def home = System.getProperty('user.home')
+            assert function.result == [
+                "${home}/a.fas".toString(),
+                '/abs/b.fas',
+                home,
+            ]
+        }
+    }
+
+    test("comma-separated string is normalised element-wise") {
+        // COVERAGE: [S60]
+        // `--fastq_folder` accepts a comma-separated string; each
+        // segment must be expanded independently and the result
+        // re-joined with commas (so the downstream split-on-comma
+        // logic keeps working).
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = '~/dir1,~/dir2'
+                """
+            }
+        }
+        then {
+            assert function.success
+            def home = System.getProperty('user.home')
+            assert function.result == "${home}/dir1,${home}/dir2".toString()
+        }
+    }
+}

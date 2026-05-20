@@ -890,6 +890,68 @@ nextflow_pipeline {
         }
     }
 
+    test("tilde-prefixed --reference_dataset is expanded at startup") {
+        // COVERAGE: [S60]
+        // Reproduces the user-reported failure where a quoted
+        // '~/...' --reference_dataset slipped through unexpanded and
+        // Nextflow joined it to launchDir, producing a dangling
+        // symlink in the vsearch work dir. With normalize_path in
+        // place, the workflow must resolve '~/...' to $HOME/... and
+        // the run succeeds.
+        tag "ci"
+        setup {
+            def home = System.getProperty('user.home')
+            // Unique sub-dir under $HOME so concurrent runs don't
+            // collide and so cleanup is precise.
+            def stamp = System.currentTimeMillis()
+            // store the path on disk; we reference the same stamp
+            // from `when` via outputDir-side bookkeeping.
+            def marker = file("${outputDir}/tilde_stamp.txt")
+            marker.parentFile.mkdirs()
+            marker.text = stamp.toString()
+            def tilde_dir = file("${home}/.nf-metabarcoding-tilde-${stamp}")
+            tilde_dir.mkdirs()
+            def ref = file("${tilde_dir}/ref.fas")
+            ref.text = ">refA Kingdom|Phylum|Class\n" +
+                       "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            def tab = file("${outputDir}/tilde_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t32\t10\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t10\n"
+            )
+        }
+        when {
+            params {
+                threads           = 1
+                results_folder    = "${outputDir}/tilde_results"
+                // The whole point of the test: a literal '~/...' that
+                // the shell would normally expand but, quoted here,
+                // arrives unexpanded. The workflow must do the
+                // expansion itself.
+                reference_dataset = "~/.nf-metabarcoding-tilde-" +
+                    file("${outputDir}/tilde_stamp.txt").text.trim() +
+                    "/ref.fas"
+                occurrence_table  = "${outputDir}/tilde_table.tsv"
+            }
+        }
+        then {
+            assert workflow.success :
+                "tilde expansion should let Part C find the reference"
+            def updated = file(
+                "${outputDir}/tilde_results/tilde_table_assigned.tsv"
+            )
+            assert updated.exists() :
+                "Part C should publish <basename>_table_assigned.tsv"
+        }
+        cleanup {
+            def stamp = file("${outputDir}/tilde_stamp.txt").text.trim()
+            file("${System.getProperty('user.home')}/.nf-metabarcoding-tilde-${stamp}")
+                .deleteDir()
+        }
+    }
+
     test("--publish_mode symlink threads through to publishDir directives") {
         // COVERAGE: [S58]
         tag "ci"

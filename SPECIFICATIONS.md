@@ -814,6 +814,25 @@ from placeholder values to real taxonomic assignments.
     <basename>_post_clustering_curation.log}` (plus the same set
     with `_notmerged` if the shadow path fired); none of the
     blacklisted intermediate filenames appear.
+- `[S60]` Path-typed parameters are normalised at workflow startup so
+  shell-style `~` prefixes that the shell did not expand (quoted on
+  the CLI, or read from a `-params-file`) still resolve to the
+  intended location instead of being joined to the launch directory.
+  The parameters covered are `--reference_dataset`,
+  `--occurrence_table`, `--fastq_folder`, `--fasta_folder`, and
+  `--results_folder`. A bare `~` or a leading `~/` is replaced with
+  the current user's home directory (`$HOME`); a leading `~user/` is
+  replaced with that user's home directory when it can be resolved
+  (best-effort lookup via `getent passwd` then `/etc/passwd`).
+  Unrecognised `~user` prefixes and paths without a leading `~`
+  (absolute or relative) pass through unchanged. List- and
+  comma-separated values (`--fastq_folder dir1,dir2`) are normalised
+  element-wise.
+  - **Pass when:** `normalize_path("~/foo.fas")` returns
+    `${HOME}/foo.fas`; an end-to-end run with
+    `--reference_dataset "~/<file>"` (quoted, so the shell does
+    *not* expand) succeeds and produces the expected output, with
+    no work-dir symlink containing a literal `~`.
 
 
 ## Dependencies
