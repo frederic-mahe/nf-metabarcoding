@@ -1208,7 +1208,7 @@ process rebuild_post_mumu_table {
 }
 
 
-workflow part_b_processes {
+workflow part_B {
     // Runs the five Part B pre-cleaving processes on already-collected
     // lists of per-sample fasta / qual / stats files. Shared by the
     // standalone (`workflow part_b`) and end-to-end paths so the
@@ -1289,12 +1289,17 @@ workflow part_b_processes {
     run_mumu(trim_metadata_for_mumu.out[0], find_similar_sequences.out[0], basename)
     rebuild_post_mumu_table(run_mumu.out[0], merge_substring_otus.out[0], basename)
     extract_mumu_fasta(rebuild_post_mumu_table.out[0])
+
+    emit:
+    // [S46] final occurrence table — consumed by part_C when Part B
+    // and Part C run end-to-end.
+    table = rebuild_post_mumu_table.out[0]
 }
 
 
-workflow part_b_shadow_processes {
+workflow part_B_shadow {
     // [S56]: shadow Part B. Runs the same pipeline as
-    // part_b_processes on the Part A shadow outputs
+    // part_B on the Part A shadow outputs
     // (<sampleId>_notmerged.{fas,qual,stats} — see [S04]), with two
     // shadow-specific steps glued around global_clustering:
     //
@@ -1385,6 +1390,14 @@ workflow part_b_shadow_processes {
     run_mumu(trim_metadata_for_mumu.out[0], find_similar_sequences.out[0], basename)
     rebuild_post_mumu_table(run_mumu.out[0], merge_substring_otus.out[0], basename)
     extract_mumu_fasta(rebuild_post_mumu_table.out[0])
+
+    emit:
+    // [S46] final shadow occurrence table — exposed so callers can
+    // splice taxonomy onto the shadow path via a standalone Part C
+    // invocation. End-to-end wiring runs Part C on the regular path
+    // only; calling it twice from the same scope is forbidden in
+    // DSL2.
+    table = rebuild_post_mumu_table.out[0]
 }
 
 
@@ -1533,7 +1546,7 @@ process update_occurrence_table {
 }
 
 
-workflow part_c_processes {
+workflow part_C {
     // Re-usable Part C wiring shared by the standalone workflow and
     // the Part B → Part C end-to-end path.
 
@@ -1610,12 +1623,27 @@ workflow part_c_processes {
                 ["${bn}_taxonomy_stampa.tsv", chunk_tsv.text]
             }
 
+        // [S51] empty-input contract: when the occurrence table has no
+        // rows, the extracted representatives fasta is empty,
+        // splitFasta emits zero chunks, and `merged` never fires —
+        // which would leave update_occurrence_table dangling. Fall
+        // back to an empty assignments file so update_occurrence_table
+        // still runs and publishes a header-only
+        // <basename>_table_assigned.tsv.
+        def empty_assignments = file("${workflow.workDir}/empty_assignments.tsv")
+        empty_assignments.text = ""
+
         update_occurrence_table(
             occurrence_table,
-            merged,
+            merged.ifEmpty(empty_assignments),
             basename,
         )
     }
+
+    emit:
+    // [S51] annotated occurrence table — sibling of Part B's
+    // <basename>_table.tsv, named <basename>_table_assigned.tsv.
+    table = update_occurrence_table.out[0]
 }
 
 
@@ -1640,7 +1668,7 @@ workflow part_c {
     def basename_ch = Channel.value(derived_basename)
     def table_ch    = Channel.fromPath(params.occurrence_table)
 
-    part_c_processes(table_ch, basename_ch)
+    part_C(table_ch, basename_ch)
 }
 
 
@@ -1648,10 +1676,16 @@ workflow part_b {
     // Standalone Part B ([S25]/[S26]/[S27]/[S56]): discover the
     // per-sample .fas files under params.fasta_folder and route them
     // to two parallel workflows:
-    //   - part_b_processes        for samples without _notmerged suffix
-    //   - part_b_shadow_processes for samples with the _notmerged suffix
+    //   - part_B        for samples without _notmerged suffix
+    //   - part_B_shadow for samples with the _notmerged suffix
     // .qual and .stats are derived as sibling files of each .fas, so
     // the same per-sample file-naming convention applies to both paths.
+    //
+    // When --reference_dataset is also set, Part C is wired onto the
+    // regular path so the table_assigned.tsv lands alongside the Part B
+    // outputs. Shadow Part C is not wired end-to-end: DSL2 forbids a
+    // second invocation of `part_C` in the same scope; users wanting
+    // shadow taxonomy can run Part C standalone on the shadow table.
     assert params.project_name :
         "--project_name must be set when --fasta_folder is set"
     assert params.results_folder :
@@ -1678,7 +1712,7 @@ workflow part_b {
     def stats_list = regular_samples_ch
         .map { id, f -> file("${f.parent}/${id}.stats") }
         .collect()
-    part_b_processes(fasta_list, qual_list, stats_list)
+    part_B(fasta_list, qual_list, stats_list)
 
     def s_fasta_list = shadow_samples_ch.map { _id, f -> f }.collect()
     def s_qual_list  = shadow_samples_ch
@@ -1687,57 +1721,28 @@ workflow part_b {
     def s_stats_list = shadow_samples_ch
         .map { id, f -> file("${f.parent}/${id}.stats") }
         .collect()
-    part_b_shadow_processes(s_fasta_list, s_qual_list, s_stats_list)
+    part_B_shadow(s_fasta_list, s_qual_list, s_stats_list)
+
+    if ( params.reference_dataset ) {
+        def basename_ch = fasta_list.map { files ->
+            "${params.project_name}_${files.size()}_samples"
+        }
+        part_C(part_B.out.table, basename_ch)
+    }
 }
 
 
-workflow {
-    // [S57]: --help short-circuits before any required-param assert.
-    // print() (not log.info) so the usage block lands on stdout —
-    // the conventional channel for help output and what nf-test
-    // captures in workflow.stdout.
-    if ( params.help ) {
-        print usage()
-        return
-    }
+workflow part_A {
+    // Part A end-to-end: fastq → per-sample dereplicated fasta + qual
+    // + stats. Wraps the regular and shadow ([S04]) pipelines so every
+    // process tagged with this part shows up as `part_A:<process>` in
+    // the Nextflow tty output.
+    //
+    // Emits three (sampleId, path) channels — one per per-sample
+    // artefact — so the main workflow can split them into regular vs
+    // shadow streams when feeding part_B / part_B_shadow.
 
-    // [S58]: validate --publish_mode before any process is wired so a
-    // typo aborts the run immediately with a clear message instead of
-    // failing on the first PublishDir attempt.
-    def allowed_modes = ['copy', 'copyNoFollow', 'link', 'move', 'rellink', 'symlink']
-    assert params.publish_mode in allowed_modes :
-        "--publish_mode must be one of ${allowed_modes}, got '${params.publish_mode}'"
-
-    // [S47]/[S48]: --occurrence_table switches the pipeline into
-    // Part C standalone mode (Parts A and B do not run). The
-    // mode also requires --reference_dataset and --results_folder.
-    if ( params.occurrence_table ) {
-        part_c()
-        return
-    }
-
-    // [S27]: --fasta_folder switches the pipeline into Part B
-    // standalone mode. Part A's --fastq_folder requirement is lifted
-    // in that mode (Part A does not run). End-to-end Part B → Part C
-    // wiring is deferred — for now Part C runs as a separate
-    // invocation against Part B's <basename>_table.tsv.
-    if ( params.fasta_folder ) {
-        part_b()
-        return
-    }
-
-    // required parameters (no default — supply via CLI or project config)
-    assert params.fastq_folder : "--fastq_folder must be set (no default)"
-
-    // [S18]/[S20]: primers and --no_trimming are mutually exclusive
-    if ( params.no_trimming ) {
-        assert !params.forward_primer : "--forward_primer must be empty when --no_trimming is set"
-        assert !params.reverse_primer : "--reverse_primer must be empty when --no_trimming is set"
-    } else {
-        assert params.forward_primer : "--forward_primer must be set (no default)"
-        assert params.reverse_primer : "--reverse_primer must be set (no default)"
-    }
-
+    main:
     // [S10]/[S11]/[S12]/[S21]: pattern-driven discovery. Pairs go
     // through merge_fastq_pairs; single-end files skip the merging
     // step.
@@ -1859,35 +1864,92 @@ workflow {
 
     list_local_clusters(ready_for_swarm.id, ready_for_swarm.file)
 
+    emit:
+    // (sampleId, path) tuples — shadow samples carry a _notmerged
+    // suffix so the main workflow can filter them into the shadow
+    // stream before calling part_B / part_B_shadow.
+    fasta = dereplicate_fasta.out[0].merge(dereplicate_fasta.out[1])
+    qual  = extract_expected_error_values.out[0]
+        .merge(extract_expected_error_values.out[1])
+    stats = list_local_clusters.out[0].merge(list_local_clusters.out[1])
+}
+
+
+workflow {
+    // [S57]: --help short-circuits before any required-param assert.
+    // print() (not log.info) so the usage block lands on stdout —
+    // the conventional channel for help output and what nf-test
+    // captures in workflow.stdout.
+    if ( params.help ) {
+        print usage()
+        return
+    }
+
+    // [S58]: validate --publish_mode before any process is wired so a
+    // typo aborts the run immediately with a clear message instead of
+    // failing on the first PublishDir attempt.
+    def allowed_modes = ['copy', 'copyNoFollow', 'link', 'move', 'rellink', 'symlink']
+    assert params.publish_mode in allowed_modes :
+        "--publish_mode must be one of ${allowed_modes}, got '${params.publish_mode}'"
+
+    // [S47]/[S48]: --occurrence_table switches the pipeline into
+    // Part C standalone mode (Parts A and B do not run). The
+    // mode also requires --reference_dataset and --results_folder.
+    if ( params.occurrence_table ) {
+        part_c()
+        return
+    }
+
+    // [S27]: --fasta_folder switches the pipeline into Part B
+    // standalone mode. Part A's --fastq_folder requirement is lifted
+    // in that mode (Part A does not run). When --reference_dataset is
+    // also set, `workflow part_b` chains Part C onto Part B's regular
+    // output.
+    if ( params.fasta_folder ) {
+        part_b()
+        return
+    }
+
+    // required parameters (no default — supply via CLI or project config)
+    assert params.fastq_folder : "--fastq_folder must be set (no default)"
+
+    // [S18]/[S20]: primers and --no_trimming are mutually exclusive
+    if ( params.no_trimming ) {
+        assert !params.forward_primer : "--forward_primer must be empty when --no_trimming is set"
+        assert !params.reverse_primer : "--reverse_primer must be empty when --no_trimming is set"
+    } else {
+        assert params.forward_primer : "--forward_primer must be set (no default)"
+        assert params.reverse_primer : "--reverse_primer must be set (no default)"
+    }
+
+    part_A()
+
     // ----- Part A → Part B handoff ([S27]/[S56]) -----
     // When --project_name is set, Part B runs on the Part A outputs
     // (without going through disk discovery). Regular and shadow
     // samples ([S04]) feed two parallel workflows:
-    //   - part_b_processes        on samples whose ID does NOT end in _notmerged
-    //   - part_b_shadow_processes on samples whose ID DOES end in _notmerged
+    //   - part_B        on samples whose ID does NOT end in _notmerged
+    //   - part_B_shadow on samples whose ID DOES end in _notmerged
     // The shadow workflow's published artefacts carry a _notmerged
     // token in their basename so they sit alongside the regular
-    // ones in --results_folder without colliding.
+    // ones in --results_folder without colliding. When
+    // --reference_dataset is also set, Part C runs on the regular
+    // Part B table; shadow taxonomy is left to a standalone Part C
+    // invocation (DSL2 forbids a second `part_C` call in the same
+    // scope).
     if ( params.project_name ) {
         assert params.results_folder :
             "--results_folder must be set when --project_name is set"
         def results_dir = new File(params.results_folder.toString())
         results_dir.mkdirs()
 
-        def fasta_ch = dereplicate_fasta.out[0]
-            .merge(dereplicate_fasta.out[1])
-        def qual_ch = extract_expected_error_values.out[0]
-            .merge(extract_expected_error_values.out[1])
-        def stats_ch = list_local_clusters.out[0]
-            .merge(list_local_clusters.out[1])
+        def regular_fasta = part_A.out.fasta.filter { id, _f -> !id.endsWith("_notmerged") }
+        def regular_qual  = part_A.out.qual .filter { id, _f -> !id.endsWith("_notmerged") }
+        def regular_stats = part_A.out.stats.filter { id, _f -> !id.endsWith("_notmerged") }
 
-        def regular_fasta = fasta_ch.filter { id, _f -> !id.endsWith("_notmerged") }
-        def regular_qual  = qual_ch .filter { id, _f -> !id.endsWith("_notmerged") }
-        def regular_stats = stats_ch.filter { id, _f -> !id.endsWith("_notmerged") }
-
-        def shadow_fasta = fasta_ch.filter { id, _f -> id.endsWith("_notmerged") }
-        def shadow_qual  = qual_ch .filter { id, _f -> id.endsWith("_notmerged") }
-        def shadow_stats = stats_ch.filter { id, _f -> id.endsWith("_notmerged") }
+        def shadow_fasta = part_A.out.fasta.filter { id, _f -> id.endsWith("_notmerged") }
+        def shadow_qual  = part_A.out.qual .filter { id, _f -> id.endsWith("_notmerged") }
+        def shadow_stats = part_A.out.stats.filter { id, _f -> id.endsWith("_notmerged") }
 
         // join the three streams on sample ID so the lists stay
         // aligned even when processes complete out of order.
@@ -1897,7 +1959,7 @@ workflow {
         def b_fasta = joined_b.map { _id, f, _q, _s -> f }.collect()
         def b_qual  = joined_b.map { _id, _f, q, _s -> q }.collect()
         def b_stats = joined_b.map { _id, _f, _q, s -> s }.collect()
-        part_b_processes(b_fasta, b_qual, b_stats)
+        part_B(b_fasta, b_qual, b_stats)
 
         def joined_shadow = shadow_fasta
             .join(shadow_qual)
@@ -1905,6 +1967,13 @@ workflow {
         def s_fasta = joined_shadow.map { _id, f, _q, _s -> f }.collect()
         def s_qual  = joined_shadow.map { _id, _f, q, _s -> q }.collect()
         def s_stats = joined_shadow.map { _id, _f, _q, s -> s }.collect()
-        part_b_shadow_processes(s_fasta, s_qual, s_stats)
+        part_B_shadow(s_fasta, s_qual, s_stats)
+
+        if ( params.reference_dataset ) {
+            def basename_ch = b_fasta.map { files ->
+                "${params.project_name}_${files.size()}_samples"
+            }
+            part_C(part_B.out.table, basename_ch)
+        }
     }
 }
