@@ -80,6 +80,8 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S51]`| Part C `update_occurrence_table` — splice taxonomy back onto the occurrence table   | `tests/processes/part_c/update_occurrence_table.nf.test` | done   | D04        |
 | `[S52]`| Part A normalises `U`/`u` to `T`/`t` in `filter_and_convert_to_fasta`                | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test` | done   | —          |
 | `[S53]`| Part B's `discover_fasta.py` rejects input fastas whose sequence lines contain `U`   | `tests/python/test_discover_fasta.py`            | done    | —          |
+| `[S54]`| every vsearch fastq-emitting module preserves the canonical 4-line layout            | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/strip_reads.nf.test`, `tests/processes/part_a/join_notmerged.nf.test` | done | — |
+| `[S55]`| every vsearch fasta-emitting module preserves the single-line-sequence layout        | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_b/global_dereplication.nf.test` | done | — |
 
 
 ## Per-process tests

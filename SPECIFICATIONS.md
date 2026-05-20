@@ -678,6 +678,36 @@ from placeholder values to real taxonomic assignments.
     `U` aborts before any Part B process runs, with stderr
     naming the offending file(s); a folder whose fastas use only
     `A`/`C`/`G`/`T`/`N` passes through unchanged.
+- `[S54]` every fastq emitted by a `vsearch`-based process keeps
+  the canonical 4-line layout (one record = `@header`, sequence,
+  `+`, quality on four consecutive lines). vsearch produces this
+  by default; the spec exists as a regression guard, since
+  `filter_and_convert_to_fasta`'s ``awk 'NR % 4 == 2'`` pre-pass
+  ([S52]) silently corrupts the wrong lines if any upstream
+  step ever starts folding the sequence onto multiple lines.
+  Every per-process nf-test of a vsearch fastq-emitting module
+  (`merge_fastq_pairs`, `strip_reads`, `join_notmerged`) asserts
+  the layout of each emitted fastq.
+  - **Pass when:** every non-empty fastq output of those processes
+    has a length divisible by 4 lines; lines (4k+1) start with
+    `@`, lines (4k+3) start with `+`, and lines (4k+2) and (4k+4)
+    have equal length for each record.
+- `[S55]` every fasta emitted by a `vsearch`-based process keeps
+  sequences on a single line (one record = `>header` + sequence on
+  two consecutive lines). This is enforced upstream by passing
+  `--fasta_width 0` to every fasta-emitting vsearch invocation and
+  is part of the Part A→B interface contract. The downstream
+  helpers `bin/cluster_cleaver.py` and
+  `bin/build_filtered_contingency_table.py` parse fasta
+  line-by-line and would silently truncate folded records, so the
+  contract is asserted by the per-process nf-tests of every
+  vsearch fasta-emitting module
+  (`filter_and_convert_to_fasta`, `dereplicate_fasta`,
+  `global_dereplication`).
+  - **Pass when:** every non-empty fasta output of those processes
+    has a length divisible by 2 lines, with even-indexed lines
+    starting with `>` and odd-indexed lines containing no `>`
+    character.
 
 
 ## Dependencies
