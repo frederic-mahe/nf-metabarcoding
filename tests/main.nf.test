@@ -30,6 +30,50 @@ nextflow_pipeline {
         }
     }
 
+    test("--help prints usage and exits without running any process") {
+        // COVERAGE: [S57]
+        tag "ci"
+        when {
+            params {
+                help = true
+                // deliberately no other params — --help must
+                // short-circuit before the mode-required asserts
+                // (`--fastq_folder`, `--forward_primer`, etc.) fire.
+            }
+        }
+        then {
+            assert workflow.success
+            def out = workflow.stdout.toString()
+
+            // header + all three entry-point flags appear in the
+            // usage block (their presence is what makes the help
+            // discoverable).
+            ["Usage:",
+             "--fastq_folder",
+             "--fasta_folder",
+             "--occurrence_table"].each { marker ->
+                assert out.contains(marker) :
+                    "--help output should contain '${marker}', got: ${out}"
+            }
+
+            // no process should run on --help — workflow.stdout
+            // lists every executed process, so an empty intersection
+            // with the process names confirms nothing fired.
+            ["merge_fastq_pairs",
+             "trim_primers",
+             "filter_and_convert_to_fasta",
+             "dereplicate_fasta",
+             "list_local_clusters",
+             "global_dereplication",
+             "global_clustering",
+             "discover_inputs",
+             "discover_part_b_fasta"].each { proc ->
+                assert !out.contains(proc) :
+                    "--help must not trigger ${proc}, got: ${out}"
+            }
+        }
+    }
+
     test("aborts when a required parameter is missing") {
         // COVERAGE: [S18]
         tag "ci"

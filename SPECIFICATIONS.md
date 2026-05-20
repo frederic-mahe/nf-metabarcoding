@@ -740,6 +740,21 @@ from placeholder values to real taxonomic assignments.
     `<project>_<M>_samples_notmerged_table.tsv` under
     `--results_folder`; the shadow representatives FASTA contains
     `N`s (not `U`s) on its sequence lines.
+- `[S57]` `nextflow run main.nf --help` (and the short form
+  `--help` set via config) prints a usage block to stdout and
+  exits cleanly without running any process. The usage block:
+  documents the three entry points (end-to-end Part A→B[→C],
+  Part B standalone via `--fasta_folder`, Part C standalone via
+  `--occurrence_table`); lists every `params.*` flag grouped by
+  the part that consumes it, with type and default; points to
+  `README.md` and `SPECIFICATIONS.md` for the behaviour contract.
+  The `--help` short-circuit fires before any parameter assertion
+  so users can discover the interface without first supplying a
+  mode-specific required flag.
+  - **Pass when:** running the workflow with only `--help` set
+    succeeds, stdout contains a `Usage:` line, references each of
+    `--fastq_folder`, `--fasta_folder`, and `--occurrence_table`,
+    and no process is executed.
 
 
 ## Dependencies

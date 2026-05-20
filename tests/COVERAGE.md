@@ -83,6 +83,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S54]`| every vsearch fastq-emitting module preserves the canonical 4-line layout            | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/strip_reads.nf.test`, `tests/processes/part_a/join_notmerged.nf.test` | done | — |
 | `[S55]`| every vsearch fasta-emitting module preserves the single-line-sequence layout        | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_b/global_dereplication.nf.test` | done | — |
 | `[S56]`| shadow Part B workflow — mask N→U before swarm, restore U→N in reps, publish `_notmerged` artefacts | `tests/processes/part_a/restore_ns_in_representatives.nf.test`, `tests/main.nf.test` | red | — |
+| `[S57]`| `--help` prints a usage block describing all modes/params and exits without running any process | `tests/main.nf.test` | done | — |
 
 
 ## Per-process tests

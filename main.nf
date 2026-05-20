@@ -1,5 +1,10 @@
 #!/usr/bin/env nextflow
 
+// [S57]: --help short-circuits the workflow before any required-param
+// assertion fires, so users can discover the interface without first
+// having to supply a mode-specific flag.
+params.help = false
+
 // optional (project defaults)
 params.fastq_pattern = "/*_1_{1,2}.fastq.gz"
 params.fastq_encoding = 33
@@ -46,6 +51,62 @@ params.occurrence_table  = null
 params.taxonomy_method   = 'stampa'
 params.iddef             = 1
 params.stampa_chunk_size = 1000
+
+
+def usage() {
+    // [S57]: usage block printed on --help. Group flags by the part
+    // that consumes them; the three entry-point flags up top double
+    // as mode selectors.
+    return """\
+nf-metabarcoding — swarm-based metabarcoding pipeline
+
+Usage:
+  nextflow run main.nf --fastq_folder PATH      [Part A → B [→ C]]
+  nextflow run main.nf --fasta_folder PATH      [Part B standalone]
+  nextflow run main.nf --occurrence_table PATH  [Part C standalone]
+
+Entry-point selection (set exactly one):
+  --fastq_folder PATH         input fastq directory (one or more,
+                              comma-separated); runs Part A and, when
+                              --project_name is also set, Part B
+  --fasta_folder PATH         per-sample .fas + .qual + .stats
+                              directory; runs Part B standalone
+  --occurrence_table PATH     Part B's <basename>_table.tsv; runs
+                              Part C standalone
+
+Part A — fastq → per-sample fasta:
+  --fastq_pattern GLOB        R1/R2 pair pattern (canonical patterns
+                              auto-detected; default: ${params.fastq_pattern})
+  --fastq_encoding INT        Phred offset, 33 or 64 (default: ${params.fastq_encoding})
+  --forward_primer SEQ        IUPAC forward primer (required unless --no_trimming)
+  --reverse_primer SEQ        IUPAC reverse primer (required unless --no_trimming)
+  --no_trimming               skip cutadapt primer trimming (default: ${params.no_trimming})
+  --stripright INT            3' nt trimmed in the shadow pipeline
+                              before R1/R2 are joined (default: ${params.stripright})
+
+Part B — per-sample fasta → occurrence table:
+  --project_name NAME         basename prefix for Part B output
+                              (required when Part B runs)
+  --results_folder PATH       where Part B publishes its artefacts
+                              (required when Part B runs)
+  --chimera_minsize INT       minimum abundance for vsearch
+                              --uchime_denovo (default: ${params.chimera_minsize})
+
+Part C — taxonomic assignment:
+  --reference_dataset PATH    reference fasta (.gz / .bz2 OK; required)
+  --taxonomy_method NAME      'stampa' (default) or 'sintax'
+  --iddef INT                 vsearch --iddef value (default: ${params.iddef})
+  --stampa_chunk_size INT     sequences per stampa scatter chunk;
+                              0 disables the split (default: ${params.stampa_chunk_size})
+
+Runtime:
+  --threads INT               threads per process (default: ${params.threads})
+  --help                      show this message and exit
+
+See README.md for examples and SPECIFICATIONS.md for the behaviour
+contract ([Sxx] IDs).
+""".stripIndent()
+}
 
 
 process merge_fastq_pairs {
@@ -1597,6 +1658,15 @@ workflow part_b {
 
 
 workflow {
+    // [S57]: --help short-circuits before any required-param assert.
+    // print() (not log.info) so the usage block lands on stdout —
+    // the conventional channel for help output and what nf-test
+    // captures in workflow.stdout.
+    if ( params.help ) {
+        print usage()
+        return
+    }
+
     // [S47]/[S48]: --occurrence_table switches the pipeline into
     // Part C standalone mode (Parts A and B do not run). The
     // mode also requires --reference_dataset and --results_folder.
