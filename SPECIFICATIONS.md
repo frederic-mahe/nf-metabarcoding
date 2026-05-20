@@ -646,6 +646,38 @@ from placeholder values to real taxonomic assignments.
     references columns overwritten; rows missing from the
     assignments pass through unchanged; the input `_table.tsv`
     is not modified.
+- `[S52]` Part A normalises every `U`/`u` in read sequences to
+  `T`/`t` before vsearch hashes the read into a SHA1-named fasta
+  record (`filter_and_convert_to_fasta`). Standard sequencing
+  platforms emit DNA reads, but neither vsearch nor cutadapt
+  converts `U` to `T`, so a stray `U` from an RNA-style input would
+  propagate untouched and later collide with the planned shadow
+  Part B masking scheme (which reserves `U` as the `N`-mask
+  character; swarm rejects `N` but silently accepts `U`).
+  Normalising once at the fastq→fasta boundary makes "no `U` in
+  Part A output sequences" a contract every downstream step can
+  rely on. Quality lines are left untouched (a Phred-33 quality
+  score of `U` is a valid printable ASCII byte, not a base).
+  - **Pass when:** feeding a fastq whose sequence lines contain
+    `U` and `u` to `filter_and_convert_to_fasta` produces a fasta
+    in which no sequence line contains `U` or `u`, with every
+    such position replaced by `T` / `t` respectively; header
+    lines and the rest of the workflow output are otherwise
+    unchanged.
+- `[S53]` Part B's fasta discovery (`discover_fasta.py`) rejects
+  any input `.fas` that contains `U` or `u` on a sequence line.
+  When Part A runs upstream, `[S52]` guarantees this can never
+  trigger; the assertion exists to defend the standalone
+  `--fasta_folder` entry point ([S27]), where the user supplies
+  fastas directly and may have skipped Part A's normalisation.
+  Aborting at discovery time avoids the silent-corruption risk
+  of mid-pipeline U→N round-trips. The error message lists every
+  offending file so users can fix the input set in one pass.
+  - **Pass when:** running Part B with `--fasta_folder` pointing
+    at a folder containing a `.fas` whose sequence lines contain
+    `U` aborts before any Part B process runs, with stderr
+    naming the offending file(s); a folder whose fastas use only
+    `A`/`C`/`G`/`T`/`N` passes through unchanged.
 
 
 ## Dependencies

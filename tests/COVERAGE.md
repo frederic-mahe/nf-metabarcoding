@@ -78,6 +78,8 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S49]`| Part C stampa primary path — splitFasta + per-chunk `vsearch --usearch_global` + `bin/stampa_merge.py` + `collectFile(sort:)` | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`, `tests/main.nf.test`, `tests/python/test_stampa_merge.py` | done | — |
 | `[S50]`| Part C sintax shadow path — `vsearch --sintax` against the same reference            | `tests/processes/part_c/assign_taxonomy_sintax.nf.test` | done    | —          |
 | `[S51]`| Part C `update_occurrence_table` — splice taxonomy back onto the occurrence table   | `tests/processes/part_c/update_occurrence_table.nf.test` | done   | D04        |
+| `[S52]`| Part A normalises `U`/`u` to `T`/`t` in `filter_and_convert_to_fasta`                | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test` | done   | —          |
+| `[S53]`| Part B's `discover_fasta.py` rejects input fastas whose sequence lines contain `U`   | `tests/python/test_discover_fasta.py`            | done    | —          |
 
 
 ## Per-process tests
