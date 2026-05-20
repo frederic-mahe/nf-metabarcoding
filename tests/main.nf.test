@@ -370,51 +370,53 @@ nextflow_pipeline {
             assert finalTable.text.split("\n", 2)[0].startsWith("OTU\ttotal") :
                 "unexpected header in final occurrence table"
 
+            // [S59]: every Part B intermediate (tables, .qual,
+            // .distr, swarm artefacts, etc.) is kept inside the
+            // work directory; only the whitelist (table + post-mumu
+            // fasta + six logs) reaches results_folder.
             ["${base}.OTU.filtered.cleaved.table",
              "${base}.OTU.filtered.cleaved.nosubstringOTUs.table",
              "${base}.OTU.filtered.cleaved.nosubstringOTUs_raw_mumu.table",
-             "${base}.OTU.filtered.cleaved.nosubstringOTUs.mumu.table"].each { intermediate ->
-                assert !file(intermediate).exists() :
-                    "intermediate table leaked into results folder: ${intermediate}"
-            }
-
-            // Non-table intermediates (.qual, .distr, .stats, swarm
-            // artefacts) remain published for debugging — the
-            // restriction in [S46] is on intermediate *tables* only.
-            ["${base}.qual",
+             "${base}.OTU.filtered.cleaved.nosubstringOTUs.mumu.table",
+             "${base}.qual",
              "${base}.distr",
              "${base}_per_sample_OTUs.stats",
              "${base}.fas",
              "${base}_1f.swarms",
              "${base}_1f.stats",
-             "${base}_1f_representatives.fas"].each { artefact ->
-                assert file(artefact).exists() :
-                    "missing Part B artefact: ${artefact}"
+             "${base}_1f.struct",
+             "${base}_1f_representatives.fas"].each { intermediate ->
+                assert !file(intermediate).exists() :
+                    "intermediate leaked into results folder: ${intermediate}"
             }
 
             // [S56]: S1_notmerged.{fas,qual,stats} feed the shadow
-            // Part B workflow (not the regular one), so the all-9
-            // SHA1 must not appear in the regular global fasta.
-            def globalFasta = file("${base}.fas").text
-            assert !globalFasta.contains("9999999999") :
-                "_notmerged sample leaked into the regular Part B fasta channel"
+            // Part B workflow (not the regular one). The
+            // dereplicated regular global fasta is no longer
+            // published ([S59]), so we check the regular
+            // _table.tsv instead — the all-9 SHA1 of the shadow
+            // sample must not appear in any row.
+            def regularTable = file("${base}_table.tsv").text
+            assert !regularTable.contains("9999999999") :
+                "_notmerged sample leaked into the regular Part B table"
 
-            // Shadow Part B publishes its own artefacts with a
-            // _notmerged token in the basename.
+            // Shadow Part B publishes its own table and post-mumu
+            // fasta with a _notmerged token in the basename.
             def shadow_base = "${resultDir}/myproj_1_samples_notmerged"
-            assert file("${shadow_base}.fas").exists() :
-                "shadow Part B global fasta should exist"
             assert file("${shadow_base}_table.tsv").exists() :
                 "shadow Part B occurrence table should exist"
-            assert file("${shadow_base}_1f_representatives.fas").exists() :
-                "shadow Part B representatives FASTA should exist"
+            assert file("${shadow_base}_table.fas").exists() :
+                "shadow Part B post-mumu fasta should exist"
 
-            // [S56]: published shadow representatives carry Ns
-            // (not Us) on their sequence lines.
-            def shadowReps = file("${shadow_base}_1f_representatives.fas").readLines()
-            for (int i = 1; i < shadowReps.size(); i += 2) {
-                assert !shadowReps[i].contains("U") :
-                    "U leaked into shadow standalone reps line ${i}: ${shadowReps[i]}"
+            // [S56]: published shadow sequences carry Ns (not Us).
+            // The pre-mumu representatives FASTA is no longer
+            // published ([S59]); the post-mumu _table.fas inherits
+            // the same sequences (column 10 of _table.tsv) and is
+            // checked here instead.
+            def shadowFasta = file("${shadow_base}_table.fas").readLines()
+            for (int i = 1; i < shadowFasta.size(); i += 2) {
+                assert !shadowFasta[i].contains("U") :
+                    "U leaked into shadow standalone fasta line ${i}: ${shadowFasta[i]}"
             }
         }
     }
@@ -442,17 +444,18 @@ nextflow_pipeline {
             // Part A's regular sample → Part B with N=1 (the
             // _notmerged shadow sample is dropped from the Part B
             // channel).
+            //
+            // [S59]: assert the published whitelist (table + post-
+            // mumu fasta + six step logs).
             def base = "${resultDir}/e2e_1_samples"
-            ["${base}.qual",
-             "${base}.distr",
-             "${base}_per_sample_OTUs.stats",
-             "${base}.fas",
+            ["${base}_table.tsv",
+             "${base}_table.fas",
              "${base}_dereplication.log",
-             "${base}_1f.swarms",
-             "${base}_1f.stats",
-             "${base}_1f_representatives.fas",
              "${base}_clustering.log",
-             "${base}_table.tsv"].each { artefact ->
+             "${base}_chimera_detection.log",
+             "${base}_cleaving.log",
+             "${base}_superstring_clustering.log",
+             "${base}_post_clustering_curation.log"].each { artefact ->
                 assert file(artefact).exists() :
                     "missing Part B artefact: ${artefact}"
             }
@@ -484,21 +487,24 @@ nextflow_pipeline {
             def regular_base = "${outputDir}/shadow_e2e_results/shadow_e2e_1_samples"
             def shadow_base  = "${regular_base}_notmerged"
 
-            assert file("${regular_base}.fas").exists() :
-                "regular Part B fasta should exist"
-            assert file("${shadow_base}.fas").exists() :
-                "shadow Part B fasta should exist (${shadow_base}.fas)"
+            // [S59]: regular path publishes its table; shadow path
+            // publishes table + post-mumu fasta.
+            assert file("${regular_base}_table.tsv").exists() :
+                "regular Part B occurrence table should exist"
             assert file("${shadow_base}_table.tsv").exists() :
                 "shadow Part B occurrence table should exist"
-            assert file("${shadow_base}_1f_representatives.fas").exists() :
-                "shadow Part B representatives FASTA should exist"
+            assert file("${shadow_base}_table.fas").exists() :
+                "shadow Part B post-mumu fasta should exist (${shadow_base}_table.fas)"
 
-            // [S56] guarantees the published representatives carry
-            // Ns (not Us) on their sequence lines.
-            def repLines = file("${shadow_base}_1f_representatives.fas").readLines()
-            for (int i = 1; i < repLines.size(); i += 2) {
-                assert !repLines[i].contains("U") :
-                    "U leaked into shadow representatives line ${i}: ${repLines[i]}"
+            // [S56] guarantees the published sequences carry Ns
+            // (not Us). The pre-mumu _1f_representatives.fas is no
+            // longer published ([S59]); the post-mumu _table.fas
+            // carries the same sequences (col 10 of _table.tsv) and
+            // is checked here instead.
+            def fastaLines = file("${shadow_base}_table.fas").readLines()
+            for (int i = 1; i < fastaLines.size(); i += 2) {
+                assert !fastaLines[i].contains("U") :
+                    "U leaked into shadow post-mumu fasta line ${i}: ${fastaLines[i]}"
             }
 
             // The per-sample shadow .fas stays in fastq_folder (Part A's
@@ -508,6 +514,70 @@ nextflow_pipeline {
             )
             assert !perSampleInResults.exists() :
                 "per-sample shadow .fas must not be published into the Part B results folder"
+        }
+    }
+
+    test("Part B results folder holds only table + post-mumu fasta + step logs") {
+        // COVERAGE: [S59]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data/e2e_part_b/fail"
+                fastq_pattern  = ""
+                project_name   = "whitelist"
+                results_folder = "${outputDir}/whitelist_results"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def resultDir = "${outputDir}/whitelist_results"
+            def regular = "whitelist_1_samples"
+            def shadow  = "whitelist_1_samples_notmerged"
+            def stepLogs = [
+                "_dereplication.log",
+                "_clustering.log",
+                "_chimera_detection.log",
+                "_cleaving.log",
+                "_superstring_clustering.log",
+                "_post_clustering_curation.log",
+            ]
+            def expected = []
+            [regular, shadow].each { base ->
+                expected << "${base}_table.tsv"
+                expected << "${base}_table.fas"
+                stepLogs.each { suffix -> expected << "${base}${suffix}" }
+            }
+            def actual = file(resultDir).listFiles()*.name.toList().sort()
+            assert actual == expected.sort() :
+                "Part B results folder mismatch.\nexpected: ${expected.sort()}\nactual:   ${actual}"
+
+            // [S59] spell out the blacklist for the regular path so
+            // a regression that re-adds a publishDir surfaces with a
+            // descriptive failure rather than the generic set diff
+            // above.
+            ["${regular}.qual",
+             "${regular}.distr",
+             "${regular}_per_sample_OTUs.stats",
+             "${regular}.fas",
+             "${regular}_1f.swarms",
+             "${regular}_1f.stats",
+             "${regular}_1f.struct",
+             "${regular}_1f_representatives.fas",
+             "${regular}_1f_representatives.results",
+             "${regular}_1f_representatives.uchime",
+             "${regular}_1f_representatives.results2",
+             "${regular}_1f_representatives.uchime2",
+             "${regular}_1f.stats2",
+             "${regular}_1f.swarms2",
+             "${regular}_1f_representatives.fas2",
+             "${regular}.OTU.filtered.cleaved.nosubstringOTUs.fas",
+            ].each { forbidden ->
+                assert !file("${resultDir}/${forbidden}").exists() :
+                    "blacklisted Part B intermediate leaked: ${forbidden}"
+            }
         }
     }
 

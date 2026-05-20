@@ -85,6 +85,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S56]`| shadow Part B workflow — mask N→U before swarm, restore U→N in reps, publish `_notmerged` artefacts | `tests/processes/part_a/restore_ns_in_representatives.nf.test`, `tests/main.nf.test` | red | — |
 | `[S57]`| `--help` prints a usage block describing all modes/params and exits without running any process | `tests/main.nf.test` | done | — |
 | `[S58]`| `params.publish_mode` threads through every `publishDir` directive; invalid values abort at startup | `tests/main.nf.test` | done   | —          |
+| `[S59]`| Part B `--results_folder` whitelist: table + post-mumu fasta + six step logs only                  | `tests/main.nf.test`                            | done    | —          |
 
 
 ## Per-process tests

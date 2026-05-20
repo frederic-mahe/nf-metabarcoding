@@ -541,8 +541,9 @@ process build_expected_error_file {
     // by length / SHA1 / ee (see extract_expected_error_values), so
     // `sort --merge` is a straight k-way merge; uniq --check-chars=40
     // keeps the lowest-ee row per SHA1.
-    publishDir params.results_folder, mode: params.publish_mode,
-        enabled: params.results_folder != null
+    //
+    // [S59]: the .qual is an internal intermediate consumed by
+    // build_occurrence_table — not published.
 
     input:
     path quals
@@ -565,8 +566,9 @@ process build_distribution_file {
     // <sha1>\t<sampleId>\t<size>. The sample ID is derived from the
     // fasta basename so the channel can be built without an explicit
     // sample-ID side car.
-    publishDir params.results_folder, mode: params.publish_mode,
-        enabled: params.results_folder != null
+    //
+    // [S59]: the .distr is an internal intermediate consumed by
+    // build_occurrence_table — not published.
 
     input:
     path fastas
@@ -597,8 +599,9 @@ process list_all_cluster_seeds_of_size_greater_than_2 {
     // filtered to clusters > 2 reads by Part A's list_local_clusters)
     // into a single project-wide file. Each row is prefixed with the
     // sample ID derived from the .stats filename.
-    publishDir params.results_folder, mode: params.publish_mode,
-        enabled: params.results_folder != null
+    //
+    // [S59]: this aggregated per-sample-OTUs stats file is an
+    // internal intermediate consumed by cleaving — not published.
 
     input:
     path stats_files
@@ -623,7 +626,10 @@ process global_dereplication {
     // per-sample size annotations so vsearch sums abundances across
     // samples. The vsearch log lands at <basename>_dereplication.log
     // ([S45]).
-    publishDir params.results_folder, mode: params.publish_mode,
+    //
+    // [S59]: only the log reaches the results folder; the
+    // dereplicated .fas is an internal intermediate.
+    publishDir params.results_folder, mode: params.publish_mode, pattern: "*.log",
         enabled: params.results_folder != null
 
     input:
@@ -654,7 +660,11 @@ process global_clustering {
     // filenames carry the `_1f` suffix (resolution=1, --fastidious)
     // to mirror the bash-reference naming scheme. The swarm log
     // lands at <basename>_clustering.log ([S45]).
-    publishDir params.results_folder, mode: params.publish_mode,
+    //
+    // [S59]: only the log reaches the results folder; the
+    // .swarms / .stats / .struct / _representatives.fas are
+    // internal intermediates.
+    publishDir params.results_folder, mode: params.publish_mode, pattern: "*.log",
         enabled: params.results_folder != null
 
     input:
@@ -688,8 +698,9 @@ process fake_taxonomic_assignment {
     // [S33]: emit a placeholder TSV that the occurrence-table builder
     // can consume before Part C lands. Each row mirrors the stampa
     // output shape: <amplicon>\t<size>\t<identity>\t<taxonomy>\t<refs>.
-    publishDir params.results_folder, mode: params.publish_mode,
-        enabled: params.results_folder != null
+    //
+    // [S59]: placeholder taxonomy is an internal intermediate
+    // consumed by build_occurrence_table — not published.
 
     input:
     path representatives
@@ -717,12 +728,10 @@ process chimera_detection {
     // [S45] keeps this pre-cleave .log internal — the canonical
     // <basename>_chimera_detection.log is published by
     // chimera_detection_post_cleave and contains the concatenation of both
-    // runs' stderr. Restricting publishDir to the .uchime pattern
-    // excludes the .log from the results folder while keeping it
-    // as a process output for testability and for downstream log
-    // concatenation.
-    publishDir params.results_folder, mode: params.publish_mode, pattern: "*.uchime",
-        enabled: params.results_folder != null
+    // runs' stderr.
+    //
+    // [S59]: the .uchime hit table is an internal intermediate
+    // consumed by build_occurrence_table — not published.
 
     input:
     path representatives
@@ -752,8 +761,10 @@ process fake_taxonomic_assignment2 {
     // representatives (cleaving's third output, `*_1f_representatives.fas2`).
     // An empty fas2 (no clusters got cleaved) is a legitimate input
     // — the output is then an empty results2 file.
-    publishDir params.results_folder, mode: params.publish_mode,
-        enabled: params.results_folder != null
+    //
+    // [S59]: post-cleave placeholder taxonomy is an internal
+    // intermediate consumed by build_occurrence_table — not
+    // published.
 
     input:
     path cleaved_representatives
@@ -787,7 +798,11 @@ process chimera_detection_post_cleave {
     // chimera_detection followed by this post-cleave run). Each
     // fragment is preceded by a `=== <process_name> ===` section
     // header so the two runs remain distinguishable.
-    publishDir params.results_folder, mode: params.publish_mode,
+    //
+    // [S59]: only the log reaches the results folder; the .uchime2
+    // hit table is an internal intermediate consumed by
+    // build_occurrence_table.
+    publishDir params.results_folder, mode: params.publish_mode, pattern: "*.log",
         enabled: params.results_folder != null
 
     input:
@@ -897,7 +912,11 @@ process cleaving {
     // [S45]: bin/cluster_cleaver.py uses python's logging module to
     // emit INFO-level progress to stderr; the redirect captures that
     // as the canonical cleaving log.
-    publishDir params.results_folder, mode: params.publish_mode,
+    //
+    // [S59]: only the log reaches the results folder; the .stats2 /
+    // .swarms2 / _representatives.fas2 cleaver outputs are internal
+    // intermediates consumed by build_occurrence_table.
+    publishDir params.results_folder, mode: params.publish_mode, pattern: "*.log",
         enabled: params.results_folder != null
 
     input:
@@ -1035,8 +1054,11 @@ process extract_otu_fasta {
     // [S40]: emit a FASTA from an OTU table (every data row).
     // Header `<amplicon>;size=<total>;`; column 4 is the amplicon,
     // column 2 the total abundance, column 10 the sequence.
-    publishDir params.results_folder, mode: params.publish_mode,
-        enabled: params.results_folder != null
+    //
+    // [S59]: pre-mumu fasta is an internal intermediate consumed by
+    // find_similar_sequences (mumu match list) — not published.
+    // The post-mumu sibling `extract_mumu_fasta` produces the one
+    // FASTA that reaches the results folder.
 
     input:
     path table

@@ -774,6 +774,37 @@ from placeholder values to real taxonomic assignments.
     symbolic link (per `Files.isSymbolicLink`); an invalid value
     such as `--publish_mode bogus` aborts the workflow with an
     error mentioning `publish_mode`.
+- `[S59]` Part B's `--results_folder` holds a closed whitelist of
+  artefacts per regular / shadow run:
+    1. exactly one occurrence table: `<basename>_table.tsv` (from
+       [S46]);
+    2. exactly one FASTA: the post-mumu
+       `<basename>_table.fas` emitted by `extract_mumu_fasta`
+       (column 10 of the final table, header
+       `>amplicon;size=total;`);
+    3. the six canonical `[S45]` step logs:
+       `_dereplication.log`, `_clustering.log`,
+       `_chimera_detection.log`, `_cleaving.log`,
+       `_superstring_clustering.log`,
+       `_post_clustering_curation.log`.
+  All other Part B intermediates (`.qual`, `.distr`,
+  `_per_sample_OTUs.stats`, the global dereplicated `.fas`, the
+  swarm artefacts `.swarms` / `.stats` / `.struct` /
+  `_representatives.fas` and their cleaver siblings,
+  `.uchime` / `.uchime2`, `_representatives.results` /
+  `.results2`, the pre-mumu `.nosubstringOTUs.fas`) stay in the
+  Nextflow work directory and **must not** appear under
+  `--results_folder`. The shadow Part B path follows the same
+  contract with the `_notmerged` token in the basename.
+  - **Pass when:** an end-to-end run produces a results folder
+    whose file set matches `{<basename>_table.tsv,
+    <basename>_table.fas, <basename>_dereplication.log,
+    <basename>_clustering.log, <basename>_chimera_detection.log,
+    <basename>_cleaving.log,
+    <basename>_superstring_clustering.log,
+    <basename>_post_clustering_curation.log}` (plus the same set
+    with `_notmerged` if the shadow path fired); none of the
+    blacklisted intermediate filenames appear.
 
 
 ## Dependencies
