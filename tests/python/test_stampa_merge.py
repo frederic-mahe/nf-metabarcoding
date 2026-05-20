@@ -98,7 +98,10 @@ def test_parse_hits_malformed_hit_raises(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_emit_results_one_amplicon_one_hit(tmp_path: Path) -> None:
-    hits = _write(tmp_path, "hits", "amp1_10\t99.5\trefA Kingdom|Phylum|Class\n")
+    hits = _write(
+        tmp_path, "hits",
+        "amp1_10\t99.5\trefA Kingdom|Phylum|Class\n",
+    )
     buf = io.StringIO()
     emit_results(str(hits), buf)
     assert buf.getvalue() == (
