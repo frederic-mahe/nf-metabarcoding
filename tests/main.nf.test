@@ -760,6 +760,52 @@ nextflow_pipeline {
         }
     }
 
+    test("--publish_mode symlink threads through to publishDir directives") {
+        // COVERAGE: [S58]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                publish_mode   = "symlink"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            // [S58]: with publish_mode=symlink, the published per-step
+            // log should be a symbolic link (default 'link' would
+            // yield a regular file with nlink > 1).
+            def log = file("${projectDir}/tests/data/paired_merge_ok_merging.log")
+            assert log.exists() : "missing published log: ${log}"
+            assert java.nio.file.Files.isSymbolicLink(log.toPath()) :
+                "publish_mode=symlink should produce a symlink, got: ${log}"
+        }
+    }
+
+    test("--publish_mode rejects an unknown value before any process runs") {
+        // COVERAGE: [S58]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                publish_mode   = "bogus"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("publish_mode") :
+                "error should mention 'publish_mode', got: ${msg}"
+        }
+    }
+
     test("empty input samples travel through to the occurrence table") {
         // COVERAGE: [S09] — pending until empty-sample passthrough lands.
         // Tagged "pending" so CI (`nf-test test --tag '!pending'`) skips

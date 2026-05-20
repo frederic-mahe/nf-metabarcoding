@@ -5,6 +5,13 @@
 // having to supply a mode-specific flag.
 params.help = false
 
+// [S58]: publishDir mode applied to every publishDir directive in the
+// workflow. Default 'link' (fast hard link) preserves prior behaviour
+// on same-filesystem layouts; switch to 'copy' when --fastq_folder or
+// --results_folder is on a different filesystem than the work dir
+// (hard links cannot cross devices).
+params.publish_mode = 'link'
+
 // optional (project defaults)
 params.fastq_pattern = "/*_1_{1,2}.fastq.gz"
 params.fastq_encoding = 33
@@ -101,6 +108,10 @@ Part C — taxonomic assignment:
 
 Runtime:
   --threads INT               threads per process (default: ${params.threads})
+  --publish_mode MODE         publishDir mode: copy, copyNoFollow, link,
+                              move, rellink, symlink. Use 'copy' when the
+                              results folder is on a different filesystem
+                              than the work directory (default: ${params.publish_mode})
   --help                      show this message and exit
 
 See README.md for examples and SPECIFICATIONS.md for the behaviour
@@ -113,7 +124,7 @@ process merge_fastq_pairs {
     // --fastqout_notmerged_fwd/_rev capture reads that fail to merge;
     // they feed the shadow Part A pipeline ([S04]). Fwd and rev are
     // kept in sync by vsearch.
-    publishDir path: { params.fastq_folder }, mode: 'link', pattern: "*.log",
+    publishDir path: { params.fastq_folder }, mode: params.publish_mode, pattern: "*.log",
         enabled: params.fastq_folder != null
 
     input:
@@ -189,7 +200,7 @@ process join_notmerged {
     // they can be processed by the rest of Part A as a single fastq.
     // The sampleId already carries the `_notmerged` suffix, so the
     // published log lands at <sampleId>_notmerged_merging.log.
-    publishDir path: { params.fastq_folder }, mode: 'link', pattern: "*.log",
+    publishDir path: { params.fastq_folder }, mode: params.publish_mode, pattern: "*.log",
         enabled: params.fastq_folder != null
 
     input:
@@ -272,7 +283,7 @@ process trim_primers {
     // are in the same orientation. Matching leftmost is the default.
     // Length and N-count filtering are delegated to
     // filter_and_convert_to_fasta (vsearch --fastq_minlen / --fastq_maxns).
-    publishDir path: { params.fastq_folder }, mode: 'link', pattern: "*.log",
+    publishDir path: { params.fastq_folder }, mode: params.publish_mode, pattern: "*.log",
         enabled: params.fastq_folder != null
 
     input:
@@ -374,7 +385,7 @@ process filter_and_convert_to_fasta {
 process extract_expected_error_values {
     // extract ee for future quality filtering (keep the lowest
     // observed expected error value for each unique sequence)
-    publishDir params.fastq_folder, mode: 'link'
+    publishDir params.fastq_folder, mode: params.publish_mode
 
     input:
     val sampleId
@@ -396,7 +407,7 @@ process extract_expected_error_values {
 
 process dereplicate_fasta {
     // dereplicate and discard expected error values (ee)
-    publishDir params.fastq_folder, mode: 'link'
+    publishDir params.fastq_folder, mode: params.publish_mode
 
     input:
     val sampleId
@@ -430,7 +441,7 @@ process dereplicate_fasta {
 process list_local_clusters {
     // retain only clusters with more than 2 reads
     // (do not use the fastidious option here)
-    publishDir params.fastq_folder, mode: 'link'
+    publishDir params.fastq_folder, mode: params.publish_mode
 
     input:
     val sampleId
@@ -530,7 +541,7 @@ process build_expected_error_file {
     // by length / SHA1 / ee (see extract_expected_error_values), so
     // `sort --merge` is a straight k-way merge; uniq --check-chars=40
     // keeps the lowest-ee row per SHA1.
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -554,7 +565,7 @@ process build_distribution_file {
     // <sha1>\t<sampleId>\t<size>. The sample ID is derived from the
     // fasta basename so the channel can be built without an explicit
     // sample-ID side car.
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -586,7 +597,7 @@ process list_all_cluster_seeds_of_size_greater_than_2 {
     // filtered to clusters > 2 reads by Part A's list_local_clusters)
     // into a single project-wide file. Each row is prefixed with the
     // sample ID derived from the .stats filename.
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -612,7 +623,7 @@ process global_dereplication {
     // per-sample size annotations so vsearch sums abundances across
     // samples. The vsearch log lands at <basename>_dereplication.log
     // ([S45]).
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -643,7 +654,7 @@ process global_clustering {
     // filenames carry the `_1f` suffix (resolution=1, --fastidious)
     // to mirror the bash-reference naming scheme. The swarm log
     // lands at <basename>_clustering.log ([S45]).
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -677,7 +688,7 @@ process fake_taxonomic_assignment {
     // [S33]: emit a placeholder TSV that the occurrence-table builder
     // can consume before Part C lands. Each row mirrors the stampa
     // output shape: <amplicon>\t<size>\t<identity>\t<taxonomy>\t<refs>.
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -710,7 +721,7 @@ process chimera_detection {
     // excludes the .log from the results folder while keeping it
     // as a process output for testability and for downstream log
     // concatenation.
-    publishDir params.results_folder, mode: 'link', pattern: "*.uchime",
+    publishDir params.results_folder, mode: params.publish_mode, pattern: "*.uchime",
         enabled: params.results_folder != null
 
     input:
@@ -741,7 +752,7 @@ process fake_taxonomic_assignment2 {
     // representatives (cleaving's third output, `*_1f_representatives.fas2`).
     // An empty fas2 (no clusters got cleaved) is a legitimate input
     // — the output is then an empty results2 file.
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -776,7 +787,7 @@ process chimera_detection_post_cleave {
     // chimera_detection followed by this post-cleave run). Each
     // fragment is preceded by a `=== <process_name> ===` section
     // header so the two runs remain distinguishable.
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -886,7 +897,7 @@ process cleaving {
     // [S45]: bin/cluster_cleaver.py uses python's logging module to
     // emit INFO-level progress to stderr; the redirect captures that
     // as the canonical cleaving log.
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -966,7 +977,7 @@ process merge_substring_otus {
     // step's stderr to produce the combined
     // <basename>_superstring_clustering.log. The merged OTU table
     // itself is **not** published ([S46]).
-    publishDir path: { params.results_folder }, mode: 'link',
+    publishDir path: { params.results_folder }, mode: params.publish_mode,
         pattern: "*_superstring_clustering.log",
         enabled: params.results_folder != null
 
@@ -1024,7 +1035,7 @@ process extract_otu_fasta {
     // [S40]: emit a FASTA from an OTU table (every data row).
     // Header `<amplicon>;size=<total>;`; column 4 is the amplicon,
     // column 2 the total abundance, column 10 the sequence.
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -1047,7 +1058,7 @@ process extract_mumu_fasta {
     // size=0 → 1 awk hotfix in `rebuild_post_mumu_table` ([S44]) no
     // row carries `$2 == 0` anymore, so the filter is a no-op
     // safety net retained for byte parity with the legacy bash.
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -1120,7 +1131,7 @@ process run_mumu {
     // [S45]: the mumu --log output is the canonical post-clustering
     // curation log. The intermediate _raw_mumu.table is **not**
     // published ([S46]); the publishDir pattern keeps the log only.
-    publishDir path: { params.results_folder }, mode: 'link', pattern: "*.log",
+    publishDir path: { params.results_folder }, mode: params.publish_mode, pattern: "*.log",
         enabled: params.results_folder != null
 
     input:
@@ -1152,7 +1163,7 @@ process rebuild_post_mumu_table {
     //
     // [S46]: emits the final occurrence table as
     // <basename>_table.tsv.
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -1437,7 +1448,7 @@ process assign_taxonomy_sintax {
     // that strips ;size= annotations and renames the bootstrap
     // confidences into the references column. Pin the exact shape
     // once D04 lands.
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -1478,7 +1489,7 @@ process update_occurrence_table {
     // <basename>_table.tsv. The output is published as a sibling
     // file `<basename>_table_assigned.tsv` so Part B's unannotated
     // table is preserved alongside the annotated one (D04 sub-q2).
-    publishDir params.results_folder, mode: 'link',
+    publishDir params.results_folder, mode: params.publish_mode,
         enabled: params.results_folder != null
 
     input:
@@ -1666,6 +1677,13 @@ workflow {
         print usage()
         return
     }
+
+    // [S58]: validate --publish_mode before any process is wired so a
+    // typo aborts the run immediately with a clear message instead of
+    // failing on the first PublishDir attempt.
+    def allowed_modes = ['copy', 'copyNoFollow', 'link', 'move', 'rellink', 'symlink']
+    assert params.publish_mode in allowed_modes :
+        "--publish_mode must be one of ${allowed_modes}, got '${params.publish_mode}'"
 
     // [S47]/[S48]: --occurrence_table switches the pipeline into
     // Part C standalone mode (Parts A and B do not run). The

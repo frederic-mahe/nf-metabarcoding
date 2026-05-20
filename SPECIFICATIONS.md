@@ -755,6 +755,25 @@ from placeholder values to real taxonomic assignments.
     succeeds, stdout contains a `Usage:` line, references each of
     `--fastq_folder`, `--fasta_folder`, and `--occurrence_table`,
     and no process is executed.
+- `[S58]` `params.publish_mode` is the publishDir mode used by every
+  `publishDir` directive in the workflow. Default `'link'` (hard
+  link) preserves the prior fast-publish behaviour on
+  same-filesystem layouts; users whose results folder is on a
+  different filesystem than the work directory must override it to
+  `'copy'` (or another non-link mode) because hard links cannot
+  cross devices. Allowed values: `'copy'`, `'copyNoFollow'`,
+  `'link'`, `'move'`, `'rellink'`, `'symlink'` (the set Nextflow
+  accepts on `publishDir mode:`). The value is validated at workflow
+  startup; an unknown mode aborts with a clear message before any
+  process runs. Note: `'symlink'` and `'rellink'` produce links that
+  point into the work directory and break when `cleanup = true`
+  removes work files; `'link'`, `'copy'`, `'copyNoFollow'`, and
+  `'move'` are safe under cleanup.
+  - **Pass when:** an end-to-end Part A run with
+    `--publish_mode symlink` publishes a `*_merging.log` that is a
+    symbolic link (per `Files.isSymbolicLink`); an invalid value
+    such as `--publish_mode bogus` aborts the workflow with an
+    error mentioning `publish_mode`.
 
 
 ## Dependencies

@@ -84,6 +84,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S55]`| every vsearch fasta-emitting module preserves the single-line-sequence layout        | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_b/global_dereplication.nf.test` | done | — |
 | `[S56]`| shadow Part B workflow — mask N→U before swarm, restore U→N in reps, publish `_notmerged` artefacts | `tests/processes/part_a/restore_ns_in_representatives.nf.test`, `tests/main.nf.test` | red | — |
 | `[S57]`| `--help` prints a usage block describing all modes/params and exits without running any process | `tests/main.nf.test` | done | — |
+| `[S58]`| `params.publish_mode` threads through every `publishDir` directive; invalid values abort at startup | `tests/main.nf.test` | done   | —          |
 
 
 ## Per-process tests
