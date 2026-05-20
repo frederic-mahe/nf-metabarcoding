@@ -254,12 +254,17 @@ nextflow_pipeline {
             def folder = "${projectDir}/tests/data"
             def shadowId = "paired_merge_fail_notmerged"
 
-            // per-step shadow logs land alongside the regular ones
-            ["merging", "trimming", "dereplicating", "clustering"].each { step ->
+            // [S04]: shadow path has no merging step (the reads in
+            // this branch could not be merged, by definition); the
+            // remaining three per-step logs land alongside the
+            // regular ones.
+            ["trimming", "dereplicating", "clustering"].each { step ->
                 def log = file("${folder}/${shadowId}_${step}.log")
                 assert log.exists()   : "missing shadow ${step} log: ${log}"
                 assert log.size() > 0 : "empty shadow ${step} log: ${log}"
             }
+            assert !file("${folder}/${shadowId}_merging.log").exists() :
+                "shadow path must not publish a _merging.log"
 
             // shadow .fas exists and retains the 8-N join padding
             def fas = file("${folder}/${shadowId}.fas")

@@ -85,8 +85,11 @@ nextflow_process {
         }
     }
 
-    test("emits a per-sample <sampleId>_merging.log for the shadow path") {
+    test("does not emit a merging log for the shadow path") {
         // COVERAGE: [S04], [S19]
+        // The shadow path performs an N-padded join, not a merge,
+        // so a `_merging.log` would be misleading. The process must
+        // expose only the sampleId and joined fastq output channels.
         tag "ci"
         when {
             process {
@@ -99,11 +102,11 @@ nextflow_process {
         }
         then {
             assert process.success
-            def logPath = process.out[2].get(0)
-            assert logPath.endsWith("sample_fail_notmerged_merging.log") :
-                "unexpected log path: ${logPath}"
-            assert path(logPath).readLines().size() > 0 :
-                "expected non-empty merging log"
+            // Exactly two output channels: sampleId + joined fastq.
+            // A third output (the legacy _merging.log) would be a
+            // regression.
+            assert process.out.size() == 2 :
+                "join_notmerged must expose only sampleId + joined fastq, got ${process.out.size()} channels"
         }
     }
 }

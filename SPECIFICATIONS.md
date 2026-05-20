@@ -51,7 +51,12 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
   and `--fastqout_notmerged_rev` (reads stay in sync) and routed
   through a parallel **shadow** Part A pipeline:
     1. join R1/R2 with `vsearch --fastq_join` (8-N padding — the
-       tool default);
+       tool default). The shadow path has no merging step (by
+       definition the reads in this branch could not be merged) and
+       therefore **no `_merging.log`** is published for shadow
+       samples — only the per-step logs from later stages
+       (trimming, dereplicating, clustering) appear under
+       `<sampleId>_notmerged_*.log`;
     2. trim primers (when `--no_trimming` is false) and convert to
        fasta with `vsearch --fastq_filter --fastq_maxns 8` so the
        join-padding `N`s survive the filter;
@@ -69,13 +74,16 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
        `.fas` IDs.
   - shadow-pipeline sample IDs are `<sampleId>_notmerged`; published
     artefacts are `<sampleId>_notmerged.{fas,qual,stats}` plus the
-    same per-step logs as the normal pipeline with the `_notmerged`
-    prefix (`<sampleId>_notmerged_{merging,trimming,dereplicating,clustering}.log`).
+    per-step logs from the stages that actually run in the shadow
+    path (`<sampleId>_notmerged_{trimming,dereplicating,clustering}.log`).
+    No `<sampleId>_notmerged_merging.log` is produced — see step 1
+    above.
   - **Pass when:** running Part A on a paired-end fixture whose reads
     cannot overlap produces non-empty `<sampleId>_notmerged.{fas,qual,stats}`
     in `params.fastq_folder`, the published `.fas` contains the 8-`N`
-    join padding, and every `_notmerged_<step>.log` from `[S19]` is
-    present and non-empty.
+    join padding, the trimming / dereplicating / clustering shadow
+    logs are present and non-empty, and no
+    `<sampleId>_notmerged_merging.log` exists.
 - `[S05]` unmerged-pair clusters appear in the occurrence table with a
   per-sample marker (working name: `sampleID_partial`)
   - **Blocked by:** [`DECISIONS.md`](DECISIONS.md) — final marker name
@@ -202,7 +210,8 @@ isolation.
     - data files: `<sampleId>.fas`, `<sampleId>.qual`,
       `<sampleId>.stats`
     - per-step log files:
-        - merging       → `<sampleId>_merging.log`
+        - merging       → `<sampleId>_merging.log` (regular path
+          only — the shadow path has no merging step, see `[S04]`)
         - trimming      → `<sampleId>_trimming.log` (only when the
           trimming step runs — see `[S20]`)
         - dereplicating → `<sampleId>_dereplicating.log`

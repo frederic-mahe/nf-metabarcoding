@@ -198,10 +198,13 @@ process join_notmerged {
     // Shadow pipeline ([S04]) entry point: concatenate fwd/rev reads
     // that failed --fastq_mergepairs with the default 8-N padding so
     // they can be processed by the rest of Part A as a single fastq.
-    // The sampleId already carries the `_notmerged` suffix, so the
-    // published log lands at <sampleId>_notmerged_merging.log.
-    publishDir path: { params.fastq_folder }, mode: params.publish_mode, pattern: "*.log",
-        enabled: params.fastq_folder != null
+    //
+    // [S04]: the shadow path has no merging step — by definition the
+    // reads in this branch could not be merged — so no `_merging.log`
+    // is produced or published. vsearch is invoked without --log; the
+    // three remaining shadow per-step logs (trimming / dereplicating
+    // / clustering) reach `params.fastq_folder` through the regular
+    // downstream processes.
 
     input:
     val sampleId
@@ -211,7 +214,6 @@ process join_notmerged {
     output:
     val sampleId
     path "joined_fastq"
-    path "${sampleId}_merging.log"
 
     shell:
     '''
@@ -222,7 +224,6 @@ process join_notmerged {
         --reverse !{notmerged_rev} \
         --fastq_ascii !{params.fastq_encoding} \
         --quiet \
-        --log !{sampleId}_merging.log \
         --fastqout joined_fastq
     '''
 }
