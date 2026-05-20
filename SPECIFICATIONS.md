@@ -723,7 +723,7 @@ from placeholder values to real taxonomic assignments.
     starting with `>` and odd-indexed lines containing no `>`
     character.
 - `[S56]` shadow Part B is a separate workflow
-  (`part_b_shadow_processes`) called alongside `part_b_processes`
+  (`part_B_shadow`) called alongside `part_B`
   from both the end-to-end (`--project_name`) and the standalone
   (`--fasta_folder`) entry points. It runs the same processes as
   the regular Part B with two differences:

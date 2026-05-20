@@ -227,7 +227,7 @@ emit_part_b_fixtures() {
         printf '>%s;size=4\n%s\n' "${sha_c}" "${seq_c}"
     } > "${dir}/S2.fas"
     # Shadow-pipeline sample ([S04]/[S56]) — fed into the shadow
-    # Part B workflow `part_b_shadow_processes`. The sequence is
+    # Part B workflow `part_B_shadow`. The sequence is
     # 8 Ns embedded in ACGT padding so mask_ns_for_swarm has Ns to
     # rewrite (N→U) and restore_ns_in_representatives has Us to
     # rewrite back (U→N). A second clean record gives swarm
