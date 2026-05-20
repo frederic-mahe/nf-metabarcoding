@@ -57,8 +57,13 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
        join-padding `N`s survive the filter;
     3. dereplicate and extract ee values per the normal pipeline; the
        published `.fas` retains the `N`s;
-    4. replace every `N` with `A` **inline** just before swarm (swarm
-       rejects `N`s). The masked fasta is **not** published; only
+    4. replace every `N` with `U` **inline** just before swarm (swarm
+       rejects `N`s but silently accepts `U` as if it were `T`).
+       Using `U` rather than `A` makes the substitution losslessly
+       reversible — `U` cannot appear naturally in our sequences
+       ([S52]), so a literal `U`→`N` pass on the swarm output (see
+       [S56]) restores the padding without risk of corrupting any
+       natural motif. The masked fasta is **not** published; only
        sequence lines are rewritten so SHA1 headers (computed in step
        2) are unchanged and the published `.stats` IDs match the
        `.fas` IDs.
@@ -708,6 +713,33 @@ from placeholder values to real taxonomic assignments.
     has a length divisible by 2 lines, with even-indexed lines
     starting with `>` and odd-indexed lines containing no `>`
     character.
+- `[S56]` shadow Part B is a separate workflow
+  (`part_b_shadow_processes`) called alongside `part_b_processes`
+  from both the end-to-end (`--project_name`) and the standalone
+  (`--fasta_folder`) entry points. It runs the same processes as
+  the regular Part B with two differences:
+    1. `mask_ns_for_swarm` ([S04]) runs on the globally-dereplicated
+       fasta before `global_clustering`, rewriting `N`→`U` on
+       sequence lines only. The masked fasta is transient
+       (not published);
+    2. immediately after `global_clustering`, a sibling process
+       `restore_ns_in_representatives` rewrites `U`→`N` on sequence
+       lines of `<basename>_notmerged_1f_representatives.fas`,
+       restoring the join padding. All downstream Part B steps
+       consume the restored (N-containing) representatives.
+  The shadow basename is `<project_name>_<N>_samples_notmerged`,
+  so every published artefact carries the `_notmerged` token (e.g.
+  `<basename>_notmerged_table.tsv`,
+  `<basename>_notmerged_1f.swarms`). The shadow path consumes the
+  Part A shadow outputs (`<sampleId>_notmerged.{fas,qual,stats}`,
+  see [S04]); when no shadow samples are present (no fastq pair
+  failed to merge), the shadow workflow is not invoked.
+  - **Pass when:** an end-to-end run on a paired-end fixture that
+    produces at least one `_notmerged` sample publishes both the
+    regular `<project>_<N>_samples_table.tsv` and the shadow
+    `<project>_<M>_samples_notmerged_table.tsv` under
+    `--results_folder`; the shadow representatives FASTA contains
+    `N`s (not `U`s) on its sequence lines.
 
 
 ## Dependencies

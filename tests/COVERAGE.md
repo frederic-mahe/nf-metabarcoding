@@ -82,6 +82,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S53]`| Part B's `discover_fasta.py` rejects input fastas whose sequence lines contain `U`   | `tests/python/test_discover_fasta.py`            | done    | —          |
 | `[S54]`| every vsearch fastq-emitting module preserves the canonical 4-line layout            | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/strip_reads.nf.test`, `tests/processes/part_a/join_notmerged.nf.test` | done | — |
 | `[S55]`| every vsearch fasta-emitting module preserves the single-line-sequence layout        | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_b/global_dereplication.nf.test` | done | — |
+| `[S56]`| shadow Part B workflow — mask N→U before swarm, restore U→N in reps, publish `_notmerged` artefacts | `tests/processes/part_a/restore_ns_in_representatives.nf.test`, `tests/main.nf.test` | red | — |
 
 
 ## Per-process tests
@@ -96,6 +97,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `list_local_clusters`           | `tests/processes/part_a/list_local_clusters.nf.test`          | S17          | red    |
 | `join_notmerged`                | `tests/processes/part_a/join_notmerged.nf.test`               | S04, S19     | red    |
 | `mask_ns_for_swarm`             | `tests/processes/part_a/mask_ns_for_swarm.nf.test`            | S04          | red    |
+| `restore_ns_in_representatives` | `tests/processes/part_a/restore_ns_in_representatives.nf.test`| S56          | done   |
 | `strip_reads`                   | `tests/processes/part_a/strip_reads.nf.test`                  | S24          | red    |
 | `build_expected_error_file`     | `tests/processes/part_b/build_expected_error_file.nf.test`    | S28          | red    |
 | `build_distribution_file`       | `tests/processes/part_b/build_distribution_file.nf.test`      | S29          | red    |
