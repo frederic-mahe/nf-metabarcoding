@@ -52,6 +52,39 @@ nextflow_process {
         }
     }
 
+    test("emits canonical 4-line fastq from vsearch --fastq_join") {
+        // COVERAGE: [S54]
+        // Regression guard for the vsearch --fastq_join output shape
+        // (see [S54] rationale).
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = merge_fastq_pairs.out[0].map { it + '_notmerged' }
+                input[1] = merge_fastq_pairs.out[3]
+                input[2] = merge_fastq_pairs.out[4]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[1].get(0)).readLines()
+            if (lines.size() == 0) {
+                return
+            }
+            assert lines.size() % 4 == 0 :
+                "fastq must be a multiple of 4 lines, got ${lines.size()}"
+            for (int i = 0; i < lines.size(); i += 4) {
+                assert lines[i].startsWith("@") :
+                    "line ${i+1} must start with '@', got: ${lines[i]}"
+                assert lines[i + 2].startsWith("+") :
+                    "line ${i+3} must start with '+', got: ${lines[i + 2]}"
+                assert lines[i + 1].length() == lines[i + 3].length() :
+                    "record ${i/4}: sequence/quality length mismatch"
+            }
+        }
+    }
+
     test("emits a per-sample <sampleId>_merging.log for the shadow path") {
         // COVERAGE: [S04], [S19]
         tag "ci"
