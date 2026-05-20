@@ -53,4 +53,53 @@ nextflow_process {
             // TODO: assert fasta_width=0 (sequences on a single line)
         }
     }
+
+    test("normalises U/u to T/t on sequence lines (no U survives)") {
+        // COVERAGE: [S52]
+        tag "ci"
+        when {
+            params {
+                // setup{} runs trim_primers for every test in the
+                // file; give it the same primers as the first test
+                // so it succeeds, even though this test feeds the
+                // process under test directly from a fixture and
+                // does not consume trim_primers.out.
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+            }
+            process {
+                """
+                input[0] = "u_sample"
+                input[1] = file("\${projectDir}/tests/data/u_containing.fastq")
+                input[2] = 0
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[1].get(0)).readLines()
+
+            // Two records survive (length 40 > MIN_LENGTH=32).
+            assert lines.size() == 4 :
+                "expected 4 lines (2 records), got ${lines.size()}"
+
+            // No 'U' or 'u' may appear anywhere in the output —
+            // sequence lines must have been rewritten before vsearch
+            // hashed and emitted them.
+            lines.each { line ->
+                assert !line.contains("U") :
+                    "literal 'U' survived to fasta: ${line}"
+                assert !line.contains("u") :
+                    "literal 'u' survived to fasta: ${line}"
+            }
+
+            // Sequence content should be the input with every U->T
+            // and u->t (case preserved). vsearch may pad headers with
+            // metadata, so we only check the sequence lines.
+            assert lines[1] == "ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT" :
+                "uppercase input not normalised correctly: ${lines[1]}"
+            assert lines[3] == "acgtacgtacgtacgtacgtacgtacgtacgtacgtacgt" :
+                "lowercase input not normalised correctly: ${lines[3]}"
+        }
+    }
 }

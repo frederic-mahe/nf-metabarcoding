@@ -233,6 +233,12 @@ process filter_and_convert_to_fasta {
     // max_n is a caller-supplied input so the same process can serve
     // merged reads (max_n=0) and the [S04] unmerged-pair path (max_n
     // = size of the N-join insert).
+    //
+    // [S52]: sequence lines are passed through awk to map U->T (and
+    // u->t) before vsearch hashes them, so the Part A output contract
+    // is "no U on sequence lines". Quality lines (every fourth line)
+    // are left untouched because the printable ASCII byte 'U' is a
+    // valid Phred-33 quality score (Q52).
     input:
     val sampleId
     path trimmed_fastq
@@ -248,8 +254,21 @@ process filter_and_convert_to_fasta {
 
     readonly MIN_LENGTH=32
 
+    # Decompress (when needed) so the awk pre-pass sees plain fastq.
+    # vsearch normally auto-detects gzip/bz2 on its input file, but we
+    # feed it via stdin (`--fastq_filter -`) so it can't peek-rewind.
+    # The --no_trimming path ([S20]) is the only branch where the file
+    # may still be compressed; trim_primers always emits plain fastq.
+    case "!{trimmed_fastq}" in
+        *.gz)  reader=(zcat)  ;;
+        *.bz2) reader=(bzcat) ;;
+        *)     reader=(cat)   ;;
+    esac
+
+    "${reader[@]}" !{trimmed_fastq} | \
+    awk 'NR % 4 == 2 { gsub(/U/, "T"); gsub(/u/, "t") } { print }' | \
     vsearch \
-        --fastq_filter !{trimmed_fastq} \
+        --fastq_filter - \
         --fastq_minlen "${MIN_LENGTH}" \
         --fastq_maxns !{max_n} \
         --relabel_sha1 \

@@ -295,6 +295,22 @@ ACGTACGT
 FASTA
 }
 
+emit_u_containing_fastq() {
+    # [S52] — fixture for `filter_and_convert_to_fasta`'s U→T
+    # normalisation. Two records (length 40, above the
+    # MIN_LENGTH=32 cut-off): the first uses uppercase `U`, the
+    # second uses lowercase `u`, so the test can pin both
+    # branches of the case-preserving strip. Quality string is
+    # Phred-40 ('I' x 40) — the literal 'U' / 'u' must NOT appear
+    # on the sequence line of the resulting fasta.
+    local qual
+    qual="$(qual_string 40)"
+    {
+        printf '@u_upper\nACGUACGUACGUACGUACGUACGUACGUACGUACGUACGU\n+\n%s\n' "${qual}"
+        printf '@u_lower\nacguacguacguacguacguacguacguacguacguacgu\n+\n%s\n' "${qual}"
+    } > u_containing.fastq
+}
+
 emit_paired "paired_merge_ok"   "${AMPLICONS_OK[@]}"
 emit_paired "paired_merge_fail" "${AMPLICONS_LONG[@]}"
 emit_single
@@ -307,5 +323,6 @@ emit_duplicate_sample_ids
 emit_part_b_fixtures
 emit_e2e_part_b_fixture
 emit_n_containing_fasta
+emit_u_containing_fastq
 
 echo "Wrote fixtures to ${DATA_DIR}"
