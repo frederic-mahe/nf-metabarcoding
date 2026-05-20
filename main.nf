@@ -157,11 +157,16 @@ process join_notmerged {
 
 
 process mask_ns_for_swarm {
-    // Shadow pipeline ([S04]) only: swarm rejects Ns, so every N in
-    // sequence lines is rewritten to A just before clustering. Header
-    // lines are left untouched so the SHA1 IDs computed by
+    // Shadow pipeline ([S04]) only: swarm rejects N but silently
+    // accepts U (treated as T), so every N in sequence lines is
+    // rewritten to U just before clustering. Header lines are left
+    // untouched so the SHA1 IDs computed by
     // filter_and_convert_to_fasta stay consistent across .fas, .qual,
-    // and .stats. The masked fasta is intentionally NOT published.
+    // and .stats. U was chosen over A because U cannot appear in
+    // Part A output sequences ([S52]) — restore_ns_in_representatives
+    // ([S56]) can therefore do a literal U->N pass on swarm's
+    // representatives without ever colliding with a natural motif.
+    // The masked fasta is intentionally NOT published.
 
     input:
     val sampleId
@@ -173,7 +178,30 @@ process mask_ns_for_swarm {
 
     shell:
     '''
-    sed '/^>/!s/N/A/g' !{fasta} > masked_fasta
+    sed '/^>/!s/N/U/g' !{fasta} > masked_fasta
+    '''
+}
+
+
+process restore_ns_in_representatives {
+    // Shadow Part B ([S56]) only: inverse of mask_ns_for_swarm.
+    // Swarm's representatives carry the U-masked sequences; rewrite
+    // every sequence-line U back to N so downstream Part B steps
+    // (chimera detection, occurrence table, etc.) see the original
+    // join padding. Headers are left untouched. Safe because [S52]
+    // guarantees no natural U survives Part A normalisation.
+
+    input:
+    val basename
+    path masked_representatives
+
+    output:
+    val basename
+    path "restored_representatives"
+
+    shell:
+    '''
+    sed '/^>/!s/U/N/g' !{masked_representatives} > restored_representatives
     '''
 }
 
@@ -408,11 +436,16 @@ process discover_inputs {
 // processes can run in parallel — they do not depend on each other.
 
 process discover_part_b_fasta {
-    // [S27]: walk params.fasta_folder, drop *_notmerged.fas, assert
-    // unique sample IDs. Emits TSV `sample_id<TAB>fasta_path`.
+    // [S27]/[S56]: walk params.fasta_folder, assert unique sample IDs,
+    // and emit two TSVs:
+    //   - fastas.tsv         — regular samples (excludes *_notmerged.fas)
+    //   - shadow_fastas.tsv  — only *_notmerged.fas samples (shadow Part B)
+    // Each row is `sample_id<TAB>fasta_path`. Either file may be empty
+    // (e.g. shadow_fastas.tsv is empty when no _notmerged.fas exists).
 
     output:
     path "fastas.tsv"
+    path "shadow_fastas.tsv"
 
     script:
     def folders = (params.fasta_folder instanceof List)
@@ -424,7 +457,8 @@ process discover_part_b_fasta {
             .findAll { it }
     def folder_args = folders.collect { "'${it}'" }.join(' ')
     """
-    discover_fasta.py ${folder_args} > fastas.tsv
+    discover_fasta.py          ${folder_args} > fastas.tsv
+    discover_fasta.py --shadow ${folder_args} > shadow_fastas.tsv
     """
 }
 
@@ -1163,6 +1197,102 @@ workflow part_b_processes {
 }
 
 
+workflow part_b_shadow_processes {
+    // [S56]: shadow Part B. Runs the same pipeline as
+    // part_b_processes on the Part A shadow outputs
+    // (<sampleId>_notmerged.{fas,qual,stats} — see [S04]), with two
+    // shadow-specific steps glued around global_clustering:
+    //
+    //   1. mask_ns_for_swarm rewrites every sequence-line N to U on
+    //      the globally-dereplicated fasta before swarm sees it
+    //      (swarm rejects N, accepts U as T).
+    //   2. restore_ns_in_representatives undoes the substitution on
+    //      <basename>_notmerged_1f_representatives.fas immediately
+    //      after global_clustering, so every downstream step that
+    //      consumes the representatives (chimera detection,
+    //      occurrence table, mumu) sees the original N padding.
+    //
+    // The basename carries a trailing _notmerged token so every
+    // published artefact is distinguishable from the regular
+    // Part B output.
+
+    take:
+    fasta_list   // value channel: List<Path>, one _notmerged.fas per sample
+    qual_list    // value channel: List<Path>, one _notmerged.qual per sample
+    stats_list   // value channel: List<Path>, one _notmerged.stats per sample
+
+    main:
+    def basename = fasta_list.map { files ->
+        "${params.project_name}_${files.size()}_samples_notmerged"
+    }
+
+    build_expected_error_file(qual_list, basename)
+    build_distribution_file(fasta_list, basename)
+    list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
+    global_dereplication(fasta_list, basename)
+
+    // [S04]/[S56]: N -> U just before swarm.
+    mask_ns_for_swarm(basename, global_dereplication.out[0])
+    global_clustering(mask_ns_for_swarm.out[1], basename)
+
+    // [S56]: U -> N immediately after swarm so every downstream
+    // step sees the original N-padded representatives.
+    restore_ns_in_representatives(basename, global_clustering.out[3])
+    def restored_reps = restore_ns_in_representatives.out[1]
+
+    fake_taxonomic_assignment(restored_reps, basename)
+    chimera_detection(restored_reps, basename)
+
+    cleaving(
+        global_clustering.out[1],            // .stats
+        global_clustering.out[2],            // .struct
+        global_clustering.out[0],            // .swarms
+        global_dereplication.out[0],         // global .fas (already N-containing)
+        list_all_cluster_seeds_of_size_greater_than_2.out[0],
+        basename
+    )
+
+    fake_taxonomic_assignment2(cleaving.out[2], basename)
+    chimera_detection_post_cleave(
+        restored_reps,
+        cleaving.out[2],
+        chimera_detection.out[1],
+        basename
+    )
+
+    build_occurrence_table(
+        restored_reps,
+        cleaving.out[2],
+        global_clustering.out[1],
+        cleaving.out[0],
+        global_clustering.out[0],
+        cleaving.out[1],
+        chimera_detection.out[0],
+        chimera_detection_post_cleave.out[0],
+        build_expected_error_file.out[0],
+        fake_taxonomic_assignment.out[0],
+        fake_taxonomic_assignment2.out[0],
+        build_distribution_file.out[0],
+        basename,
+    )
+
+    search_for_terminal_gaps(build_occurrence_table.out[0])
+    merge_substring_otus(
+        build_occurrence_table.out[0],
+        search_for_terminal_gaps.out[0],
+        search_for_terminal_gaps.out[1],
+        basename,
+    )
+
+    extract_otu_fasta(merge_substring_otus.out[0])
+    trim_metadata_for_mumu(merge_substring_otus.out[0])
+    find_similar_sequences(extract_otu_fasta.out[0])
+    run_mumu(trim_metadata_for_mumu.out[0], find_similar_sequences.out[0], basename)
+    rebuild_post_mumu_table(run_mumu.out[0], merge_substring_otus.out[0], basename)
+    extract_mumu_fasta(rebuild_post_mumu_table.out[0])
+}
+
+
 // ============================================================================
 // Part C — taxonomic assignment (stampa re-implementation)
 // ============================================================================
@@ -1420,10 +1550,13 @@ workflow part_c {
 
 
 workflow part_b {
-    // Standalone Part B ([S25]/[S26]/[S27]): discover per-sample .fas
-    // files (skipping shadow-pipeline _notmerged artefacts), assert
-    // sample-ID uniqueness, and run the pre-cleaving processes. .qual
-    // and .stats are derived as sibling files of each .fas.
+    // Standalone Part B ([S25]/[S26]/[S27]/[S56]): discover the
+    // per-sample .fas files under params.fasta_folder and route them
+    // to two parallel workflows:
+    //   - part_b_processes        for samples without _notmerged suffix
+    //   - part_b_shadow_processes for samples with the _notmerged suffix
+    // .qual and .stats are derived as sibling files of each .fas, so
+    // the same per-sample file-naming convention applies to both paths.
     assert params.project_name :
         "--project_name must be set when --fasta_folder is set"
     assert params.results_folder :
@@ -1436,19 +1569,30 @@ workflow part_b {
 
     discover_part_b_fasta()
 
-    def samples_ch = discover_part_b_fasta.out
+    def regular_samples_ch = discover_part_b_fasta.out[0]
+        .splitCsv(sep: '\t')
+        .map { row -> tuple(row[0], file(row[1])) }
+    def shadow_samples_ch = discover_part_b_fasta.out[1]
         .splitCsv(sep: '\t')
         .map { row -> tuple(row[0], file(row[1])) }
 
-    def fasta_list = samples_ch.map { _id, f -> f }.collect()
-    def qual_list  = samples_ch
+    def fasta_list = regular_samples_ch.map { _id, f -> f }.collect()
+    def qual_list  = regular_samples_ch
         .map { id, f -> file("${f.parent}/${id}.qual") }
         .collect()
-    def stats_list = samples_ch
+    def stats_list = regular_samples_ch
         .map { id, f -> file("${f.parent}/${id}.stats") }
         .collect()
-
     part_b_processes(fasta_list, qual_list, stats_list)
+
+    def s_fasta_list = shadow_samples_ch.map { _id, f -> f }.collect()
+    def s_qual_list  = shadow_samples_ch
+        .map { id, f -> file("${f.parent}/${id}.qual") }
+        .collect()
+    def s_stats_list = shadow_samples_ch
+        .map { id, f -> file("${f.parent}/${id}.stats") }
+        .collect()
+    part_b_shadow_processes(s_fasta_list, s_qual_list, s_stats_list)
 }
 
 
@@ -1604,38 +1748,52 @@ workflow {
 
     list_local_clusters(ready_for_swarm.id, ready_for_swarm.file)
 
-    // ----- Part A → Part B handoff ([S27]) -----
+    // ----- Part A → Part B handoff ([S27]/[S56]) -----
     // When --project_name is set, Part B runs on the Part A outputs
-    // (without going through disk discovery). The shadow path's
-    // outputs are dropped from the Part B channel: [S04] specifies
-    // they belong to a separate downstream path, not the regular
-    // Part B fasta channel. They remain published to params.fastq_folder.
+    // (without going through disk discovery). Regular and shadow
+    // samples ([S04]) feed two parallel workflows:
+    //   - part_b_processes        on samples whose ID does NOT end in _notmerged
+    //   - part_b_shadow_processes on samples whose ID DOES end in _notmerged
+    // The shadow workflow's published artefacts carry a _notmerged
+    // token in their basename so they sit alongside the regular
+    // ones in --results_folder without colliding.
     if ( params.project_name ) {
         assert params.results_folder :
             "--results_folder must be set when --project_name is set"
         def results_dir = new File(params.results_folder.toString())
         results_dir.mkdirs()
 
-        def regular_fasta = dereplicate_fasta.out[0]
+        def fasta_ch = dereplicate_fasta.out[0]
             .merge(dereplicate_fasta.out[1])
-            .filter { id, _f -> !id.endsWith("_notmerged") }
-        def regular_qual = extract_expected_error_values.out[0]
+        def qual_ch = extract_expected_error_values.out[0]
             .merge(extract_expected_error_values.out[1])
-            .filter { id, _f -> !id.endsWith("_notmerged") }
-        def regular_stats = list_local_clusters.out[0]
+        def stats_ch = list_local_clusters.out[0]
             .merge(list_local_clusters.out[1])
-            .filter { id, _f -> !id.endsWith("_notmerged") }
+
+        def regular_fasta = fasta_ch.filter { id, _f -> !id.endsWith("_notmerged") }
+        def regular_qual  = qual_ch .filter { id, _f -> !id.endsWith("_notmerged") }
+        def regular_stats = stats_ch.filter { id, _f -> !id.endsWith("_notmerged") }
+
+        def shadow_fasta = fasta_ch.filter { id, _f -> id.endsWith("_notmerged") }
+        def shadow_qual  = qual_ch .filter { id, _f -> id.endsWith("_notmerged") }
+        def shadow_stats = stats_ch.filter { id, _f -> id.endsWith("_notmerged") }
 
         // join the three streams on sample ID so the lists stay
         // aligned even when processes complete out of order.
         def joined_b = regular_fasta
             .join(regular_qual)
             .join(regular_stats)
-
         def b_fasta = joined_b.map { _id, f, _q, _s -> f }.collect()
         def b_qual  = joined_b.map { _id, _f, q, _s -> q }.collect()
         def b_stats = joined_b.map { _id, _f, _q, s -> s }.collect()
-
         part_b_processes(b_fasta, b_qual, b_stats)
+
+        def joined_shadow = shadow_fasta
+            .join(shadow_qual)
+            .join(shadow_stats)
+        def s_fasta = joined_shadow.map { _id, f, _q, _s -> f }.collect()
+        def s_qual  = joined_shadow.map { _id, _f, q, _s -> q }.collect()
+        def s_stats = joined_shadow.map { _id, _f, _q, s -> s }.collect()
+        part_b_shadow_processes(s_fasta, s_qual, s_stats)
     }
 }

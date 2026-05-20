@@ -348,11 +348,30 @@ nextflow_pipeline {
                     "missing Part B artefact: ${artefact}"
             }
 
-            // The notmerged decoy must not appear anywhere in the
-            // global fasta.
+            // [S56]: S1_notmerged.{fas,qual,stats} feed the shadow
+            // Part B workflow (not the regular one), so the all-9
+            // SHA1 must not appear in the regular global fasta.
             def globalFasta = file("${base}.fas").text
             assert !globalFasta.contains("9999999999") :
-                "_notmerged decoy leaked into the Part B fasta channel"
+                "_notmerged sample leaked into the regular Part B fasta channel"
+
+            // Shadow Part B publishes its own artefacts with a
+            // _notmerged token in the basename.
+            def shadow_base = "${resultDir}/myproj_1_samples_notmerged"
+            assert file("${shadow_base}.fas").exists() :
+                "shadow Part B global fasta should exist"
+            assert file("${shadow_base}_table.tsv").exists() :
+                "shadow Part B occurrence table should exist"
+            assert file("${shadow_base}_1f_representatives.fas").exists() :
+                "shadow Part B representatives FASTA should exist"
+
+            // [S56]: published shadow representatives carry Ns
+            // (not Us) on their sequence lines.
+            def shadowReps = file("${shadow_base}_1f_representatives.fas").readLines()
+            for (int i = 1; i < shadowReps.size(); i += 2) {
+                assert !shadowReps[i].contains("U") :
+                    "U leaked into shadow standalone reps line ${i}: ${shadowReps[i]}"
+            }
         }
     }
 
@@ -396,8 +415,8 @@ nextflow_pipeline {
         }
     }
 
-    test("Part A → Part B drops the _notmerged shadow sample from the Part B channel") {
-        // COVERAGE: [S04], [S27]
+    test("Part A → Part B runs shadow Part B alongside the regular path") {
+        // COVERAGE: [S04], [S27], [S56]
         tag "ci"
         when {
             params {
@@ -412,18 +431,39 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            // sampleB.fastq.gz produces *two* Part A sample IDs (the
-            // regular `sampleB` and the shadow `sampleB_notmerged`).
-            // Only the regular one feeds Part B → N=1.
-            def base = "${outputDir}/shadow_e2e_results/shadow_e2e_1_samples"
-            assert file("${base}.fas").exists() : "Part B fasta should exist"
-            // The shadow sample's published .fas stays in fastq_folder
-            // (Part A's publishDir target) — not in the Part B results.
-            def shadowInResults = file(
+            // sampleB.fastq.gz produces two Part A sample IDs: the
+            // regular `sampleB` (empty .fas — pairs cannot merge)
+            // and the shadow `sampleB_notmerged` (carries the join-
+            // padded reads). Both feed Part B: regular path yields
+            // shadow_e2e_1_samples_*, shadow path yields
+            // shadow_e2e_1_samples_notmerged_*.
+            def regular_base = "${outputDir}/shadow_e2e_results/shadow_e2e_1_samples"
+            def shadow_base  = "${regular_base}_notmerged"
+
+            assert file("${regular_base}.fas").exists() :
+                "regular Part B fasta should exist"
+            assert file("${shadow_base}.fas").exists() :
+                "shadow Part B fasta should exist (${shadow_base}.fas)"
+            assert file("${shadow_base}_table.tsv").exists() :
+                "shadow Part B occurrence table should exist"
+            assert file("${shadow_base}_1f_representatives.fas").exists() :
+                "shadow Part B representatives FASTA should exist"
+
+            // [S56] guarantees the published representatives carry
+            // Ns (not Us) on their sequence lines.
+            def repLines = file("${shadow_base}_1f_representatives.fas").readLines()
+            for (int i = 1; i < repLines.size(); i += 2) {
+                assert !repLines[i].contains("U") :
+                    "U leaked into shadow representatives line ${i}: ${repLines[i]}"
+            }
+
+            // The per-sample shadow .fas stays in fastq_folder (Part A's
+            // publishDir target) — not in the Part B results folder.
+            def perSampleInResults = file(
                 "${outputDir}/shadow_e2e_results/sampleB_notmerged.fas"
             )
-            assert !shadowInResults.exists() :
-                "shadow .fas must not be published into the Part B results folder"
+            assert !perSampleInResults.exists() :
+                "per-sample shadow .fas must not be published into the Part B results folder"
         }
     }
 
