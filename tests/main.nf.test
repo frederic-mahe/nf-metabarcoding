@@ -467,6 +467,61 @@ nextflow_pipeline {
         }
     }
 
+    test("Part A → Part B → Part C end-to-end runs Part C when --reference_dataset is set") {
+        // COVERAGE: [S01], [S51]
+        // End-to-end three-part workflow: --reference_dataset triggers
+        // Part C on Part B's regular occurrence table. The e2e_part_b
+        // fixtures have no clusters above the >2 read threshold ([S17])
+        // so Part B emits a header-only table. The empty-input
+        // contract ([S51]) requires Part C to still publish a
+        // header-only <basename>_table_assigned.tsv — exercised here.
+        tag "ci"
+        when {
+            params {
+                forward_primer    = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer    = "ACTTTCGTTCTTGATYRA"
+                fastq_folder      = "${projectDir}/tests/data/e2e_part_b/ok"
+                fastq_pattern     = ""
+                project_name      = "e2ec"
+                results_folder    = "${outputDir}/e2ec_results"
+                reference_dataset = "${outputDir}/e2ec_ref.fas"
+                threads           = 1
+            }
+        }
+        setup {
+            // Tiny reference (single record, identical shape to the
+            // standalone Part C fixtures earlier in this file). The
+            // e2e fixture's Part B table is empty so the reference is
+            // never actually queried, but Part C still needs a valid
+            // file path at --reference_dataset.
+            def ref = file("${outputDir}/e2ec_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA Kingdom|Phylum|Class\n" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def base = "${outputDir}/e2ec_results/e2ec_1_samples"
+            def partB = file("${base}_table.tsv")
+            assert partB.exists() :
+                "Part B occurrence table should exist end-to-end"
+            // The fixture leaves Part B with a header-only table.
+            assert partB.readLines().size() == 1 :
+                "expected Part B occurrence table to be header-only, got: ${partB.readLines()}"
+            // [S51] empty-input contract: Part C still publishes a
+            // header-only <basename>_table_assigned.tsv.
+            def assigned = file("${base}_table_assigned.tsv")
+            assert assigned.exists() :
+                "Part C should publish <basename>_table_assigned.tsv even on empty input"
+            assert assigned.readLines().size() == 1 :
+                "expected header-only table_assigned.tsv, got: ${assigned.readLines()}"
+            assert assigned.readLines()[0] == partB.readLines()[0] :
+                "table_assigned header should match the input table header"
+        }
+    }
+
     test("Part A → Part B runs shadow Part B alongside the regular path") {
         // COVERAGE: [S04], [S27], [S56]
         tag "ci"
