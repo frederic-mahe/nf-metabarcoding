@@ -64,6 +64,41 @@ nextflow_process {
         }
     }
 
+    test("emits single-line fasta from vsearch --fastx_uniques") {
+        // COVERAGE: [S55]
+        // Regression guard for the vsearch --fastx_uniques output
+        // shape (--fasta_width 0). See [S55] rationale.
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "tests/data"
+            }
+            process {
+                """
+                input[0] = filter_and_convert_to_fasta.out[0]
+                input[1] = filter_and_convert_to_fasta.out[1]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[1].get(0)).readLines()
+            if (lines.size() == 0) {
+                return
+            }
+            assert lines.size() % 2 == 0 :
+                "fasta must be a multiple of 2 lines, got ${lines.size()}"
+            for (int i = 0; i < lines.size(); i += 2) {
+                assert lines[i].startsWith(">") :
+                    "fasta line ${i+1} must start with '>', got: ${lines[i]}"
+                assert !lines[i + 1].startsWith(">") :
+                    "fasta line ${i+2} must be sequence data, got header: ${lines[i + 1]}"
+            }
+        }
+    }
+
     test("emits a per-sample dereplicating log") {
         // COVERAGE: [S19]
         tag "ci"

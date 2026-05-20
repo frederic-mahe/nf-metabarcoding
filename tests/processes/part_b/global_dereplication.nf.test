@@ -55,6 +55,40 @@ nextflow_process {
         }
     }
 
+    test("emits single-line fasta from vsearch --fastx_uniques") {
+        // COVERAGE: [S55]
+        // Regression guard for the vsearch --fastx_uniques output
+        // shape (--fasta_width 0). See [S55] rationale.
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/data/part_b/S1.fas"),
+                    file("\${projectDir}/tests/data/part_b/S2.fas"),
+                    file("\${projectDir}/tests/data/part_b/E.fas")
+                ]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[0].get(0)).readLines()
+            if (lines.size() == 0) {
+                return
+            }
+            assert lines.size() % 2 == 0 :
+                "fasta must be a multiple of 2 lines, got ${lines.size()}"
+            for (int i = 0; i < lines.size(); i += 2) {
+                assert lines[i].startsWith(">") :
+                    "fasta line ${i+1} must start with '>', got: ${lines[i]}"
+                assert !lines[i + 1].startsWith(">") :
+                    "fasta line ${i+2} must be sequence data, got header: ${lines[i + 1]}"
+            }
+        }
+    }
+
     test("aborts when --project_name is not set") {
         // COVERAGE: [S25]
         tag "pending"
