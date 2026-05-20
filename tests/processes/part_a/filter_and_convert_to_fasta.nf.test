@@ -107,7 +107,7 @@ nextflow_process {
             process {
                 """
                 input[0] = "u_sample"
-                input[1] = file("\${projectDir}/tests/data/u_containing.fastq")
+                input[1] = file("\${projectDir}/tests/data/u_normalisation.fastq")
                 input[2] = 0
                 """
             }

@@ -15,7 +15,7 @@ rules:
 See ``[S13]``, ``[S14]``, ``[S27]`` in SPECIFICATIONS.md.
 """
 
-# COVERAGE: [S13], [S14], [S27], [S53]
+# COVERAGE: [S13], [S14], [S27], [S53], [S56]
 
 from __future__ import annotations
 
@@ -141,6 +141,58 @@ def test_check_unique_sample_ids_raises_on_duplicates() -> None:
     assert "/run2/A.fas" in msg
     # the non-duplicated sample's path is not surfaced
     assert "/run1/B.fas" not in msg
+
+
+# ---------- shadow channel ([S56]) ----------------------------------------
+
+def test_discover_shadow_returns_only_notmerged(tmp_path: Path) -> None:
+    # [S56]: shadow Part B needs the _notmerged samples that the
+    # regular discover call excludes.
+    _make_fasta(tmp_path, "A.fas")
+    s = _make_fasta(tmp_path, "A_notmerged.fas")
+
+    result = discover([tmp_path], shadow=True)
+
+    assert result == [FastaSample(sample_id="A_notmerged", fasta=s)]
+
+
+def test_discover_shadow_empty_when_no_notmerged(tmp_path: Path) -> None:
+    _make_fasta(tmp_path, "A.fas")
+    _make_fasta(tmp_path, "B.fas")
+
+    assert discover([tmp_path], shadow=True) == []
+
+
+def test_discover_regular_and_shadow_partitions_input(tmp_path: Path) -> None:
+    a = _make_fasta(tmp_path, "A.fas")
+    sa = _make_fasta(tmp_path, "A_notmerged.fas")
+    b = _make_fasta(tmp_path, "B.fas")
+
+    regular = discover([tmp_path])
+    shadow = discover([tmp_path], shadow=True)
+
+    assert regular == [
+        FastaSample(sample_id="A", fasta=a),
+        FastaSample(sample_id="B", fasta=b),
+    ]
+    assert shadow == [FastaSample(sample_id="A_notmerged", fasta=sa)]
+
+
+def test_cli_shadow_flag_emits_only_notmerged(tmp_path: Path) -> None:
+    _make_fasta(tmp_path, "A.fas")
+    s = _make_fasta(tmp_path, "A_notmerged.fas")
+
+    script = (
+        Path(__file__).resolve().parents[2] / "bin" / "discover_fasta.py"
+    )
+    proc = subprocess.run(
+        [sys.executable, str(script), "--shadow", str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    lines = proc.stdout.strip().splitlines()
+    assert lines == [f"A_notmerged\t{s}"]
 
 
 # ---------- U-in-sequence rejection ([S53]) -------------------------------

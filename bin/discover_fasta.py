@@ -63,10 +63,17 @@ def _is_notmerged(path: Path) -> bool:
     return _sample_id_from_fasta(path).endswith(NOTMERGED_SUFFIX)
 
 
-def discover(folders: list[Path]) -> list[FastaSample]:
-    """Walk ``folders`` (no recursion) and return the Part B fasta channel.
+def discover(
+    folders: list[Path], *, shadow: bool = False,
+) -> list[FastaSample]:
+    """Walk ``folders`` (no recursion) and return a Part B fasta channel.
 
-    Files whose basename ends in ``_notmerged.fas`` are skipped.
+    By default (``shadow=False``), files whose basename ends in
+    ``_notmerged.fas`` are skipped — they belong to the shadow Part
+    B path ([S04]/[S56]). Setting ``shadow=True`` flips the filter
+    and returns *only* the ``_notmerged`` files, used to populate
+    the shadow Part B channel.
+
     Empty files are kept so empty samples travel through to the
     occurrence table ([S09]).
     """
@@ -75,7 +82,7 @@ def discover(folders: list[Path]) -> list[FastaSample]:
         for path in sorted(folder.glob("*.fas")):
             if not path.is_file():
                 continue
-            if _is_notmerged(path):
+            if _is_notmerged(path) != shadow:
                 continue
             samples.append(
                 FastaSample(
@@ -161,12 +168,21 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         type=Path,
         help="Folders to scan (no recursion).",
     )
+    parser.add_argument(
+        "--shadow",
+        action="store_true",
+        help=(
+            "Emit only *_notmerged.fas files (shadow Part B channel, "
+            "see [S56]). Without this flag, the *_notmerged.fas files "
+            "are excluded."
+        ),
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
-    samples = discover(args.folders)
+    samples = discover(args.folders, shadow=args.shadow)
     try:
         check_unique_sample_ids(samples)
         check_no_u_in_sequences(samples)
