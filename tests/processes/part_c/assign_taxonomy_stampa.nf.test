@@ -14,7 +14,7 @@ nextflow_process {
         // owns the final filename.
         //
         // Real-world LCA correctness is pinned by the pytest suite
-        // (test_stampa_merge.py, test_stampa_merge_legacy.py).
+        // (test_stampa_merge.py).
         tag "ci"
         when {
             params {
