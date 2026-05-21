@@ -4,15 +4,18 @@ nextflow_process {
     script "main.nf"
     process "assign_taxonomy_sintax"
 
-    test("runs vsearch --sintax + reshapes the tabbed output") {
+    test("reshapes vsearch --sintax output: column 2 (bootstrap lineage) becomes taxonomy") {
         // COVERAGE: [S50]
-        // Skeleton phase: pin the process wiring + output filename;
-        // the sintax-to-stampa reshape is best-effort until D04
-        // lands.
+        // [S50] revised (2026-05-21): the shadow path lifts vsearch's
+        // tabbed-output column 2 (lineage with bootstrap, e.g.
+        // `d:Bacteria(1.00),p:Proteobacteria(0.95)`) into the
+        // canonical assignments TSV's `taxonomy` column. `identity`
+        // and `references` stay at placeholder values (`0.0` / `NA`).
         tag "ci"
         when {
             params {
-                threads = 1
+                threads       = 1
+                sintax_cutoff = 0.9
             }
             process {
                 """
@@ -22,16 +25,77 @@ nextflow_process {
                 ref.text = '>refA;tax=d:Bacteria,p:Proteobacteria,c:Gammaproteobacteria;\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
                 input[0] = file(reps.toString())
                 input[1] = file(ref.toString())
-                input[2] = "proj_1_samples"
+                input[2] = "proj_1_samples_notmerged"
                 """
             }
         }
         then {
             assert process.success
             def assignments = process.out[0].get(0)
-            assert assignments.endsWith("proj_1_samples_taxonomy_sintax.tsv")
+            assert assignments.endsWith("proj_1_samples_notmerged_taxonomy_sintax.tsv") :
+                "expected <basename>_taxonomy_sintax.tsv, got: ${assignments}"
             def log = process.out[1].get(0)
-            assert log.endsWith("proj_1_samples_taxonomy.log")
+            assert log.endsWith("proj_1_samples_notmerged_taxonomy.log") :
+                "expected <basename>_taxonomy.log, got: ${log}"
+
+            def rows = path(assignments).readLines()
+            assert rows.size() == 1 :
+                "expected one row per query, got: ${rows}"
+            def fields = rows[0].split("\t", -1)
+            assert fields.size() == 5 :
+                "expected 5-column TSV (amplicon\\tabundance\\tidentity\\ttaxonomy\\treferences), got: ${rows[0]}"
+            assert fields[0] == "amp1" :
+                "expected amplicon=amp1, got: ${fields[0]}"
+            assert fields[1] == "10" :
+                "expected abundance=10 (parsed from ;size=10;), got: ${fields[1]}"
+            assert fields[2] == "0.0" :
+                "expected identity placeholder 0.0, got: ${fields[2]}"
+            // Taxonomy column = vsearch tabbed-output column 2:
+            // bootstrap-annotated lineage like `d:Bacteria(1.00),...`
+            assert fields[3].contains("d:Bacteria") :
+                "expected taxonomy to carry the sintax lineage (column 2), got: ${fields[3]}"
+            assert fields[3] =~ /\([0-9.]+\)/ :
+                "expected bootstrap parens in taxonomy, got: ${fields[3]}"
+            assert fields[4] == "NA" :
+                "expected references placeholder NA, got: ${fields[4]}"
+        }
+    }
+
+    test("emits an empty assignments TSV when sintax_cutoff rejects every hit") {
+        // COVERAGE: [S50]
+        // Sanity-check the cutoff wiring: with sintax_cutoff close to 1.0
+        // a low-confidence hit drops out and vsearch's tabbed output for
+        // that query has an empty column 2. The reshape must still emit
+        // a row (one per query) so update_occurrence_table can pass the
+        // amplicon through unchanged.
+        tag "ci"
+        when {
+            params {
+                threads       = 1
+                sintax_cutoff = 0.99
+            }
+            process {
+                """
+                def reps = workDir.resolve("reps.fas")
+                reps.text = '>amp1;size=10;\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>refA;tax=d:Bacteria,p:Proteobacteria;\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
+                input[0] = file(reps.toString())
+                input[1] = file(ref.toString())
+                input[2] = "proj_1_samples_notmerged"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def assignments = process.out[0].get(0)
+            def rows = path(assignments).readLines()
+            assert rows.size() == 1 :
+                "expected one passthrough row per query even under high cutoff, got: ${rows}"
+            def fields = rows[0].split("\t", -1)
+            assert fields.size() == 5
+            assert fields[0] == "amp1"
+            assert fields[1] == "10"
         }
     }
 }

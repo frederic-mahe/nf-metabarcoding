@@ -1017,4 +1017,182 @@ nextflow_pipeline {
             // TODO: assert occurrence table contains a row for the empty sample with abundance 0
         }
     }
+
+    test("--taxonomy_method rejects an unknown value before any process runs") {
+        // COVERAGE: [S61]
+        tag "ci"
+        when {
+            params {
+                occurrence_table  = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                results_folder    = "${outputDir}/bad_taxmethod"
+                reference_dataset = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                taxonomy_method   = "bogus"
+                threads           = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("taxonomy_method") :
+                "error should mention 'taxonomy_method', got: ${msg}"
+        }
+    }
+
+    test("Part C standalone runs the regular path through sintax when --taxonomy_method=sintax") {
+        // COVERAGE: [S61]
+        // The regular path can opt into sintax via params.taxonomy_method.
+        // Same input shape as the stampa standalone test; the published
+        // file is still <basename>_table_assigned.tsv (no _notmerged token).
+        tag "ci"
+        when {
+            params {
+                threads           = 1
+                taxonomy_method   = "sintax"
+                results_folder    = "${outputDir}/part_c_regular_sintax"
+                reference_dataset = "${outputDir}/part_c_regular_sintax_ref.fas"
+                occurrence_table  = "${outputDir}/part_c_regular_sintax_table.tsv"
+                sintax_cutoff     = 0.5
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_regular_sintax_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA;tax=d:Bacteria,p:Proteobacteria;\n" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            )
+            def tab = file("${outputDir}/part_c_regular_sintax_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t32\t10\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t10\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def assigned = file(
+                "${outputDir}/part_c_regular_sintax/part_c_regular_sintax_table_assigned.tsv"
+            )
+            assert assigned.exists() :
+                "regular sintax path should publish <basename>_table_assigned.tsv"
+            def lines = assigned.readLines()
+            assert lines.size() == 2 :
+                "expected header + 1 row, got: ${lines}"
+            // No _notmerged sibling was created → no shadow output.
+            def shadow = file(
+                "${outputDir}/part_c_regular_sintax/part_c_regular_sintax_notmerged_table_assigned.tsv"
+            )
+            assert !shadow.exists() :
+                "no _notmerged sibling on disk → shadow Part C must not run"
+        }
+    }
+
+    test("Part C standalone runs shadow Part C when <basename>_notmerged_table.tsv sibling exists") {
+        // COVERAGE: [S50], [S62]
+        // [S62]: presence of a <basename>_notmerged_table.tsv sibling
+        // alongside the --occurrence_table input is the toggle for the
+        // shadow Part C workflow. Both assigned tables must reach the
+        // results folder when the sibling is present.
+        tag "ci"
+        when {
+            params {
+                threads           = 1
+                results_folder    = "${outputDir}/part_c_shadow"
+                reference_dataset = "${outputDir}/part_c_shadow_ref.fas"
+                occurrence_table  = "${outputDir}/part_c_shadow_table.tsv"
+                sintax_cutoff     = 0.5
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_shadow_ref.fas")
+            ref.parentFile.mkdirs()
+            // sintax-formatted reference header (`;tax=...;`).
+            ref.text = (
+                ">refA;tax=d:Bacteria,p:Proteobacteria;\n" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            )
+            def tab = file("${outputDir}/part_c_shadow_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t32\t10\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t10\n"
+            )
+            def shadow_tab = file("${outputDir}/part_c_shadow_notmerged_table.tsv")
+            shadow_tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t7\tNA\tampS\t32\t7\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t7\n"
+            )
+        }
+        then {
+            assert workflow.success
+            // regular path → stampa
+            def regular = file(
+                "${outputDir}/part_c_shadow/part_c_shadow_table_assigned.tsv"
+            )
+            assert regular.exists() :
+                "regular Part C should publish <basename>_table_assigned.tsv"
+            // shadow path → sintax on the _notmerged sibling
+            def shadow = file(
+                "${outputDir}/part_c_shadow/part_c_shadow_notmerged_table_assigned.tsv"
+            )
+            assert shadow.exists() :
+                "shadow Part C should publish <basename>_notmerged_table_assigned.tsv"
+            def shadow_rows = shadow.readLines()
+            assert shadow_rows.size() == 2 :
+                "expected shadow assigned table header + 1 row, got: ${shadow_rows}"
+            def fields = shadow_rows[1].split("\t", -1)
+            assert fields[3] == "ampS" :
+                "expected shadow row amplicon ampS, got: ${fields[3]}"
+            // sintax column 2 = bootstrap-annotated lineage in the
+            // taxonomy field (col 12 of the occurrence table schema).
+            assert fields[11].contains("d:Bacteria") :
+                "expected shadow taxonomy to carry sintax lineage, got: ${fields[11]}"
+        }
+    }
+
+    test("Part C standalone with no _notmerged sibling skips the shadow workflow") {
+        // COVERAGE: [S62]
+        // No <basename>_notmerged_table.tsv next to --occurrence_table →
+        // shadow Part C is not invoked, only the regular assigned table
+        // is published, and the workflow exits cleanly (no error).
+        tag "ci"
+        when {
+            params {
+                threads           = 1
+                results_folder    = "${outputDir}/part_c_no_shadow"
+                reference_dataset = "${outputDir}/part_c_no_shadow_ref.fas"
+                occurrence_table  = "${outputDir}/part_c_no_shadow_table.tsv"
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_no_shadow_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = ">refA Kingdom|Phylum|Class\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            def tab = file("${outputDir}/part_c_no_shadow_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t32\t10\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t10\n"
+            )
+            // deliberately no <basename>_notmerged_table.tsv sibling
+        }
+        then {
+            assert workflow.success
+            def regular = file(
+                "${outputDir}/part_c_no_shadow/part_c_no_shadow_table_assigned.tsv"
+            )
+            assert regular.exists() :
+                "regular Part C should publish <basename>_table_assigned.tsv"
+            def shadow = file(
+                "${outputDir}/part_c_no_shadow/part_c_no_shadow_notmerged_table_assigned.tsv"
+            )
+            assert !shadow.exists() :
+                "no sibling → no shadow Part C → no _notmerged_table_assigned.tsv"
+        }
+    }
 }
