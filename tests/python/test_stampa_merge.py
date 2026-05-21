@@ -52,7 +52,9 @@ def _write(tmp_path: Path, name: str, content: str) -> Path:
 
 
 def test_parse_hits_strips_abundance_suffix(tmp_path: Path) -> None:
-    hits = _write(tmp_path, "hits", "amp1_10\t99.5\trefA Kingdom|Phylum\n")
+    hits = _write(
+        tmp_path, "hits", "amp1;size=10;\t99.5\trefA Kingdom|Phylum\n"
+    )
     rows = list(parse_hits(str(hits)))
     assert len(rows) == 1
     amplicon, abundance, identity, taxonomy, accession = rows[0]
@@ -64,24 +66,45 @@ def test_parse_hits_strips_abundance_suffix(tmp_path: Path) -> None:
 
 
 def test_parse_hits_handles_no_hit_marker(tmp_path: Path) -> None:
-    hits = _write(tmp_path, "hits", "amp2_5\t0.0\t*\n")
+    hits = _write(tmp_path, "hits", "amp2;size=5;\t0.0\t*\n")
     rows = list(parse_hits(str(hits)))
     assert rows == [("amp2", "5", "0.0", ["No_hit"], "No_hit")]
 
 
-def test_parse_hits_handles_multi_underscore_amplicon(tmp_path: Path) -> None:
-    # rsplit("_", 1) splits only on the final underscore so amplicon
-    # IDs may themselves contain underscores (e.g. SHA1-derived
-    # sample-prefixed IDs). The slurm-era stampa_merge.py used
-    # plain split("_") and crashed on these.
+def test_parse_hits_preserves_underscores_in_amplicon(tmp_path: Path) -> None:
+    # The ";size=N" delimiter is unambiguous, so amplicon IDs may
+    # contain arbitrary underscores (e.g. SHA1-derived sample-prefixed
+    # IDs) without confusing the abundance parser.
     hits = _write(
         tmp_path, "hits",
-        "sample_a_amp7_42\t99.0\trefX Bacteria|Firmicutes\n",
+        "sample_a_amp7;size=42;\t99.0\trefX Bacteria|Firmicutes\n",
     )
     rows = list(parse_hits(str(hits)))
     assert rows == [
         ("sample_a_amp7", "42", "99.0", ["Bacteria", "Firmicutes"], "refX")
     ]
+
+
+def test_parse_hits_accepts_size_without_trailing_semicolon(
+    tmp_path: Path,
+) -> None:
+    # vsearch's --notrunclabels preserves the trailing ';' the workflow
+    # emits, but the parser also accepts the bare ';size=N' form so it
+    # stays robust against label-trimming upstream.
+    hits = _write(
+        tmp_path, "hits", "amp1;size=10\t99.5\trefA Kingdom|Phylum\n"
+    )
+    rows = list(parse_hits(str(hits)))
+    assert rows == [("amp1", "10", "99.5", ["Kingdom", "Phylum"], "refA")]
+
+
+def test_parse_hits_rejects_missing_size_field(tmp_path: Path) -> None:
+    # Fail-loud when the query label is missing the ';size=N' annotation
+    # — mirrors the malformed-hit guard so upstream label corruption is
+    # impossible to miss.
+    hits = _write(tmp_path, "hits", "amp1\t99.5\trefA Kingdom|Phylum\n")
+    with pytest.raises(ValueError):
+        list(parse_hits(str(hits)))
 
 
 def test_parse_hits_malformed_hit_raises(tmp_path: Path) -> None:
@@ -100,7 +123,7 @@ def test_parse_hits_malformed_hit_raises(tmp_path: Path) -> None:
 def test_emit_results_one_amplicon_one_hit(tmp_path: Path) -> None:
     hits = _write(
         tmp_path, "hits",
-        "amp1_10\t99.5\trefA Kingdom|Phylum|Class\n",
+        "amp1;size=10;\t99.5\trefA Kingdom|Phylum|Class\n",
     )
     buf = io.StringIO()
     emit_results(str(hits), buf)
@@ -113,8 +136,8 @@ def test_emit_results_groups_multi_hit_amplicon(tmp_path: Path) -> None:
     # Two top hits for amp1: they agree at level 0 and 2, disagree
     # at level 1 → LCA = "K|*|C".
     hits_text = (
-        "amp1_10\t99.5\trefA K|P1|C\n"
-        "amp1_10\t99.5\trefB K|P2|C\n"
+        "amp1;size=10;\t99.5\trefA K|P1|C\n"
+        "amp1;size=10;\t99.5\trefB K|P2|C\n"
     )
     hits = _write(tmp_path, "hits", hits_text)
     buf = io.StringIO()
@@ -124,8 +147,8 @@ def test_emit_results_groups_multi_hit_amplicon(tmp_path: Path) -> None:
 
 def test_emit_results_multiple_amplicons(tmp_path: Path) -> None:
     hits_text = (
-        "amp1_10\t99.5\trefA K|P\n"
-        "amp2_5\t88.0\t*\n"
+        "amp1;size=10;\t99.5\trefA K|P\n"
+        "amp2;size=5;\t88.0\t*\n"
     )
     hits = _write(tmp_path, "hits", hits_text)
     buf = io.StringIO()

@@ -1536,7 +1536,9 @@ process assign_taxonomy_stampa {
     // with bin/stampa_merge.py. The workflow uses splitFasta
     // upstream to produce chunks and collectFile downstream to
     // gather + sort the slices into the final
-    // <basename>_taxonomy_stampa.tsv.
+    // <basename>_taxonomy_stampa.tsv. --notrunclabels keeps the
+    // ";size=N;" annotation in vsearch's --userout, which
+    // stampa_merge.py parses directly.
 
     input:
     path chunk
@@ -1547,14 +1549,8 @@ process assign_taxonomy_stampa {
 
     shell:
     '''
-    # Rewrite vsearch-style ";size=N;" into the swarm-style "_N"
-    # abundance annotation that stampa_merge.py expects (mirrors
-    # the `sed` pass in the legacy stampa.sh).
-    sed -e '/^>/ s/;size=/_/' -e '/^>/ s/;$//' !{chunk} \
-        > stampa_input.fas
-
     vsearch \
-        --usearch_global stampa_input.fas \
+        --usearch_global !{chunk} \
         --threads !{params.threads} \
         --db !{reference_dataset} \
         --dbmask none \

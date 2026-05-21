@@ -9,12 +9,13 @@ invocation (no array split — `[S49]`), so this port collapses the
 loop into one input → one output stream.
 
 Input format (vsearch ``--userout`` with
-``--userfields query+id<iddef>+target``)::
+``--userfields query+id<iddef>+target`` and ``--notrunclabels``)::
 
-    amplicon_<abundance>\\tidentity\\thit
+    amplicon;size=<abundance>;\\tidentity\\thit
 
-`hit` is either ``*`` (no hit) or ``accession<SPACE>taxonomy`` where
-``taxonomy`` is a ``|``-separated lineage.
+The trailing ``;`` on the size annotation is optional. `hit` is either
+``*`` (no hit) or ``accession<SPACE>taxonomy`` where ``taxonomy`` is a
+``|``-separated lineage.
 
 Output format (`[S33]` / `[S49]` shape)::
 
@@ -29,12 +30,16 @@ to ``*``.
 from __future__ import annotations
 
 __author__ = "Frédéric Mahé <frederic.mahe@cirad.fr>"
-__date__ = "2026/05/19"
-__version__ = "$Revision: 3.0"
+__date__ = "2026/05/21"
+__version__ = "$Revision: 3.1"
 
 import argparse
+import re
 import sys
 from typing import Iterator, Optional
+
+
+SIZE_RE = re.compile(r"^(?P<amplicon>.+);size=(?P<abundance>\d+);?$")
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
@@ -77,7 +82,14 @@ def parse_hits(path: str) -> Iterator[tuple[str, str, str, list[str], str]]:
             if not line:
                 continue
             amplicon_field, identity, hit = line.split("\t")
-            amplicon, abundance = amplicon_field.rsplit("_", 1)
+            match = SIZE_RE.match(amplicon_field)
+            if match is None:
+                raise ValueError(
+                    f"stampa_merge: query label missing ';size=N' "
+                    f"annotation: {amplicon_field!r}"
+                )
+            amplicon = match["amplicon"]
+            abundance = match["abundance"]
             if hit == "*":
                 accession = "No_hit"
                 taxonomy = ["No_hit"]
