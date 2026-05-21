@@ -643,15 +643,35 @@ from placeholder values to real taxonomic assignments.
     confirms one chunk's vsearch + `bin/stampa_merge.py` wiring;
     and LCA correctness is pinned at the helper level by
     `tests/python/test_stampa_merge.py`.
-- `[S50]` Part C's shadow path uses `vsearch --sintax` against
-  the **same** reference dataset and emits an alternative
-  taxonomy TSV with the same column shape as the primary path
-  (`[S49]`). Sintax-specific columns (bootstrap confidences) are
-  collapsed into the `references` field; users opt in via
-  `--taxonomy_method sintax` (default `stampa`).
-  - **Pass when:** **(skeleton phase)** the sintax process exists
-    and runs against a tiny reference fixture without error; the
-    taxonomy column it emits is documented.
+- `[S50]` Part C's **shadow path** runs `vsearch --sintax`
+  against the same `--reference_dataset` ([S47]) on the shadow
+  occurrence table `<basename>_notmerged_table.tsv` produced by
+  shadow Part B ([S56]) and emits
+  `<basename>_notmerged_table_assigned.tsv` (the shadow sibling
+  of `[S51]`'s `<basename>_table_assigned.tsv`). The shadow path
+  has no method toggle — sintax is the only assignment method
+  for the shadow path. The vsearch call uses
+  `--sintax_cutoff ${params.sintax_cutoff}` (default `0.9`),
+  `--dbmask none`, and `--tabbedout`; the assignment lifted into
+  the occurrence table's `taxonomy` column is **column 2** of
+  the tabbed output (the bootstrap-annotated lineage, e.g.
+  `d:Bacteria(0.99),p:Proteobacteria(0.85)`). The `identity` and
+  `references` columns are not populated by sintax — they stay
+  at their `[S33]`/`[S46]` placeholder values (`0.0` / `NA`).
+  The shadow Part C workflow (`part_C_shadow`) is invoked
+  alongside the regular `part_C` from all three entry points
+  (end-to-end Part A→B→C, Part B standalone with
+  `--reference_dataset`, and Part C standalone — see [S61]).
+  When no shadow occurrence table is available (no `_notmerged`
+  sample upstream, or no sibling file in standalone mode), the
+  shadow Part C workflow is not invoked.
+  - **Pass when:** an end-to-end run on a paired-end fixture
+    that produces at least one `_notmerged` sample publishes
+    both `<basename>_table_assigned.tsv` (stampa, regular path)
+    and `<basename>_notmerged_table_assigned.tsv` (sintax,
+    shadow path) under `--results_folder`; the shadow assigned
+    table's `taxonomy` column carries the bootstrap-annotated
+    lineage from vsearch's tabbed output.
 - `[S51]` Part C's `update_occurrence_table` splices the
   taxonomic assignment back onto the `[S46]` occurrence table by
   amplicon ID, overwriting the `identity`, `taxonomy`, and
@@ -841,6 +861,37 @@ from placeholder values to real taxonomic assignments.
     `--reference_dataset "~/<file>"` (quoted, so the shell does
     *not* expand) succeeds and produces the expected output, with
     no work-dir symlink containing a literal `~`.
+- `[S61]` `params.taxonomy_method` controls the **regular** Part
+  C assignment method only ([S49] / [S50]'s sibling sintax run on
+  the regular table). Accepted values: `'stampa'` (default, the
+  [S49] scatter-gather) and `'sintax'` (use `vsearch --sintax` on
+  the regular table with the same reshape rules as [S50]). The
+  shadow path always uses sintax regardless of this flag. The
+  value is validated at workflow startup; an unknown method
+  aborts with a clear message before any process runs.
+  - **Pass when:** `--taxonomy_method bogus` aborts the workflow
+    with an error naming `taxonomy_method`; `--taxonomy_method
+    sintax` runs the regular path through
+    `assign_taxonomy_sintax` and still publishes
+    `<basename>_table_assigned.tsv`.
+- `[S62]` In Part C **standalone mode** (`--occurrence_table
+  /path/to/<basename>_table.tsv`), the workflow probes for a
+  shadow occurrence-table sibling at
+  `<dirname>/<basename>_notmerged_table.tsv`. If that file
+  exists, `part_C_shadow` ([S50]) runs on it alongside the
+  regular `part_C`, publishing both
+  `<basename>_table_assigned.tsv` and
+  `<basename>_notmerged_table_assigned.tsv` under
+  `--results_folder`. If the sibling does **not** exist, the
+  shadow workflow is not invoked and only the regular
+  `_table_assigned.tsv` is published — no error. There is no CLI
+  flag to opt in or out: presence of the sibling file is the
+  toggle.
+  - **Pass when:** running Part C standalone with both
+    `<basename>_table.tsv` and `<basename>_notmerged_table.tsv`
+    in the same directory publishes both `_table_assigned.tsv`
+    files; running with only `<basename>_table.tsv` publishes
+    only the regular assigned table and exits cleanly.
 
 
 ## Dependencies

@@ -76,7 +76,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S47]`| Part C requires `--reference_dataset` (no default)                                   | `tests/main.nf.test`                            | done    | —          |
 | `[S48]`| Part C accepts either an occurrence table or a fasta file (fasta-input branch blocked)| `tests/processes/part_c/extract_fasta_sequences_from_occurrence_table.nf.test` | done   | D04        |
 | `[S49]`| Part C stampa primary path — splitFasta + per-chunk `vsearch --usearch_global` + `bin/stampa_merge.py` + `collectFile(sort:)` | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`, `tests/main.nf.test`, `tests/python/test_stampa_merge.py` | done | — |
-| `[S50]`| Part C sintax shadow path — `vsearch --sintax` against the same reference            | `tests/processes/part_c/assign_taxonomy_sintax.nf.test` | done    | —          |
+| `[S50]`| Part C sintax shadow path — `part_C_shadow` runs `vsearch --sintax` on `<basename>_notmerged_table.tsv` and publishes `<basename>_notmerged_table_assigned.tsv` | `tests/processes/part_c/assign_taxonomy_sintax.nf.test`, `tests/main.nf.test` | red    | —          |
 | `[S51]`| Part C `update_occurrence_table` — splice taxonomy back onto the occurrence table   | `tests/processes/part_c/update_occurrence_table.nf.test` | done   | D04        |
 | `[S52]`| Part A normalises `U`/`u` to `T`/`t` in `filter_and_convert_to_fasta`                | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test` | done   | —          |
 | `[S53]`| Part B's `discover_fasta.py` rejects input fastas whose sequence lines contain `U`   | `tests/python/test_discover_fasta.py`            | done    | —          |
@@ -87,6 +87,8 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S58]`| `params.publish_mode` threads through every `publishDir` directive; invalid values abort at startup | `tests/main.nf.test` | done   | —          |
 | `[S59]`| Part B `--results_folder` whitelist: table + post-mumu fasta + six step logs only                  | `tests/main.nf.test`                            | done    | —          |
 | `[S60]`| path-typed params normalise leading `~` / `~user` at workflow startup (reference_dataset, occurrence_table, fastq_folder, fasta_folder, results_folder) | `tests/functions/normalize_path.nf.test`, `tests/main.nf.test` | done | — |
+| `[S61]`| `params.taxonomy_method` validated at startup: accepts `stampa` (default) and `sintax`; invalid value aborts before any process runs | `tests/main.nf.test` | red | — |
+| `[S62]`| Part C standalone probes for `<basename>_notmerged_table.tsv` sibling; runs `part_C_shadow` iff present, no-op otherwise | `tests/main.nf.test` | red | — |
 
 
 ## Per-process tests
