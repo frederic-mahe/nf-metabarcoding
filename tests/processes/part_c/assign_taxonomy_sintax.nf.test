@@ -11,6 +11,11 @@ nextflow_process {
         // `d:Bacteria(1.00),p:Proteobacteria(0.95)`) into the
         // canonical assignments TSV's `taxonomy` column. `identity`
         // and `references` stay at placeholder values (`0.0` / `NA`).
+        //
+        // The fixture uses an 80-nt non-periodic sequence: sintax
+        // samples 8-mers and needs enough unique kmers to bootstrap a
+        // confident lineage — short or periodic sequences come back
+        // unclassified (col 2 empty), exercised by the second test.
         tag "ci"
         when {
             params {
@@ -19,10 +24,11 @@ nextflow_process {
             }
             process {
                 """
+                def SEQ = 'ACGGAATTCAGTATTCGATGCAATCAGTAGCATGCAGTTAATCGATGCATTAGCATGCAGTCATGCAATCGAGCATTAGC'
                 def reps = workDir.resolve("reps.fas")
-                reps.text = '>amp1;size=10;\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
+                reps.text = '>amp1;size=10;\\n' + SEQ + '\\n'
                 def ref = workDir.resolve("reference.fas")
-                ref.text = '>refA;tax=d:Bacteria,p:Proteobacteria,c:Gammaproteobacteria;\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
+                ref.text = '>refA;tax=d:Bacteria,p:Proteobacteria,c:Gammaproteobacteria;\\n' + SEQ + '\\n'
                 input[0] = file(reps.toString())
                 input[1] = file(ref.toString())
                 input[2] = "proj_1_samples_notmerged"
@@ -61,18 +67,19 @@ nextflow_process {
         }
     }
 
-    test("emits an empty assignments TSV when sintax_cutoff rejects every hit") {
+    test("emits NA in the taxonomy column when sintax produces no classification") {
         // COVERAGE: [S50]
-        // Sanity-check the cutoff wiring: with sintax_cutoff close to 1.0
-        // a low-confidence hit drops out and vsearch's tabbed output for
-        // that query has an empty column 2. The reshape must still emit
-        // a row (one per query) so update_occurrence_table can pass the
-        // amplicon through unchanged.
+        // Short / low-complexity sequences come back unclassified from
+        // sintax — vsearch's tabbed output has an empty column 2 for
+        // that query. The reshape must turn the empty cell into the
+        // canonical `NA` placeholder so the assignments TSV stays
+        // 5-column tidy and update_occurrence_table can pass the row
+        // through unchanged.
         tag "ci"
         when {
             params {
                 threads       = 1
-                sintax_cutoff = 0.99
+                sintax_cutoff = 0.9
             }
             process {
                 """
@@ -91,11 +98,13 @@ nextflow_process {
             def assignments = process.out[0].get(0)
             def rows = path(assignments).readLines()
             assert rows.size() == 1 :
-                "expected one passthrough row per query even under high cutoff, got: ${rows}"
+                "expected one passthrough row even when unclassified, got: ${rows}"
             def fields = rows[0].split("\t", -1)
             assert fields.size() == 5
             assert fields[0] == "amp1"
             assert fields[1] == "10"
+            assert fields[3] == "NA" :
+                "empty sintax col 2 → taxonomy must be NA, got: ${fields[3]}"
         }
     }
 }

@@ -1094,6 +1094,12 @@ nextflow_pipeline {
         // alongside the --occurrence_table input is the toggle for the
         // shadow Part C workflow. Both assigned tables must reach the
         // results folder when the sibling is present.
+        //
+        // The reference header carries both formats so a single fixture
+        // serves the regular (stampa, space-separated lineage) and
+        // shadow (sintax, `;tax=...;`) paths at once. stampa_merge.py
+        // splits the target on the first space, sintax picks up the
+        // `tax=...` annotation.
         tag "ci"
         when {
             params {
@@ -1105,26 +1111,26 @@ nextflow_pipeline {
             }
         }
         setup {
+            // 80-nt non-periodic sequence — sintax needs enough unique
+            // kmers (it samples 8-mers) to bootstrap a lineage.
+            def SEQ = "ACGGAATTCAGTATTCGATGCAATCAGTAGCATGCAGTTAATCGATGCATTAGCATGCAGTCATGCAATCGAGCATTAGC"
             def ref = file("${outputDir}/part_c_shadow_ref.fas")
             ref.parentFile.mkdirs()
-            // sintax-formatted reference header (`;tax=...;`).
             ref.text = (
-                ">refA;tax=d:Bacteria,p:Proteobacteria;\n" +
-                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+                ">refA;tax=d:Bacteria,p:Proteobacteria; Bacteria|Proteobacteria\n" +
+                "${SEQ}\n"
             )
             def tab = file("${outputDir}/part_c_shadow_table.tsv")
             tab.text = (
                 "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
                 "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
-                "1\t10\tNA\tamp1\t32\t10\tN\t1\t0.001\t" +
-                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t10\n"
+                "1\t10\tNA\tamp1\t80\t10\tN\t1\t0.001\t${SEQ}\t0.0\tNA\tNA\t10\n"
             )
             def shadow_tab = file("${outputDir}/part_c_shadow_notmerged_table.tsv")
             shadow_tab.text = (
                 "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
                 "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
-                "1\t7\tNA\tampS\t32\t7\tN\t1\t0.001\t" +
-                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t7\n"
+                "1\t7\tNA\tampS\t80\t7\tN\t1\t0.001\t${SEQ}\t0.0\tNA\tNA\t7\n"
             )
         }
         then {

@@ -65,6 +65,10 @@ params.stampa_chunk_size = 1000
 // dropped (stampa_merge.py then emits "No_hit" for the amplicon).
 params.stampa_maxrejects = 0
 params.stampa_id         = 0.5
+// [S50]: --sintax_cutoff threshold for vsearch's sintax classifier.
+// Used by the shadow Part C path (always) and by the regular Part C
+// path when params.taxonomy_method == 'sintax'.
+params.sintax_cutoff     = 0.9
 
 
 def normalize_path(value) {
@@ -196,7 +200,9 @@ Part B — per-sample fasta → occurrence table:
 
 Part C — taxonomic assignment:
   --reference_dataset PATH    reference fasta (.gz / .bz2 OK; required)
-  --taxonomy_method NAME      'stampa' (default) or 'sintax'
+  --taxonomy_method NAME      regular-path method: 'stampa' (default)
+                              or 'sintax'. The shadow path always uses
+                              sintax regardless of this flag.
   --iddef INT                 vsearch --iddef value (default: ${params.iddef})
   --stampa_chunk_size INT     sequences per stampa scatter chunk;
                               0 disables the split (default: ${params.stampa_chunk_size})
@@ -205,6 +211,10 @@ Part C — taxonomic assignment:
                               (default: ${params.stampa_maxrejects})
   --stampa_id FLOAT           vsearch --id threshold for the stampa
                               scatter step (default: ${params.stampa_id})
+  --sintax_cutoff FLOAT       vsearch --sintax_cutoff threshold; used by
+                              the shadow path and by --taxonomy_method
+                              sintax on the regular path
+                              (default: ${params.sintax_cutoff})
 
 Runtime:
   --threads INT               threads per process (default: ${params.threads})
@@ -1573,15 +1583,24 @@ process assign_taxonomy_stampa {
 
 
 process assign_taxonomy_sintax {
-    // [S50]: shadow taxonomic-assignment path. Run vsearch --sintax
-    // against the same reference dataset and reshape the output to
-    // match the stampa-style TSV
+    // [S50]: shadow Part C runs `vsearch --sintax` against the same
+    // --reference_dataset ([S47]) and reshapes the tabbed output to
+    // the canonical assignments TSV
     // (amplicon\tabundance\tidentity\ttaxonomy\treferences).
     //
-    // Skeleton: the sed/awk reshape below is a best-effort pass
-    // that strips ;size= annotations and renames the bootstrap
-    // confidences into the references column. Pin the exact shape
-    // once D04 lands.
+    // Column mapping from vsearch --sintax --tabbedout:
+    //   col 1 → amplicon (after stripping ;size=N;)
+    //   col 2 → taxonomy (bootstrap-annotated lineage, e.g.
+    //           `d:Bacteria(1.00),p:Proteobacteria(0.85)`)
+    //   col 3 (strand) and col 4 (cutoff-filtered lineage) are ignored.
+    // `identity` and `references` stay at placeholder values
+    // ([S33]/[S46]) — sintax does not produce a percent identity, and
+    // there is no single "reference accession" to record.
+    //
+    // The process is also used by the regular path when
+    // params.taxonomy_method == 'sintax' ([S61]); the published
+    // filename embeds `basename`, which carries the `_notmerged` token
+    // on the shadow path.
     publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
         enabled: params.results_folder != null
 
@@ -1600,19 +1619,19 @@ process assign_taxonomy_sintax {
         --sintax !{representatives} \
         --threads !{params.threads} \
         --db !{reference_dataset} \
-        --sintax_cutoff 0.8 \
+        --dbmask none \
+        --sintax_cutoff !{params.sintax_cutoff} \
         --tabbedout raw_sintax.tsv \
         --log !{basename}_taxonomy.log
 
-    awk 'BEGIN {FS = OFS = "\t"}
+    awk 'BEGIN { FS = OFS = "\t" }
          {
-             split($1, a, ";size=")
-             amplicon = a[1]
-             gsub(/;.*$/, "", a[2])
-             abundance = a[2] + 0
-             # column 4 (sintax LCA at the cutoff) → taxonomy
-             # column 2 (raw lineage with bootstrap) → references
-             print amplicon, abundance, "0.0", $4, $2
+             split($1, parts, ";size=")
+             amplicon = parts[1]
+             gsub(/;.*$/, "", parts[2])
+             abundance = parts[2] + 0
+             taxonomy = ($2 == "") ? "NA" : $2
+             print amplicon, abundance, "0.0", taxonomy, "NA"
          }' raw_sintax.tsv > !{basename}_taxonomy_sintax.tsv
     '''
 }
@@ -1745,6 +1764,57 @@ workflow part_C {
 }
 
 
+workflow part_C_shadow {
+    // [S50]: shadow Part C. Runs `vsearch --sintax` (always, no
+    // toggle) on the shadow occurrence table produced by shadow
+    // Part B ([S56]) or supplied via [S62]'s standalone-mode probe.
+    // The basename carries the `_notmerged` token so every
+    // published artefact is distinguishable from the regular Part C
+    // output. Shares `extract_fasta_sequences_from_occurrence_table`
+    // and `update_occurrence_table` with `part_C` — DSL2 allows
+    // these processes to be invoked from both sub-workflows because
+    // each invocation lives in its own workflow scope.
+    //
+    // [S50] short-circuit: when the upstream produced no `_notmerged`
+    // samples, `part_B_shadow` still emits a header-only table
+    // (`_0_samples_notmerged_table.tsv`). The filter on `populated`
+    // drops that case so no shadow artefacts are published when there
+    // is nothing to assign. Standalone mode reaches this workflow only
+    // when the sibling file exists ([S62]), but the filter is also a
+    // safety net there (empty sibling → no published shadow artefact).
+
+    take:
+    occurrence_table   // value channel: Path to <basename>_notmerged_table.tsv
+    basename           // value channel: <project>_<N>_samples_notmerged
+
+    main:
+    def reference = file(normalize_path(params.reference_dataset))
+
+    def populated = occurrence_table.filter { tbl ->
+        // any non-empty line after the header → there is at least one
+        // amplicon to assign.
+        tbl.toFile().readLines().drop(1).any { it.trim() }
+    }
+
+    extract_fasta_sequences_from_occurrence_table(populated)
+
+    assign_taxonomy_sintax(
+        extract_fasta_sequences_from_occurrence_table.out[0],
+        reference,
+        basename,
+    )
+
+    update_occurrence_table(
+        populated,
+        assign_taxonomy_sintax.out[0],
+        basename,
+    )
+
+    emit:
+    table = update_occurrence_table.out[0]
+}
+
+
 workflow part_c {
     // Standalone Part C ([S47]/[S48]): the user provides
     // --occurrence_table (Part B's <basename>_table.tsv) and
@@ -1767,6 +1837,22 @@ workflow part_c {
     def table_ch    = Channel.fromPath(normalize_path(params.occurrence_table))
 
     part_C(table_ch, basename_ch)
+
+    // [S62]: probe for a shadow sibling next to the input table. The
+    // file lookup is done at workflow-build time (not inside a channel
+    // operator) so the toggle is "the file exists on disk now". When
+    // the sibling is present, route it through part_C_shadow alongside
+    // the regular part_C invocation — DSL2 allows two distinct
+    // sub-workflows in the same scope. When absent, the shadow
+    // workflow is simply not invoked.
+    def shadow_table_path = file(
+        "${table_path.parent}/${derived_basename}_notmerged_table.tsv"
+    )
+    if ( shadow_table_path.exists() ) {
+        def shadow_basename_ch = Channel.value("${derived_basename}_notmerged")
+        def shadow_table_ch    = Channel.fromPath(shadow_table_path.toString())
+        part_C_shadow(shadow_table_ch, shadow_basename_ch)
+    }
 }
 
 
@@ -1781,9 +1867,9 @@ workflow part_b {
     //
     // When --reference_dataset is also set, Part C is wired onto the
     // regular path so the table_assigned.tsv lands alongside the Part B
-    // outputs. Shadow Part C is not wired end-to-end: DSL2 forbids a
-    // second invocation of `part_C` in the same scope; users wanting
-    // shadow taxonomy can run Part C standalone on the shadow table.
+    // outputs. Shadow taxonomy ([S50]) is wired via the sibling
+    // workflow `part_C_shadow` on `part_B_shadow.out.table` — DSL2
+    // allows two distinct sub-workflows in the same scope.
     assert params.project_name :
         "--project_name must be set when --fasta_folder is set"
     assert params.results_folder :
@@ -1826,6 +1912,14 @@ workflow part_b {
             "${params.project_name}_${files.size()}_samples"
         }
         part_C(part_B.out.table, basename_ch)
+
+        // [S50]: shadow taxonomy on part_B_shadow's occurrence table.
+        // The header-only gate inside part_C_shadow suppresses output
+        // when the shadow side had no samples upstream.
+        def shadow_basename_ch = s_fasta_list.map { files ->
+            "${params.project_name}_${files.size()}_samples_notmerged"
+        }
+        part_C_shadow(part_B_shadow.out.table, shadow_basename_ch)
     }
 }
 
@@ -1990,6 +2084,13 @@ workflow {
     assert params.publish_mode in allowed_modes :
         "--publish_mode must be one of ${allowed_modes}, got '${params.publish_mode}'"
 
+    // [S61]: validate --taxonomy_method up-front. Only the regular
+    // Part C path consults this flag; shadow Part C always uses sintax
+    // ([S50]).
+    def allowed_taxonomy_methods = ['stampa', 'sintax']
+    assert params.taxonomy_method in allowed_taxonomy_methods :
+        "--taxonomy_method must be one of ${allowed_taxonomy_methods}, got '${params.taxonomy_method}'"
+
     // [S60]: every path-typed param is read through `normalize_path()`
     // at its use site (file(), publishDir, etc.) — see the helper at the
     // top of this file. Nextflow 25's `params` map is read-only from
@@ -2038,9 +2139,9 @@ workflow {
     // token in their basename so they sit alongside the regular
     // ones in --results_folder without colliding. When
     // --reference_dataset is also set, Part C runs on the regular
-    // Part B table; shadow taxonomy is left to a standalone Part C
-    // invocation (DSL2 forbids a second `part_C` call in the same
-    // scope).
+    // Part B table and `part_C_shadow` ([S50]) runs on the shadow
+    // table — DSL2 allows two distinct sub-workflows in the same
+    // scope.
     if ( params.project_name ) {
         assert params.results_folder :
             "--results_folder must be set when --project_name is set"
@@ -2078,6 +2179,14 @@ workflow {
                 "${params.project_name}_${files.size()}_samples"
             }
             part_C(part_B.out.table, basename_ch)
+
+            // [S50]: shadow taxonomy on part_B_shadow's table. The
+            // header-only gate inside part_C_shadow suppresses output
+            // when the shadow side had zero _notmerged samples.
+            def shadow_basename_ch = s_fasta.map { files ->
+                "${params.project_name}_${files.size()}_samples_notmerged"
+            }
+            part_C_shadow(part_B_shadow.out.table, shadow_basename_ch)
         }
     }
 }
