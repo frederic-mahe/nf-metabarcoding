@@ -89,25 +89,4 @@ nextflow_process {
         }
     }
 
-    test("aborts when --project_name is not set") {
-        // COVERAGE: [S25]
-        tag "pending"
-        // The assertion that --project_name is required is enforced
-        // at the workflow level (main.nf "workflow { assert ... }"),
-        // not in the process itself; covered end-to-end by
-        // tests/main.nf.test once Part B is wired into the main
-        // workflow. This placeholder keeps the [S25] coverage row
-        // visible.
-        when {
-            process {
-                """
-                input[0] = []
-                input[1] = ""
-                """
-            }
-        }
-        then {
-            assert process.failed
-        }
-    }
 }
