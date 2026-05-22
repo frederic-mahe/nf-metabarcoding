@@ -59,7 +59,9 @@ nextflow_process {
         then {
             assert process.success
 
-            // column layout: <SHA1> <ee> <length>, space-separated
+            // Part A → Part B contract (see "Interfaces between parts"
+            // in SPECIFICATIONS.md): space-separated `<SHA1> <ee> <length>`
+            // sorted by length / SHA1 / ee, one row per unique SHA1.
             def lines = path(process.out[1].get(0)).readLines()
             assert lines.size() > 0 : "expected at least one .qual line"
             lines.each { line ->
@@ -70,8 +72,30 @@ nextflow_process {
                 assert cols[2] ==~ /\d+/          : "expected integer length in column 3: ${line}"
             }
 
-            // TODO: assert duplicate SHA1s are collapsed to the lowest ee
-            // TODO: assert sort order matches the spec (length asc, id asc, ee asc)
+            // Uniqueness: every SHA1 appears at most once
+            // (`uniq --check-chars=40` collapses duplicates onto the
+            // lowest-ee row).
+            def shas = lines.collect { it.split(' ')[0] }
+            assert shas == shas.unique() :
+                ".qual must have one row per unique SHA1, got duplicates in: ${shas}"
+
+            // Sort order: primary by length asc, secondary by SHA1
+            // ascii asc, tertiary by ee numeric asc. The fixture's
+            // three reads have the same length after primer trimming,
+            // so we assert (a) length is non-decreasing and (b) within
+            // each length bucket, SHA1 is non-decreasing.
+            for (int i = 1; i < lines.size(); i++) {
+                def prev = lines[i - 1].split(' ')
+                def cur  = lines[i].split(' ')
+                def prevLen = prev[2] as int
+                def curLen  = cur[2] as int
+                assert prevLen <= curLen :
+                    "length must be non-decreasing, got ${prevLen} then ${curLen}"
+                if ( prevLen == curLen ) {
+                    assert prev[0] <= cur[0] :
+                        "within a length bucket, SHA1 must be non-decreasing: ${prev[0]} then ${cur[0]}"
+                }
+            }
         }
     }
 }

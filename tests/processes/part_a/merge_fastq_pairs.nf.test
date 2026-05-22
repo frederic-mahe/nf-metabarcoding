@@ -6,6 +6,11 @@ nextflow_process {
 
     test("merges overlapping paired-end reads") {
         // COVERAGE: [S01], [S03]
+        // The paired_merge_ok fixture carries 3 amplicons whose
+        // R1 + R2 overlap on the central insert ([S03] paired-end
+        // path). vsearch --fastq_mergepairs must emit one merged
+        // record per pair and leave the notmerged_{fwd,rev} streams
+        // empty for this fixture.
         tag "ci"
         when {
             process {
@@ -22,7 +27,17 @@ nextflow_process {
         }
         then {
             assert process.success
-            // TODO: assert that the merged_fastq output contains 3 records
+
+            // merged fastq: 3 records (= 12 lines, 4 per record).
+            def merged = path(process.out[1].get(0)).readLines()
+            assert merged.size() == 12 :
+                "expected 3 merged records (12 lines), got ${merged.size()}"
+
+            // every input pair merged → notmerged_fwd / notmerged_rev empty.
+            assert path(process.out[3].get(0)).readLines().isEmpty() :
+                "notmerged_fwd should be empty when every pair merges"
+            assert path(process.out[4].get(0)).readLines().isEmpty() :
+                "notmerged_rev should be empty when every pair merges"
         }
     }
 

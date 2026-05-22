@@ -39,19 +39,31 @@ nextflow_process {
         then {
             assert process.success
 
-            // every sequence line should be shorter than the 98-bp merged
-            // input (20-bp forward + 18-bp reverse primer removed)
+            // The paired_merge_ok fixture carries 3 amplicons; every
+            // amplicon flanked by the canonical forward + reverse
+            // primer pair → cutadapt --discard-untrimmed keeps all
+            // three. Read count must be preserved.
             def lines = path(process.out[1].get(0)).readLines()
+            assert lines.size() == 12 :
+                "expected 3 trimmed records (12 lines), got ${lines.size()}"
+
+            // After trimming, every sequence is shorter than the 98-bp
+            // amplicon (20 forward + 18 reverse primer removed). The
+            // synthetic body is 60 nt; allow a few bp of slack on each
+            // side to absorb cutadapt's 2/3 minimum-overlap matching.
             def seqs = []
             for (int i = 1; i < lines.size(); i += 4) {
                 seqs.add(lines[i])
             }
-            assert seqs.size() > 0 : "expected at least one trimmed read"
             seqs.each { seq ->
-                assert seq.length() < 98 : "expected length < 98 after trimming, got ${seq.length()}: ${seq}"
+                assert seq.length() <= 64 :
+                    "expected length <= 64 (60 body + slack) after trimming, got ${seq.length()}: ${seq}"
+                assert seq.length() >= 56 :
+                    "expected length >= 56 (60 body - slack) after trimming, got ${seq.length()}: ${seq}"
+                // primer bases must not survive in the read
+                assert !seq.contains("CCAGCA") :
+                    "forward-primer prefix should be gone, got: ${seq}"
             }
-
-            // TODO: assert read count preserved (or `--max-n 0` discards expected)
         }
     }
 

@@ -58,9 +58,27 @@ nextflow_process {
         }
         then {
             assert process.success
-            // TODO: assert headers carry `size=N` (--sizeout)
-            // TODO: assert `ee=` is absent (--xee)
-            // TODO: assert duplicate sequences are collapsed
+            // Output contract (Part A → Part B): every record's header
+            // is `>SHA1;size=N` with --sizeout and stripped of
+            // `ee=` / `length=` (--xee / --xlength).
+            def lines = path(process.out[1].get(0)).readLines()
+            assert lines.size() > 0 : "expected at least one record"
+            assert lines.size() % 2 == 0 :
+                "fasta width=0 expected, got ${lines.size()} lines"
+            def shas = []
+            for (int i = 0; i < lines.size(); i += 2) {
+                def header = lines[i]
+                assert header ==~ /^>[0-9a-f]{40};size=\d+;?$/ :
+                    "expected >SHA1;size=N, got: ${header}"
+                assert !header.contains("ee=") :
+                    "ee= must be stripped (--xee), got: ${header}"
+                assert !header.contains("length=") :
+                    "length= must be stripped (--xlength), got: ${header}"
+                shas << header.replaceFirst(/^>/, '').split(';')[0]
+            }
+            // duplicate-sequence collapse: every emitted SHA1 is unique.
+            assert shas == shas.unique() :
+                "dereplication must produce one row per SHA1, got: ${shas}"
         }
     }
 

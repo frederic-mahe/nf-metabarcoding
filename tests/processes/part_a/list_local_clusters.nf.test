@@ -67,9 +67,24 @@ nextflow_process {
         }
         then {
             assert process.success
-            // TODO: assert every row in the .stats output has column 2 > 2
-            // TODO: assert clusters with <=2 reads are absent
-            // TODO: confirm the --fastidious flag is not used (per process comment)
+            // [S17]: filter_swarm_stats.awk drops every row whose
+            // column 2 (total reads) is <= 2. The paired_merge_ok
+            // fixture's 3 reads collapse into 3 singleton clusters
+            // (one per amplicon) — all filtered out. Assert the
+            // output is either empty OR every surviving row carries
+            // column 2 > 2; mixed bag is a [S17] violation.
+            def stats = path(process.out[1].get(0)).readLines()
+            stats.each { line ->
+                if ( line.trim().isEmpty() ) {
+                    return
+                }
+                def cols = line.split("\t")
+                assert cols.size() >= 2 :
+                    "expected at least 2 tab-separated columns, got: ${line}"
+                def total = cols[1] as int
+                assert total > 2 :
+                    "[S17] violation: row with total=${total} reads survived the > 2 filter: ${line}"
+            }
         }
     }
 

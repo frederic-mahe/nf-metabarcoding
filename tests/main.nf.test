@@ -25,8 +25,27 @@ nextflow_pipeline {
                 assert log.exists()       : "missing ${step} log: ${log}"
                 assert log.size() > 0     : "empty ${step} log: ${log}"
             }
-            // TODO: assert per-sample artefacts exist (.fas, .qual, .stats)
-            // TODO: assert each .stats row has > 2 reads
+
+            // [S01]/[S19]: per-sample artefacts (the Part A → Part B
+            // contract) also land in params.fastq_folder.
+            ["fas", "qual", "stats"].each { ext ->
+                def artefact = file("${folder}/${sampleId}.${ext}")
+                assert artefact.exists() :
+                    "missing per-sample ${ext}: ${artefact}"
+            }
+
+            // [S17]: every row in the published .stats has column 2
+            // (total reads) > 2. The paired_merge_ok fixture has 3
+            // singleton clusters, all filtered out → an empty .stats
+            // is a legitimate outcome.
+            file("${folder}/${sampleId}.stats").readLines().each { line ->
+                if ( line.trim().isEmpty() ) {
+                    return
+                }
+                def total = line.split("\t")[1] as int
+                assert total > 2 :
+                    "[S17] violation: row with total=${total} reads survived: ${line}"
+            }
         }
     }
 
