@@ -347,6 +347,46 @@ emit_u_containing_fastq() {
     } > u_normalisation.fastq
 }
 
+emit_compression_variants() {
+    # [S03]: three byte-identical fastq pairs in different
+    # compression forms — plain, gzip, bzip2. The amplicon set is
+    # the same as paired_merge_ok so vsearch / cutadapt / swarm
+    # have something to merge / trim / cluster.
+    #
+    # The three pairs share one folder so a single workflow run
+    # discovers and processes them all together; distinct
+    # filename prefixes (`cmp_plain_`, `cmp_gz_`, `cmp_bz2_`) keep
+    # the derived sample IDs ([S12]) collision-free per [S13].
+    local -r dir="compression_variants"
+    mkdir -p "${dir}"
+
+    local i
+    local fwd
+    local rev_src
+    local rev
+    : > "${dir}/cmp_plain_1.fastq"
+    : > "${dir}/cmp_plain_2.fastq"
+    i=0
+    for A in "${AMPLICONS_OK[@]}"; do
+        i=$((i + 1))
+        fwd="${A:0:${READ_LEN}}"
+        rev_src="${A: -${READ_LEN}}"
+        rev="$(reverse_complement "${rev_src}")"
+        write_record "${dir}/cmp_plain_1.fastq" "read_${i} 1:N:0:1" "${fwd}"
+        write_record "${dir}/cmp_plain_2.fastq" "read_${i} 2:N:0:1" "${rev}"
+    done
+    # Mirror the same content into gz and bz2 siblings.
+    gzip --keep --force "${dir}/cmp_plain_1.fastq"
+    gzip --keep --force "${dir}/cmp_plain_2.fastq"
+    mv "${dir}/cmp_plain_1.fastq.gz" "${dir}/cmp_gz_1.fastq.gz"
+    mv "${dir}/cmp_plain_2.fastq.gz" "${dir}/cmp_gz_2.fastq.gz"
+    bzip2 --keep --force "${dir}/cmp_plain_1.fastq"
+    bzip2 --keep --force "${dir}/cmp_plain_2.fastq"
+    mv "${dir}/cmp_plain_1.fastq.bz2" "${dir}/cmp_bz2_1.fastq.bz2"
+    mv "${dir}/cmp_plain_2.fastq.bz2" "${dir}/cmp_bz2_2.fastq.bz2"
+}
+
+
 emit_paired "paired_merge_ok"   "${AMPLICONS_OK[@]}"
 emit_paired "paired_merge_fail" "${AMPLICONS_LONG[@]}"
 emit_single
@@ -361,5 +401,6 @@ emit_e2e_part_b_fixture
 emit_n_containing_fasta
 emit_u_containing_fasta
 emit_u_containing_fastq
+emit_compression_variants
 
 echo "Wrote fixtures to ${DATA_DIR}"

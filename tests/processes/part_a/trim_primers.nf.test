@@ -60,8 +60,12 @@ nextflow_process {
                     "expected length <= 64 (60 body + slack) after trimming, got ${seq.length()}: ${seq}"
                 assert seq.length() >= 56 :
                     "expected length >= 56 (60 body - slack) after trimming, got ${seq.length()}: ${seq}"
-                // primer bases must not survive in the read
-                assert !seq.contains("CCAGCA") :
+                // The forward primer (with IUPAC ambiguities collapsed
+                // in the fixture: S→C, Y→C) must not survive at the
+                // 5' end of the read. We can't ban arbitrary primer
+                // substrings — bodies legitimately contain motifs like
+                // CCAGCA — but `startsWith` is a tight check.
+                assert !seq.startsWith("CCAGCACCCGCGGTAATTCC") :
                     "forward-primer prefix should be gone, got: ${seq}"
             }
         }

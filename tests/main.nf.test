@@ -1262,4 +1262,54 @@ nextflow_pipeline {
                 "no sibling → no shadow Part C → no _notmerged_table_assigned.tsv"
         }
     }
+
+    test("plain / .gz / .bz2 inputs produce byte-identical Part A outputs") {
+        // COVERAGE: [S03]
+        // [S03]: "the same input data in any of these forms produces
+        // byte-identical Part A outputs". The compression_variants
+        // fixture holds three identical-content pairs:
+        //   cmp_plain_{1,2}.fastq    (no compression)
+        //   cmp_gz_{1,2}.fastq.gz    (gzip)
+        //   cmp_bz2_{1,2}.fastq.bz2  (bzip2)
+        // After one Part A run, the three derived samples
+        // (cmp_plain / cmp_gz / cmp_bz2) must publish identical
+        // .fas, .qual and .stats files. The SHA1 IDs are computed
+        // from the sequence content, which is the same across the
+        // three pairs, so byte-identity is the spec-mandated outcome.
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data/compression_variants"
+                fastq_pattern  = ""
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def folder = "${projectDir}/tests/data/compression_variants"
+
+            // every sample published the three per-sample artefacts.
+            ["cmp_plain", "cmp_gz", "cmp_bz2"].each { sampleId ->
+                ["fas", "qual", "stats"].each { ext ->
+                    def artefact = file("${folder}/${sampleId}.${ext}")
+                    assert artefact.exists() :
+                        "missing per-sample ${ext} for ${sampleId}: ${artefact}"
+                }
+            }
+
+            // [S03] core assertion: outputs are byte-identical across
+            // the three compression variants.
+            ["fas", "qual", "stats"].each { ext ->
+                def plain = file("${folder}/cmp_plain.${ext}").bytes
+                def gz    = file("${folder}/cmp_gz.${ext}").bytes
+                def bz2   = file("${folder}/cmp_bz2.${ext}").bytes
+                assert plain == gz :
+                    "[S03] cmp_plain.${ext} differs from cmp_gz.${ext}"
+                assert plain == bz2 :
+                    "[S03] cmp_plain.${ext} differs from cmp_bz2.${ext}"
+            }
+        }
+    }
 }
