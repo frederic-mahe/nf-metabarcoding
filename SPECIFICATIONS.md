@@ -97,8 +97,11 @@ isolation.
 - **Part A → Part B**
   - `<sampleId>.fas` — dereplicated FASTA, vsearch
     `--sizeout`-style abundance annotation, `--fasta_width 0`
-  - `<sampleId>.qual` — TSV with columns `sha1\tee\tlength`, sorted
-    by length then SHA1
+  - `<sampleId>.qual` — three space-separated columns
+    `sha1 ee length`, sorted by length (numeric asc), then SHA1
+    (ascii asc), then ee (numeric asc). One row per unique SHA1 —
+    `uniq --check-chars=40` collapses duplicates onto the lowest-ee
+    row.
   - `<sampleId>.stats` — swarm `--statistics-file` output, filtered
     to clusters with > 2 reads
 - **Part B → Part C**
