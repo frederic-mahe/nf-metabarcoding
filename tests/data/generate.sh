@@ -298,9 +298,10 @@ emit_duplicate_sample_ids() {
 emit_n_containing_fasta() {
     # [S04] — minimal fixture for `mask_ns_for_swarm`: one sequence
     # with 8 internal Ns (mirrors the `vsearch --fastq_join` padding),
-    # one clean sequence. Sequence lines must be rewritten N→A;
-    # header lines (including the literal 'N' in '>seq1_with_Ns') must
-    # be left alone.
+    # one clean sequence. Sequence lines must be rewritten N→U
+    # (the U mask is losslessly reversible — see [S04] / [S52]);
+    # header lines (including the literal 'N' in '>seq1_with_Ns')
+    # must be left alone.
     cat > n_containing.fas <<'FASTA'
 >seq1_with_Ns
 ACGTACGTNNNNNNNNACGTACGT
