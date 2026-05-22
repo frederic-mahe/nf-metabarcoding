@@ -146,6 +146,48 @@ nextflow_pipeline {
         }
     }
 
+    test("--no_trimming true also skips trim_primers on the shadow Part A pipeline") {
+        // COVERAGE: [S04], [S20]
+        // paired_merge_fail produces both a regular and a shadow
+        // (_notmerged) stream — the regular and shadow channels are
+        // mixed before the trim_primers gate in part_A, so asserting
+        // trim_primers is entirely absent from the trace while the
+        // shadow-only join_notmerged / strip_reads still run proves
+        // --no_trimming reaches the shadow pipeline too.
+        // As in the sibling [S20] test, we check workflow.stdout (the
+        // process trace) rather than the absence of a published
+        // _notmerged_trimming.log — tests/data/ is shared across
+        // cases and the [S04] test may have just published one.
+        tag "ci"
+        when {
+            params {
+                forward_primer = ""
+                reverse_primer = ""
+                no_trimming    = true
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_fail_{1,2}.fastq.gz"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def out = workflow.stdout.toString()
+            assert !out.contains("trim_primers") :
+                "trim_primers must not run when --no_trimming is set (shadow path), got: ${out}"
+            // shadow-only processes still run on the _notmerged stream
+            ["join_notmerged", "strip_reads"].each { proc ->
+                assert out.contains(proc) :
+                    "expected shadow-path ${proc} to run, got: ${out}"
+            }
+            // common processes still run on both regular and shadow streams
+            ["merge_fastq_pairs", "filter_and_convert_to_fasta",
+             "dereplicate_fasta", "list_local_clusters"].each { proc ->
+                assert out.contains(proc) :
+                    "expected ${proc} to run, got: ${out}"
+            }
+        }
+    }
+
     test("unpaired fastq files are processed by skipping the merging step") {
         // COVERAGE: [S21]
         tag "ci"
