@@ -270,16 +270,32 @@ isolation.
   downstream). The step consumes the four swarm outputs
   (`--seeds`, `--statistics-file`, `--internal-structure`,
   `--output-file`) plus a concatenated per-sample stats file, and
-  emits an augmented `(stats, swarms, representatives)` triple. The
-  fastidious flag used by the upstream swarm run is propagated to
-  this step (default: `--fastidious`) so the representatives output
-  filename matches the swarm parameters.
+  emits an augmented `(stats, swarms, representatives)` triple.
+
+  `params.fastidious` (default `true`) is the single propagation
+  lever for the fastidious flag: when `true`, both the upstream
+  `global_clustering` ([S32]) swarm run and the `cleaving` cluster
+  cleaver run receive `--fastidious`, and every artefact carries
+  the `_1f` swarm-parameters suffix (`_1f.swarms`, `_1f.stats`,
+  `_1f.struct`, `_1f_representatives.fas`, `_1f.swarms2`,
+  `_1f.stats2`, `_1f_representatives.fas2`). When `false`, neither
+  process receives the flag, and the cleaver's representatives
+  filename swaps from `_1f_representatives.fas2` to
+  `_1_representatives.fas2` (the `.stats2`/`.swarms2` filenames
+  follow the input naming, so they inherit the upstream `_1f`/`_1`
+  suffix chosen by `global_clustering`). The toggle exists for
+  very large datasets where `--fastidious` is too memory- or
+  time-expensive; the default preserves the higher recall of the
+  fastidious pass.
   - **Pass when:** golden-file characterization tests for
     `bin/cluster_cleaver.py` reproduce the byte-exact output of the
     legacy `tmp/OTU_cleaver.py` on a fixture covering: (a) a cluster
     that splits on a sub-seed, (b) a cluster that does not split,
     (c) a candidate sub-seed below the per-sample-presence threshold,
-    (d) a sort tie within a sub-cluster.
+    (d) a sort tie within a sub-cluster; an end-to-end run with
+    `--fastidious false` completes successfully and `cleaving`
+    publishes `<basename>_1_representatives.fas2` (not the `_1f`
+    variant).
 - `[S24]` the shadow pipeline ([S04]) strips `params.stripright`
   nucleotides from the 3' end of each not-merged R1 and R2 read
   before joining, using `vsearch --fastx_filter --fastq_stripright`.
@@ -374,14 +390,20 @@ isolation.
     `;size=N` value is the sum of the per-sample sizes.
 - `[S32]` Part B's `global_clustering` runs swarm on the
   globally-dereplicated fasta from `[S31]` with `--differences 1
-  --fastidious --usearch-abundance` and the four output flags
+  --usearch-abundance` and the four output flags
   `--internal-structure`, `--output-file`, `--statistics-file`,
-  `--seeds`. Output filenames follow the
-  `<project_name>_<N>_samples_1f.{swarms,stats,struct}` and
-  `<project_name>_<N>_samples_1f_representatives.fas` scheme; the
-  run log is `<project_name>_<N>_samples_1f.log`.
+  `--seeds`. `--fastidious` is propagated from `params.fastidious`
+  (see [S22]). The swarm-parameters suffix `<sfx>` is `1f` when
+  `params.fastidious` is `true` (the default) and `1` when it is
+  `false`. Output filenames follow the
+  `<project_name>_<N>_samples_<sfx>.{swarms,stats,struct}` and
+  `<project_name>_<N>_samples_<sfx>_representatives.fas` scheme;
+  the run log is published as `<project_name>_<N>_samples_clustering.log`
+  ([S45], the project-wide construct — independent of `<sfx>`).
   - **Pass when:** the four output files plus the log exist and are
-    non-empty for the documented fixture.
+    non-empty for the documented fixture; a run with
+    `--fastidious false` produces `_1.{swarms,stats,struct}` /
+    `_1_representatives.fas` (no `_1f` artefacts).
 - `[S33]` Part B's `fake_taxonomic_assignment` writes a placeholder
   Part C input file by scanning the swarm representatives FASTA
   (`<basename>_1f_representatives.fas` from `[S32]`) and emitting,
