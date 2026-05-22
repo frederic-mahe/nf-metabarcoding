@@ -62,4 +62,52 @@ nextflow_process {
             assert file(structPath).exists()
         }
     }
+
+    test("--fastidious false drops the flag and swaps the _1f suffix for _1") {
+        // COVERAGE: [S32]
+        // [S32] propagation lever: params.fastidious (default true) is
+        // honored by global_clustering both in the swarm command line
+        // and in the published filenames' swarm-parameters suffix.
+        tag "ci"
+        when {
+            params {
+                threads    = 1
+                fastidious = false
+            }
+            process {
+                """
+                input[0] = global_dereplication.out[0]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+
+            def swarmsPath = process.out[0].get(0)
+            def statsPath  = process.out[1].get(0)
+            def structPath = process.out[2].get(0)
+            def repPath    = process.out[3].get(0)
+            def logPath    = process.out[4].get(0)
+
+            // _1f → _1 across every swarm output.
+            assert swarmsPath.endsWith("proj_3_samples_1.swarms") :
+                "expected _1.swarms with --fastidious=false, got: ${swarmsPath}"
+            assert statsPath.endsWith("proj_3_samples_1.stats") :
+                "expected _1.stats with --fastidious=false, got: ${statsPath}"
+            assert structPath.endsWith("proj_3_samples_1.struct") :
+                "expected _1.struct with --fastidious=false, got: ${structPath}"
+            assert repPath.endsWith("proj_3_samples_1_representatives.fas") :
+                "expected _1_representatives.fas with --fastidious=false, got: ${repPath}"
+            // [S45] step-log filename is independent of the suffix.
+            assert logPath.endsWith("proj_3_samples_clustering.log") :
+                "step log name should be suffix-independent, got: ${logPath}"
+
+            // No _1f artefact must have leaked into the work dir.
+            [swarmsPath, statsPath, structPath, repPath].each { p ->
+                assert !p.contains("_1f.") && !p.contains("_1f_") :
+                    "_1f artefact slipped through with --fastidious=false: ${p}"
+            }
+        }
+    }
 }

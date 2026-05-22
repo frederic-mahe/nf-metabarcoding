@@ -1263,6 +1263,49 @@ nextflow_pipeline {
         }
     }
 
+    test("Part B standalone runs end-to-end with --fastidious false") {
+        // COVERAGE: [S22], [S32]
+        // [S22]/[S32] propagation lever: setting params.fastidious to
+        // false threads --no-fastidious through both global_clustering
+        // (swarm) and cleaving (cluster_cleaver.py), and the workflow
+        // still produces a usable Part B occurrence table. The Part B
+        // results folder is whitelist-published ([S59]) so we can't
+        // directly observe the _1 suffix from here — the per-process
+        // tests in global_clustering.nf.test / cleaving.nf.test pin
+        // that. This test is the end-to-end smoke: the whole chain
+        // (including downstream chimera detection, cleaver-aware
+        // build_occurrence_table, mumu, etc.) survives the non-fastidious
+        // input naming.
+        tag "ci"
+        when {
+            params {
+                project_name   = "nofast"
+                results_folder = "${outputDir}/part_b_nofast"
+                fasta_folder   = "${projectDir}/tests/data/part_b"
+                threads        = 1
+                fastidious     = false
+            }
+        }
+        then {
+            assert workflow.success
+            def base = "${outputDir}/part_b_nofast/nofast_3_samples"
+            assert file("${base}_table.tsv").exists() :
+                "Part B should publish the table under --fastidious=false"
+            assert file("${base}_table.fas").exists() :
+                "Part B should publish the post-mumu fasta under --fastidious=false"
+            ["_dereplication.log",
+             "_clustering.log",
+             "_chimera_detection.log",
+             "_cleaving.log",
+             "_superstring_clustering.log",
+             "_post_clustering_curation.log"].each { suffix ->
+                def log = file("${base}${suffix}")
+                assert log.exists() && log.size() > 0 :
+                    "missing or empty step log: ${log}"
+            }
+        }
+    }
+
     test("plain / .gz / .bz2 inputs produce byte-identical Part A outputs") {
         // COVERAGE: [S03]
         // [S03]: "the same input data in any of these forms produces

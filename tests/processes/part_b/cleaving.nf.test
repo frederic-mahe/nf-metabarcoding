@@ -88,4 +88,39 @@ nextflow_process {
                 "cleaving log should not be empty"
         }
     }
+
+    test("--fastidious false swaps the cleaved representatives suffix from _1f to _1") {
+        // COVERAGE: [S22]
+        // Propagation lever from [S22]: cluster_cleaver.py receives
+        // --no-fastidious, and the published representatives FASTA
+        // filename swaps from _1f_representatives.fas2 to
+        // _1_representatives.fas2. The .stats2 / .swarms2 names follow
+        // the input filename (which carries the upstream global_clustering
+        // suffix), so they stay as `_1f` here because the setup{}
+        // block above runs global_clustering with the default
+        // (fastidious=true). The cleaver's filename-branching for
+        // representatives is what [S22] propagates.
+        tag "ci"
+        when {
+            params {
+                fastidious = false
+            }
+            process {
+                """
+                input[0] = global_clustering.out[1]   // .stats
+                input[1] = global_clustering.out[2]   // .struct
+                input[2] = global_clustering.out[0]   // .swarms
+                input[3] = global_dereplication.out[0] // global .fas
+                input[4] = list_all_cluster_seeds_of_size_greater_than_2.out[0]
+                input[5] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def fas2 = process.out[2].get(0)
+            assert fas2.endsWith("proj_3_samples_1_representatives.fas2") :
+                "expected _1_representatives.fas2 with --fastidious=false, got: ${fas2}"
+        }
+    }
 }

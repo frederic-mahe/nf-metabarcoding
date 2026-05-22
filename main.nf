@@ -38,6 +38,13 @@ params.results_folder  = null
 // (vsearch --fastx_filter --minsize). Records below this size are
 // dropped before uchime_denovo runs.
 params.chimera_minsize = 2
+// [S22]/[S32]: propagation lever for the swarm --fastidious flag.
+// When true (default), global_clustering's swarm and cleaving's
+// cluster_cleaver.py both run fastidious and every artefact carries
+// the `_1f` suffix; when false, both processes drop the flag and the
+// suffix swaps to `_1`. Exposed for very large datasets where the
+// fastidious pass is too expensive.
+params.fastidious = true
 
 // Part C parameters — required only when Part C runs.
 // [S47]: path to a reference dataset (fasta, plain / .gz / .bz2).
@@ -197,6 +204,11 @@ Part B — per-sample fasta → occurrence table:
                               (required when Part B runs)
   --chimera_minsize INT       minimum abundance for vsearch
                               --uchime_denovo (default: ${params.chimera_minsize})
+  --fastidious BOOL           run swarm + cluster_cleaver.py with
+                              --fastidious; default true. Set false on
+                              very large datasets where the fastidious
+                              pass is too memory- or time-expensive
+                              (default: ${params.fastidious})
 
 Part C — taxonomic assignment:
   --reference_dataset PATH    reference fasta (.gz / .bz2 OK; required)
@@ -770,9 +782,11 @@ process global_dereplication {
 
 process global_clustering {
     // [S32]: swarm on the globally-dereplicated fasta. Output
-    // filenames carry the `_1f` suffix (resolution=1, --fastidious)
-    // to mirror the bash-reference naming scheme. The swarm log
-    // lands at <basename>_clustering.log ([S45]).
+    // filenames carry the swarm-parameters suffix `_1f`
+    // (--fastidious, default) or `_1` (--no-fastidious), driven by
+    // params.fastidious. See [S22]'s propagation lever. The swarm
+    // log lands at <basename>_clustering.log ([S45]) — suffix-
+    // independent.
     //
     // [S59]: only the log reaches the results folder; the
     // .swarms / .stats / .struct / _representatives.fas are
@@ -785,25 +799,27 @@ process global_clustering {
     val basename
 
     output:
-    path "${basename}_1f.swarms"
-    path "${basename}_1f.stats"
-    path "${basename}_1f.struct"
-    path "${basename}_1f_representatives.fas"
+    path "${basename}_${params.fastidious ? '1f' : '1'}.swarms"
+    path "${basename}_${params.fastidious ? '1f' : '1'}.stats"
+    path "${basename}_${params.fastidious ? '1f' : '1'}.struct"
+    path "${basename}_${params.fastidious ? '1f' : '1'}_representatives.fas"
     path "${basename}_clustering.log"
 
     shell:
-    '''
-    swarm \
-        --threads !{params.threads} \
-        --differences 1 \
-        --fastidious \
-        --usearch-abundance \
-        --internal-structure !{basename}_1f.struct \
-        --output-file !{basename}_1f.swarms \
-        --statistics-file !{basename}_1f.stats \
-        --seeds !{basename}_1f_representatives.fas \
-        !{global_fasta} 2> !{basename}_clustering.log
-    '''
+    def sfx = params.fastidious ? '1f' : '1'
+    def fastidious_flag = params.fastidious ? '--fastidious' : ''
+    """
+    swarm \\
+        --threads ${params.threads} \\
+        --differences 1 \\
+        ${fastidious_flag} \\
+        --usearch-abundance \\
+        --internal-structure ${basename}_${sfx}.struct \\
+        --output-file ${basename}_${sfx}.swarms \\
+        --statistics-file ${basename}_${sfx}.stats \\
+        --seeds ${basename}_${sfx}_representatives.fas \\
+        ${global_fasta} 2> ${basename}_clustering.log
+    """
 }
 
 
@@ -1018,9 +1034,9 @@ process cleaving {
     // [S22]: re-cleave global swarm clusters along sub-seed
     // boundaries. The script does all the work — this process is the
     // nextflow wrapper around bin/cluster_cleaver.py. The output
-    // names follow the legacy `<input>2` / `<basename>_1f_representatives.fas2`
-    // convention so downstream concatenations (used by the
-    // occurrence-table builder) keep working unchanged.
+    // names follow the legacy `<input>2` / `<basename>_<sfx>_representatives.fas2`
+    // convention, where `<sfx>` is `1f` (default, --fastidious) or
+    // `1` (--no-fastidious) per [S22]'s propagation lever.
     //
     // [S45]: bin/cluster_cleaver.py uses python's logging module to
     // emit INFO-level progress to stderr; the redirect captures that
@@ -1033,30 +1049,31 @@ process cleaving {
         enabled: params.results_folder != null
 
     input:
-    path global_stats        // <basename>_1f.stats
-    path struct              // <basename>_1f.struct
-    path swarms              // <basename>_1f.swarms
+    path global_stats        // <basename>_<sfx>.stats
+    path struct              // <basename>_<sfx>.struct
+    path swarms              // <basename>_<sfx>.swarms
     path global_fasta        // <basename>.fas
     path per_sample_stats    // <basename>_per_sample_OTUs.stats
     val basename
 
     output:
-    path "${basename}_1f.stats2"
-    path "${basename}_1f.swarms2"
-    path "${basename}_1f_representatives.fas2"
+    path "${basename}_${params.fastidious ? '1f' : '1'}.stats2"
+    path "${basename}_${params.fastidious ? '1f' : '1'}.swarms2"
+    path "${basename}_${params.fastidious ? '1f' : '1'}_representatives.fas2"
     path "${basename}_cleaving.log"
 
     shell:
-    '''
-    cluster_cleaver.py \
-        --global_stats !{global_stats} \
-        --per_sample_stats !{per_sample_stats} \
-        --struct !{struct} \
-        --swarms !{swarms} \
-        --fasta !{global_fasta} \
-        --fastidious \
-        2> !{basename}_cleaving.log
-    '''
+    def fastidious_flag = params.fastidious ? '--fastidious' : '--no-fastidious'
+    """
+    cluster_cleaver.py \\
+        --global_stats ${global_stats} \\
+        --per_sample_stats ${per_sample_stats} \\
+        --struct ${struct} \\
+        --swarms ${swarms} \\
+        --fasta ${global_fasta} \\
+        ${fastidious_flag} \\
+        2> ${basename}_cleaving.log
+    """
 }
 
 
