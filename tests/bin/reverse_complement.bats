@@ -1,6 +1,11 @@
 #!/usr/bin/env bats
 #
-# Unit tests for bin/reverse_complement.sh.
+# Unit tests for bin/reverse_complement.sh — the IUPAC-aware
+# reverse-complement helper that trim_primers ([S01], Part A) calls
+# to derive the reverse primer's revcomp before feeding it to
+# cutadapt's --adapter search.
+#
+# COVERAGE: [S01]
 #
 # Run from the repository root:
 #   bats tests/bin/

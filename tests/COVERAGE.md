@@ -21,7 +21,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | Spec   | Bullet                                                                     | Test file                                       | Status  | Blocked by |
 |--------|----------------------------------------------------------------------------|-------------------------------------------------|---------|------------|
 | `[S00]`| TDD discipline (meta)                                                      | `tests/coverage-gate.sh`                        | done    | —          |
-| `[S01]`| three-part workflow (fastq→fasta, fasta→occurrence, taxonomic assignment)  | `tests/main.nf.test`                            | done    | —          |
+| `[S01]`| three-part workflow (fastq→fasta, fasta→occurrence, taxonomic assignment)  | `tests/main.nf.test`, `tests/bin/reverse_complement.bats` | done    | —          |
 | `[S02]`| each part can be run separately or all at once                             | `tests/main.nf.test`                            | TODO    | —          |
 | `[S03]`| paired-end or single-end, compressed (gz/bz2) or uncompressed input        | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/main.nf.test` | done | — |
 | `[S04]`| unmerged paired reads → shadow pipeline (N-join, N→U mask before swarm)    | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/join_notmerged.nf.test`, `tests/processes/part_a/mask_ns_for_swarm.nf.test`, `tests/main.nf.test` | done | — |
