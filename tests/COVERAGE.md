@@ -24,7 +24,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S01]`| three-part workflow (fastq→fasta, fasta→occurrence, taxonomic assignment)  | `tests/main.nf.test`, `tests/bin/reverse_complement.bats` | done    | —          |
 | `[S02]`| each part can be run separately or all at once                             | `tests/main.nf.test`                            | TODO    | —          |
 | `[S03]`| paired-end or single-end, compressed (gz/bz2) or uncompressed input        | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/main.nf.test` | done | — |
-| `[S04]`| unmerged paired reads → shadow pipeline (N-join, N→U mask before swarm)    | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/join_notmerged.nf.test`, `tests/processes/part_a/mask_ns_for_swarm.nf.test`, `tests/main.nf.test` | done | — |
+| `[S04]`| unmerged paired reads → shadow pipeline (A-padded join, no mask round-trip)| `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/join_notmerged.nf.test`, `tests/main.nf.test` | red    | —          |
 | `[S05]`| unmerged clusters appear in occurrence table with per-sample marker        | —                                               | blocked | D01, D02   |
 
 
@@ -78,17 +78,18 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S49]`| Part C stampa primary path — splitFasta + per-chunk `vsearch --usearch_global` + `bin/stampa_merge.py` + `collectFile(sort:)` | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`, `tests/main.nf.test`, `tests/python/test_stampa_merge.py` | done | — |
 | `[S50]`| Part C sintax shadow path — `part_C_shadow` runs `vsearch --sintax` on `<basename>_notmerged_table.tsv` and publishes `<basename>_notmerged_table_assigned.tsv` | `tests/processes/part_c/assign_taxonomy_sintax.nf.test`, `tests/main.nf.test` | done   | —          |
 | `[S51]`| Part C `update_occurrence_table` — splice taxonomy back onto the occurrence table   | `tests/processes/part_c/update_occurrence_table.nf.test` | done   | D04        |
-| `[S52]`| Part A normalises `U`/`u` to `T`/`t` in `filter_and_convert_to_fasta`                | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test` | done   | —          |
-| `[S53]`| Part B's `discover_fasta.py` rejects input fastas whose sequence lines contain `U`   | `tests/python/test_discover_fasta.py`            | done    | —          |
+| `[S52]`| **Retired** (was: Part A U/u → T/t normalisation; dropped with the A-padding redesign — see `[S04]`, `[S63]`) | —                                | retired | —          |
+| `[S53]`| **Retired** (was: `discover_fasta.py` rejects U/u; dropped with the A-padding redesign — see `[S04]`, `[S63]`) | —                                | retired | —          |
 | `[S54]`| every vsearch fastq-emitting module preserves the canonical 4-line layout            | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/strip_reads.nf.test`, `tests/processes/part_a/join_notmerged.nf.test` | done | — |
 | `[S55]`| every vsearch fasta-emitting module preserves the single-line-sequence layout        | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_b/global_dereplication.nf.test` | done | — |
-| `[S56]`| shadow Part B workflow — mask N→U before swarm, restore U→N in reps, publish `_notmerged` artefacts | `tests/processes/part_a/restore_ns_in_representatives.nf.test`, `tests/main.nf.test` | done | — |
+| `[S56]`| shadow Part B workflow — runs Part B as-is on A-padded shadow inputs; publishes `_notmerged` artefacts | `tests/main.nf.test` | red    | —          |
 | `[S57]`| `--help` prints a usage block describing all modes/params and exits without running any process | `tests/main.nf.test` | done | — |
 | `[S58]`| `params.publish_mode` threads through every `publishDir` directive; invalid values abort at startup | `tests/main.nf.test` | done   | —          |
 | `[S59]`| Part B `--results_folder` whitelist: table + post-mumu fasta + six step logs only                  | `tests/main.nf.test`                            | done    | —          |
 | `[S60]`| path-typed params normalise leading `~` / `~user` at workflow startup (reference_dataset, occurrence_table, fastq_folder, fasta_folder, results_folder) | `tests/functions/normalize_path.nf.test`, `tests/main.nf.test` | done | — |
 | `[S61]`| `params.taxonomy_method` validated at startup: accepts `stampa` (default) and `sintax`; invalid value aborts before any process runs | `tests/main.nf.test` | done | — |
 | `[S62]`| Part C standalone probes for `<basename>_notmerged_table.tsv` sibling; runs `part_C_shadow` iff present, no-op otherwise | `tests/main.nf.test` | done | — |
+| `[S63]`| `params.join_padding_length` (default 8): A-padding length used by `vsearch --fastq_join` in the shadow Part A path | `tests/processes/part_a/join_notmerged.nf.test`, `tests/main.nf.test` | red    | —          |
 
 
 ## Per-process tests
@@ -97,13 +98,11 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 |---------------------------------|--------------------------------------------------------|--------------|--------|
 | `merge_fastq_pairs`             | `tests/processes/part_a/merge_fastq_pairs.nf.test`            | S01, S03, S04, S54 | done   |
 | `trim_primers`                  | `tests/processes/part_a/trim_primers.nf.test`                 | S01, S19     | done   |
-| `filter_and_convert_to_fasta`   | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`  | S01, S52, S55| done   |
+| `filter_and_convert_to_fasta`   | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`  | S01, S55     | done   |
 | `extract_expected_error_values` | `tests/processes/part_a/extract_expected_error_values.nf.test`| S01          | done   |
 | `dereplicate_fasta`             | `tests/processes/part_a/dereplicate_fasta.nf.test`            | S01, S19, S55| done   |
 | `list_local_clusters`           | `tests/processes/part_a/list_local_clusters.nf.test`          | S17, S19     | done   |
-| `join_notmerged`                | `tests/processes/part_a/join_notmerged.nf.test`               | S04, S19, S54| done   |
-| `mask_ns_for_swarm`             | `tests/processes/part_a/mask_ns_for_swarm.nf.test`            | S04          | done   |
-| `restore_ns_in_representatives` | `tests/processes/part_a/restore_ns_in_representatives.nf.test`| S56          | done   |
+| `join_notmerged`                | `tests/processes/part_a/join_notmerged.nf.test`               | S04, S19, S54, S63 | red    |
 | `strip_reads`                   | `tests/processes/part_a/strip_reads.nf.test`                  | S24, S54     | done   |
 | `build_expected_error_file`     | `tests/processes/part_b/build_expected_error_file.nf.test`    | S28          | done   |
 | `build_distribution_file`       | `tests/processes/part_b/build_distribution_file.nf.test`      | S29          | done   |

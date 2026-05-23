@@ -327,15 +327,56 @@ nextflow_pipeline {
             assert !file("${folder}/${shadowId}_merging.log").exists() :
                 "shadow path must not publish a _merging.log"
 
-            // shadow .fas exists and retains the 8-N join padding
+            // shadow .fas exists and carries the default 8-A
+            // join padding ([S04], [S63]); no Ns are introduced any
+            // more.
             def fas = file("${folder}/${shadowId}.fas")
             assert fas.exists() : "missing shadow .fas"
-            assert fas.text.contains("NNNNNNNN") :
-                "shadow .fas must preserve the 8-N join padding"
+            assert fas.text.contains("AAAAAAAA") :
+                "shadow .fas must carry the 8-A join padding"
+            fas.readLines().eachWithIndex { line, i ->
+                if ( i % 2 == 1 ) {
+                    assert !line.contains("N") :
+                        "shadow .fas sequence line ${i} contains N: ${line}"
+                }
+            }
 
             // shadow .qual / .stats also published
             assert file("${folder}/${shadowId}.qual").exists() : "missing shadow .qual"
             assert file("${folder}/${shadowId}.stats").exists() : "missing shadow .stats"
+        }
+    }
+
+    test("--join_padding_length lever widens the A run in the shadow .fas") {
+        // COVERAGE: [S04], [S63]
+        // End-to-end check that the param threads through Part A.
+        // Pick a length that no natural read can produce by chance
+        // (16 As) so the test fails fast if the lever is dropped.
+        tag "ci"
+        when {
+            params {
+                forward_primer       = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer       = "ACTTTCGTTCTTGATYRA"
+                fastq_folder         = "${projectDir}/tests/data"
+                fastq_pattern        = "/paired_merge_fail_{1,2}.fastq.gz"
+                join_padding_length  = 16
+                threads              = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def folder = "${projectDir}/tests/data"
+            def shadowId = "paired_merge_fail_notmerged"
+
+            def fas = file("${folder}/${shadowId}.fas")
+            assert fas.exists() : "missing shadow .fas"
+            assert fas.text.contains("A" * 16) :
+                "shadow .fas must carry the 16-A join padding"
+            // No run shorter than the requested length should appear
+            // as an *isolated* padding artefact: every join site must
+            // be exactly 16 As. (Natural runs of As shorter than 16
+            // are fine; the assertion above is the sufficient guard
+            // for the lever.)
         }
     }
 
@@ -617,15 +658,19 @@ nextflow_pipeline {
             assert file("${shadow_base}_table.fas").exists() :
                 "shadow Part B post-mumu fasta should exist (${shadow_base}_table.fas)"
 
-            // [S56] guarantees the published sequences carry Ns
-            // (not Us). The pre-mumu _1f_representatives.fas is no
-            // longer published ([S59]); the post-mumu _table.fas
-            // carries the same sequences (col 10 of _table.tsv) and
-            // is checked here instead.
+            // [S56] guarantees the published sequences carry only
+            // A/C/G/T — the A-padding is composed entirely of
+            // standard bases, so neither N nor U should appear on
+            // any sequence line. The pre-mumu _1f_representatives.fas
+            // is no longer published ([S59]); the post-mumu
+            // _table.fas carries the same sequences (col 10 of
+            // _table.tsv) and is checked here instead.
             def fastaLines = file("${shadow_base}_table.fas").readLines()
             for (int i = 1; i < fastaLines.size(); i += 2) {
                 assert !fastaLines[i].contains("U") :
                     "U leaked into shadow post-mumu fasta line ${i}: ${fastaLines[i]}"
+                assert !fastaLines[i].contains("N") :
+                    "N leaked into shadow post-mumu fasta line ${i}: ${fastaLines[i]}"
             }
 
             // The per-sample shadow .fas stays in fastq_folder (Part A's

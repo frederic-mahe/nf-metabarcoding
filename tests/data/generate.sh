@@ -227,16 +227,16 @@ emit_part_b_fixtures() {
         printf '>%s;size=4\n%s\n' "${sha_c}" "${seq_c}"
     } > "${dir}/S2.fas"
     # Shadow-pipeline sample ([S04]/[S56]) — fed into the shadow
-    # Part B workflow `part_B_shadow`. The sequence is
-    # 8 Ns embedded in ACGT padding so mask_ns_for_swarm has Ns to
-    # rewrite (N→U) and restore_ns_in_representatives has Us to
-    # rewrite back (U→N). A second clean record gives swarm
-    # something non-trivial to cluster against.
+    # Part B workflow `part_B_shadow`. The sequence carries the
+    # A-padded join site emitted by Part A's shadow pipeline
+    # (`vsearch --fastq_join --join_padgap AAAAAAAA` by default;
+    # see [S63]). A second clean record gives swarm something
+    # non-trivial to cluster against.
     local -r sha_d="dddddddddddddddddddddddddddddddddddddddd"
-    local -r seq_n_padded="ACGTACGTNNNNNNNNACGTACGTACGTACGTACGTACGT"
-    local -r seq_d="GGGGAAAATTTTCCCCGGGGAAAATTTTCCCCGGGGAAAA"
+    local -r seq_a_padded="ACGTACGTAAAAAAAAACGTACGTACGTACGTACGTACGT"
+    local -r seq_d="GGGGTTTTGGGGCCCCGGGGTTTTGGGGCCCCGGGGTTTT"
     {
-        printf '>%s;size=5\n%s\n' "${sha_n}" "${seq_n_padded}"
+        printf '>%s;size=5\n%s\n' "${sha_n}" "${seq_a_padded}"
         printf '>%s;size=3\n%s\n' "${sha_d}" "${seq_d}"
     } > "${dir}/S1_notmerged.fas"
     {
@@ -295,59 +295,6 @@ emit_duplicate_sample_ids() {
     cp paired_merge_ok_2.fastq.gz "${b}/A_R2.fastq.gz"
 }
 
-emit_n_containing_fasta() {
-    # [S04] — minimal fixture for `mask_ns_for_swarm`: one sequence
-    # with 8 internal Ns (mirrors the `vsearch --fastq_join` padding),
-    # one clean sequence. Sequence lines must be rewritten N→U
-    # (the U mask is losslessly reversible — see [S04] / [S52]);
-    # header lines (including the literal 'N' in '>seq1_with_Ns')
-    # must be left alone.
-    cat > n_containing.fas <<'FASTA'
->seq1_with_Ns
-ACGTACGTNNNNNNNNACGTACGT
->seq2_no_Ns
-ACGTACGT
-FASTA
-}
-
-emit_u_containing_fasta() {
-    # [S56] — minimal fixture for `restore_ns_in_representatives`:
-    # mirrors `n_containing.fas` but with the join-padding bases
-    # already rewritten to `U` (the form swarm sees in shadow Part
-    # B). One sequence with 8 internal Us, one clean sequence; the
-    # restore process must rewrite every sequence-line U back to N
-    # while leaving header lines untouched.
-    cat > u_containing.fas <<'FASTA'
->seq1_with_Us
-ACGTACGTUUUUUUUUACGTACGT
->seq2_no_Us
-ACGTACGT
-FASTA
-}
-
-emit_u_containing_fastq() {
-    # [S52] — fixture for `filter_and_convert_to_fasta`'s U→T
-    # normalisation. Two records (length 40, above the
-    # MIN_LENGTH=32 cut-off): the first uses uppercase `U`, the
-    # second uses lowercase `u`, so the test can pin both
-    # branches of the case-preserving strip. Quality string is
-    # Phred-40 ('I' x 40) — the literal 'U' / 'u' must NOT appear
-    # on the sequence line of the resulting fasta.
-    #
-    # The basename is `u_normalisation` rather than `u_containing`
-    # so it does not collide with the `u_containing.fas` fixture:
-    # when a workflow-level Part A test sets fastq_folder to
-    # tests/data/, dereplicate_fasta publishes
-    # `<sampleId>.fas` back into that same folder, which would
-    # otherwise overwrite the fixture in place.
-    local qual
-    qual="$(qual_string 40)"
-    {
-        printf '@u_upper\nACGUACGUACGUACGUACGUACGUACGUACGUACGUACGU\n+\n%s\n' "${qual}"
-        printf '@u_lower\nacguacguacguacguacguacguacguacguacguacgu\n+\n%s\n' "${qual}"
-    } > u_normalisation.fastq
-}
-
 emit_compression_variants() {
     # [S03]: three byte-identical fastq pairs in different
     # compression forms — plain, gzip, bzip2. The amplicon set is
@@ -399,9 +346,6 @@ emit_reserved_keyword
 emit_duplicate_sample_ids
 emit_part_b_fixtures
 emit_e2e_part_b_fixture
-emit_n_containing_fasta
-emit_u_containing_fasta
-emit_u_containing_fastq
 emit_compression_variants
 
 echo "Wrote fixtures to ${DATA_DIR}"

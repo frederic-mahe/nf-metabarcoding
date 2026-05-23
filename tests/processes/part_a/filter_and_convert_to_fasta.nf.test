@@ -42,7 +42,6 @@ nextflow_process {
                 """
                 input[0] = trim_primers.out[0]
                 input[1] = trim_primers.out[1]
-                input[2] = 0
                 """
             }
         }
@@ -50,8 +49,7 @@ nextflow_process {
             assert process.success
             // Header layout: `>SHA1;ee=<float>;length=<int>` produced
             // by vsearch's --relabel_sha1 --eeout --lengthout. The
-            // extract_ee.awk consumer ([S01]) and discover_fasta's
-            // U-rejection ([S53]) both depend on this contract.
+            // extract_ee.awk consumer ([S01]) depends on this contract.
             def lines = path(process.out[1].get(0)).readLines()
             assert lines.size() > 0 : "expected at least one fasta record"
             assert lines.size() % 2 == 0 :
@@ -65,9 +63,6 @@ nextflow_process {
                 def seq = lines[i + 1]
                 assert !seq.startsWith(">") :
                     "expected sequence on line ${i+1}, got header: ${seq}"
-                // [S52] guarantees no U / u survives.
-                assert !seq.contains("U") && !seq.contains("u") :
-                    "U survived [S52] normalisation: ${seq}"
             }
         }
     }
@@ -88,7 +83,6 @@ nextflow_process {
                 """
                 input[0] = trim_primers.out[0]
                 input[1] = trim_primers.out[1]
-                input[2] = 0
                 """
             }
         }
@@ -109,52 +103,4 @@ nextflow_process {
         }
     }
 
-    test("normalises U/u to T/t on sequence lines (no U survives)") {
-        // COVERAGE: [S52]
-        tag "ci"
-        when {
-            params {
-                // setup{} runs trim_primers for every test in the
-                // file; give it the same primers as the first test
-                // so it succeeds, even though this test feeds the
-                // process under test directly from a fixture and
-                // does not consume trim_primers.out.
-                forward_primer = "CCAGCASCYGCGGTAATTCC"
-                reverse_primer = "ACTTTCGTTCTTGATYRA"
-            }
-            process {
-                """
-                input[0] = "u_sample"
-                input[1] = file("\${projectDir}/tests/data/u_normalisation.fastq")
-                input[2] = 0
-                """
-            }
-        }
-        then {
-            assert process.success
-            def lines = path(process.out[1].get(0)).readLines()
-
-            // Two records survive (length 40 > MIN_LENGTH=32).
-            assert lines.size() == 4 :
-                "expected 4 lines (2 records), got ${lines.size()}"
-
-            // No 'U' or 'u' may appear anywhere in the output —
-            // sequence lines must have been rewritten before vsearch
-            // hashed and emitted them.
-            lines.each { line ->
-                assert !line.contains("U") :
-                    "literal 'U' survived to fasta: ${line}"
-                assert !line.contains("u") :
-                    "literal 'u' survived to fasta: ${line}"
-            }
-
-            // Sequence content should be the input with every U->T
-            // and u->t (case preserved). vsearch may pad headers with
-            // metadata, so we only check the sequence lines.
-            assert lines[1] == "ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT" :
-                "uppercase input not normalised correctly: ${lines[1]}"
-            assert lines[3] == "acgtacgtacgtacgtacgtacgtacgtacgtacgtacgt" :
-                "lowercase input not normalised correctly: ${lines[3]}"
-        }
-    }
 }

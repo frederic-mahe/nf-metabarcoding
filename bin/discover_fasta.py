@@ -16,11 +16,7 @@ Rules (see ``[S27]`` in SPECIFICATIONS.md):
   table (``[S09]``); downstream processes tolerate zero-record
   inputs;
 * duplicate sample IDs abort the workflow (see ``[S13]`` /
-  ``[S14]``);
-* sequences containing ``U`` or ``u`` abort the workflow (see
-  ``[S53]``) — ``U`` is reserved as the ``N``-mask character by the
-  shadow Part B pipeline and must never appear in user-supplied
-  fastas.
+  ``[S14]``).
 """
 
 from __future__ import annotations
@@ -45,10 +41,6 @@ class FastaSample(NamedTuple):
 
 class DuplicateSampleIDError(ValueError):
     """Raised when two or more fasta files derive the same sample ID."""
-
-
-class UInSequenceError(ValueError):
-    """Raised when an input fasta carries a ``U`` on a sequence line."""
 
 
 def _sample_id_from_fasta(path: Path) -> str:
@@ -90,42 +82,6 @@ def discover(
                 )
             )
     return samples
-
-
-def _fasta_has_u_in_sequence(path: Path) -> bool:
-    """Return True if any non-header line of ``path`` contains ``U``/``u``."""
-    with path.open("r") as fh:
-        for line in fh:
-            if line.startswith(">"):
-                continue
-            if "U" in line or "u" in line:
-                return True
-    return False
-
-
-def check_no_u_in_sequences(samples: list[FastaSample]) -> None:
-    """Reject any fasta whose sequence lines contain ``U`` or ``u``.
-
-    See ``[S53]``. ``U`` is reserved as the shadow-Part-B
-    ``N``-mask character; allowing it through would risk silently
-    corrupting natural-``U`` sequences during the mask round-trip.
-    The error message groups every offending fasta path so users
-    can fix the input set in one pass.
-    """
-    offenders = [
-        sample.fasta
-        for sample in samples
-        if _fasta_has_u_in_sequence(sample.fasta)
-    ]
-    if not offenders:
-        return
-
-    lines: list[str] = [
-        "uracil (U/u) found on sequence lines — Part B refuses to run:"
-    ]
-    for path in offenders:
-        lines.append(f"  {path}")
-    raise UInSequenceError("\n".join(lines))
 
 
 def check_unique_sample_ids(samples: list[FastaSample]) -> None:
@@ -185,8 +141,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     samples = discover(args.folders, shadow=args.shadow)
     try:
         check_unique_sample_ids(samples)
-        check_no_u_in_sequences(samples)
-    except (DuplicateSampleIDError, UInSequenceError) as exc:
+    except DuplicateSampleIDError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     for sample in samples:

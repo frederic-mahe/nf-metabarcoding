@@ -21,8 +21,14 @@ nextflow_process {
         }
     }
 
-    test("joins not-merged R1/R2 with the default 8-N padding") {
-        // COVERAGE: [S04]
+    test("joins not-merged R1/R2 with the default 8-A padding") {
+        // COVERAGE: [S04], [S63]
+        // The A-padding redesign ([S04]) drops the mask/restore
+        // round-trip: vsearch --fastq_join is invoked with
+        // --join_padgap set to params.join_padding_length As and
+        // --join_padgapq set to the same number of `I` characters
+        // (Phred 40). With the default length, every joined read
+        // carries a run of 8 As at the R1/R2 boundary.
         tag "ci"
         when {
             process {
@@ -42,12 +48,61 @@ nextflow_process {
                 "fastq must have a multiple of 4 lines, got ${lines.size()}"
 
             def seqs = []
+            def quals = []
             for (int i = 1; i < lines.size(); i += 4) {
                 seqs.add(lines[i])
+                quals.add(lines[i + 2])
             }
             seqs.each { seq ->
-                assert seq.contains("NNNNNNNN") :
-                    "expected 8-N join padding in: ${seq}"
+                assert seq.contains("AAAAAAAA") :
+                    "expected 8-A join padding in: ${seq}"
+                assert !seq.contains("N") :
+                    "shadow path must not introduce N padding: ${seq}"
+            }
+            quals.each { q ->
+                assert q.contains("IIIIIIII") :
+                    "expected 8-I (Phred 40) padding-quality run in: ${q}"
+            }
+        }
+    }
+
+    test("--join_padding_length 12 widens the A run to at least 12 As") {
+        // COVERAGE: [S63]
+        // The lever is workflow-wide. With join_padding_length=12,
+        // every joined record must carry a run of at least 12 As at
+        // the join site. The matching --join_padgapq Phred-40 ('I')
+        // string must be exactly 12 characters long so the run of
+        // padding-quality bytes is also at least 12. (An exact-length
+        // assertion on the A run is unsafe because a read whose R1
+        // tail or R2 head happens to be an A would inflate the visible
+        // run by one or two characters — the meaningful check is the
+        // lower bound matching the requested length.)
+        tag "ci"
+        when {
+            params {
+                join_padding_length = 12
+            }
+            process {
+                """
+                input[0] = merge_fastq_pairs.out[0].map { it + '_notmerged' }
+                input[1] = merge_fastq_pairs.out[3]
+                input[2] = merge_fastq_pairs.out[4]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[1].get(0)).readLines()
+            assert lines.size() % 4 == 0 :
+                "fastq must have a multiple of 4 lines, got ${lines.size()}"
+
+            for (int i = 1; i < lines.size(); i += 4) {
+                def seq = lines[i]
+                def qual = lines[i + 2]
+                assert seq.contains("A" * 12) :
+                    "expected 12-A run in: ${seq}"
+                assert qual.contains("I" * 12) :
+                    "expected 12-I (Phred 40) padding-quality run in: ${qual}"
             }
         }
     }
@@ -87,7 +142,7 @@ nextflow_process {
 
     test("does not emit a merging log for the shadow path") {
         // COVERAGE: [S04], [S19]
-        // The shadow path performs an N-padded join, not a merge,
+        // The shadow path performs an A-padded join, not a merge,
         // so a `_merging.log` would be misleading. The process must
         // expose only the sampleId and joined fastq output channels.
         tag "ci"

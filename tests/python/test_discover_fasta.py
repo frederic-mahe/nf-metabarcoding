@@ -15,7 +15,7 @@ rules:
 See ``[S13]``, ``[S14]``, ``[S27]`` in SPECIFICATIONS.md.
 """
 
-# COVERAGE: [S13], [S14], [S27], [S53], [S56]
+# COVERAGE: [S13], [S14], [S27], [S56]
 
 from __future__ import annotations
 
@@ -28,8 +28,6 @@ import pytest
 from discover_fasta import (
     DuplicateSampleIDError,
     FastaSample,
-    UInSequenceError,
-    check_no_u_in_sequences,
     check_unique_sample_ids,
     discover,
 )
@@ -193,75 +191,6 @@ def test_cli_shadow_flag_emits_only_notmerged(tmp_path: Path) -> None:
     assert proc.returncode == 0, proc.stderr
     lines = proc.stdout.strip().splitlines()
     assert lines == [f"A_notmerged\t{s}"]
-
-
-# ---------- U-in-sequence rejection ([S53]) -------------------------------
-
-def test_check_no_u_in_sequences_passes_on_clean(tmp_path: Path) -> None:
-    a = _make_fasta(tmp_path, "A.fas", ">a\nACGTACGT\n")
-    b = _make_fasta(tmp_path, "B.fas", ">b\nACGNACGT\n")  # N is fine
-    samples = [
-        FastaSample(sample_id="A", fasta=a),
-        FastaSample(sample_id="B", fasta=b),
-    ]
-    check_no_u_in_sequences(samples)
-
-
-def test_check_no_u_in_sequences_ignores_u_in_headers(tmp_path: Path) -> None:
-    # [S53] guards sequence content. A literal 'U' inside a fasta header
-    # (e.g. a sample name) must not trigger the abort.
-    a = _make_fasta(tmp_path, "A.fas", ">U_in_header_only\nACGTACGT\n")
-    check_no_u_in_sequences([FastaSample(sample_id="A", fasta=a)])
-
-
-def test_check_no_u_in_sequences_raises_on_uppercase_u(tmp_path: Path) -> None:
-    a = _make_fasta(tmp_path, "A.fas", ">a\nACGUACGU\n")
-    with pytest.raises(UInSequenceError) as excinfo:
-        check_no_u_in_sequences([FastaSample(sample_id="A", fasta=a)])
-    assert str(a) in str(excinfo.value)
-
-
-def test_check_no_u_in_sequences_raises_on_lowercase_u(tmp_path: Path) -> None:
-    a = _make_fasta(tmp_path, "A.fas", ">a\nacguacgu\n")
-    with pytest.raises(UInSequenceError) as excinfo:
-        check_no_u_in_sequences([FastaSample(sample_id="A", fasta=a)])
-    assert str(a) in str(excinfo.value)
-
-
-def test_check_no_u_in_sequences_lists_every_offender(tmp_path: Path) -> None:
-    a = _make_fasta(tmp_path, "A.fas", ">a\nACGUACGU\n")
-    clean = _make_fasta(tmp_path, "B.fas", ">b\nACGTACGT\n")
-    c = _make_fasta(tmp_path, "C.fas", ">c\nacgtacgu\n")
-    samples = [
-        FastaSample(sample_id="A", fasta=a),
-        FastaSample(sample_id="B", fasta=clean),
-        FastaSample(sample_id="C", fasta=c),
-    ]
-    with pytest.raises(UInSequenceError) as excinfo:
-        check_no_u_in_sequences(samples)
-    msg = str(excinfo.value)
-    assert str(a) in msg
-    assert str(c) in msg
-    # the clean fasta's path must not be surfaced
-    assert str(clean) not in msg
-
-
-def test_cli_exits_non_zero_on_u_containing_fasta(tmp_path: Path) -> None:
-    bad = _make_fasta(tmp_path, "Bad.fas", ">x\nACGUACGT\n")
-    script = (
-        Path(__file__).resolve().parents[2] / "bin" / "discover_fasta.py"
-    )
-    proc = subprocess.run(
-        [sys.executable, str(script), str(tmp_path)],
-        capture_output=True,
-        text=True,
-    )
-    assert proc.returncode != 0, (
-        f"expected non-zero exit; stdout={proc.stdout!r}"
-    )
-    assert str(bad) in proc.stderr
-    # the error message should mention what went wrong
-    assert "u" in proc.stderr.lower() or "uracil" in proc.stderr.lower()
 
 
 def test_cli_emits_tsv_for_each_sample(tmp_path: Path) -> None:

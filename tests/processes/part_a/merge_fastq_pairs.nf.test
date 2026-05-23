@@ -68,9 +68,9 @@ nextflow_process {
     test("emits canonical 4-line fastq for merged + notmerged outputs") {
         // COVERAGE: [S54]
         // Regression guard: vsearch produces 4-line fastq by default;
-        // if any future vsearch flag or upstream change ever folds the
-        // layout, filter_and_convert_to_fasta's `awk 'NR % 4 == 2'`
-        // pre-pass ([S52]) would silently corrupt the wrong bytes.
+        // downstream consumers (further vsearch invocations, awk-based
+        // helpers) assume the layout, so a silent drift to a folded
+        // representation would corrupt the wrong bytes.
         tag "ci"
         when {
             process {

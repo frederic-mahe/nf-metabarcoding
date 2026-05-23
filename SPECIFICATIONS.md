@@ -50,28 +50,29 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
   collected via `vsearch --fastq_mergepairs --fastqout_notmerged_fwd`
   and `--fastqout_notmerged_rev` (reads stay in sync) and routed
   through a parallel **shadow** Part A pipeline:
-    1. join R1/R2 with `vsearch --fastq_join` (8-N padding — the
-       tool default). The shadow path has no merging step (by
-       definition the reads in this branch could not be merged) and
-       therefore **no `_merging.log`** is published for shadow
-       samples — only the per-step logs from later stages
+    1. join R1/R2 with `vsearch --fastq_join`, passing
+       `--join_padgap` set to a run of `A`s of length
+       `params.join_padding_length` (default 8; see [S63]) and
+       `--join_padgapq` set to the same number of `I` quality
+       characters (Phred 40). `A` is used instead of vsearch's
+       default `N` so the joined sequence carries only A/C/G/T —
+       swarm accepts the padding without complaint and no mask /
+       restore round-trip is needed. The shadow path has no merging
+       step (by definition the reads in this branch could not be
+       merged) and therefore **no `_merging.log`** is published for
+       shadow samples — only the per-step logs from later stages
        (trimming, dereplicating, clustering) appear under
        `<sampleId>_notmerged_*.log`;
     2. trim primers (when `--no_trimming` is false) and convert to
-       fasta with `vsearch --fastq_filter --fastq_maxns 8` so the
-       join-padding `N`s survive the filter;
+       fasta with `vsearch --fastq_filter --fastq_maxns 0`; the
+       A-padding contributes no `N`s, so the shadow path uses the
+       same max-N budget as the regular path;
     3. dereplicate and extract ee values per the normal pipeline; the
-       published `.fas` retains the `N`s;
-    4. replace every `N` with `U` **inline** just before swarm (swarm
-       rejects `N`s but silently accepts `U` as if it were `T`).
-       Using `U` rather than `A` makes the substitution losslessly
-       reversible — `U` cannot appear naturally in our sequences
-       ([S52]), so a literal `U`→`N` pass on the swarm output (see
-       [S56]) restores the padding without risk of corrupting any
-       natural motif. The masked fasta is **not** published; only
-       sequence lines are rewritten so SHA1 headers (computed in step
-       2) are unchanged and the published `.stats` IDs match the
-       `.fas` IDs.
+       published `.fas` retains the run of `A`s at the join site.
+       The run of `A`s is **artificial padding**, not biological
+       sequence — it is the user's responsibility to keep that in
+       mind when interpreting shadow-pipeline output (the shadow
+       pipeline is experimental).
   - shadow-pipeline sample IDs are `<sampleId>_notmerged`; published
     artefacts are `<sampleId>_notmerged.{fas,qual,stats}` plus the
     per-step logs from the stages that actually run in the shadow
@@ -80,9 +81,10 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
     above.
   - **Pass when:** running Part A on a paired-end fixture whose reads
     cannot overlap produces non-empty `<sampleId>_notmerged.{fas,qual,stats}`
-    in `params.fastq_folder`, the published `.fas` contains the 8-`N`
-    join padding, the trimming / dereplicating / clustering shadow
-    logs are present and non-empty, and no
+    in `params.fastq_folder`, the published `.fas` contains a run of
+    `params.join_padding_length` `A`s (default 8), no shadow output
+    sequence line contains `N`, the trimming / dereplicating /
+    clustering shadow logs are present and non-empty, and no
     `<sampleId>_notmerged_merging.log` exists.
 - `[S05]` unmerged-pair clusters appear in the occurrence table with a
   per-sample marker (working name: `sampleID_partial`)
@@ -713,48 +715,28 @@ from placeholder values to real taxonomic assignments.
     references columns overwritten; rows missing from the
     assignments pass through unchanged; the input `_table.tsv`
     is not modified.
-- `[S52]` Part A normalises every `U`/`u` in read sequences to
-  `T`/`t` before vsearch hashes the read into a SHA1-named fasta
-  record (`filter_and_convert_to_fasta`). Standard sequencing
-  platforms emit DNA reads, but neither vsearch nor cutadapt
-  converts `U` to `T`, so a stray `U` from an RNA-style input would
-  propagate untouched and later collide with the planned shadow
-  Part B masking scheme (which reserves `U` as the `N`-mask
-  character; swarm rejects `N` but silently accepts `U`).
-  Normalising once at the fastq→fasta boundary makes "no `U` in
-  Part A output sequences" a contract every downstream step can
-  rely on. Quality lines are left untouched (a Phred-33 quality
-  score of `U` is a valid printable ASCII byte, not a base).
-  - **Pass when:** feeding a fastq whose sequence lines contain
-    `U` and `u` to `filter_and_convert_to_fasta` produces a fasta
-    in which no sequence line contains `U` or `u`, with every
-    such position replaced by `T` / `t` respectively; header
-    lines and the rest of the workflow output are otherwise
-    unchanged.
-- `[S53]` Part B's fasta discovery (`discover_fasta.py`) rejects
-  any input `.fas` that contains `U` or `u` on a sequence line.
-  When Part A runs upstream, `[S52]` guarantees this can never
-  trigger; the assertion exists to defend the standalone
-  `--fasta_folder` entry point ([S27]), where the user supplies
-  fastas directly and may have skipped Part A's normalisation.
-  Aborting at discovery time avoids the silent-corruption risk
-  of mid-pipeline U→N round-trips. The error message lists every
-  offending file so users can fix the input set in one pass.
-  - **Pass when:** running Part B with `--fasta_folder` pointing
-    at a folder containing a `.fas` whose sequence lines contain
-    `U` aborts before any Part B process runs, with stderr
-    naming the offending file(s); a folder whose fastas use only
-    `A`/`C`/`G`/`T`/`N` passes through unchanged.
+- `[S52]` **Retired.** Was: Part A's `filter_and_convert_to_fasta`
+  normalised every `U`/`u` to `T`/`t` to defend the shadow Part B
+  U-masking scheme. With the A-padding redesign ([S04] / [S63]),
+  no character is reserved any more, so the awk pre-pass was
+  removed and the contract dropped. ID is preserved so prior git
+  history stays readable.
+- `[S53]` **Retired.** Was: Part B's `discover_fasta.py` rejected
+  any input `.fas` whose sequence lines contained `U` or `u`. The
+  check existed only to defend the U-masking round-trip; the
+  A-padding redesign ([S04] / [S63]) leaves no reserved character
+  to protect, so the check was removed. ID is preserved so prior
+  git history stays readable.
 - `[S54]` every fastq emitted by a `vsearch`-based process keeps
   the canonical 4-line layout (one record = `@header`, sequence,
   `+`, quality on four consecutive lines). vsearch produces this
-  by default; the spec exists as a regression guard, since
-  `filter_and_convert_to_fasta`'s ``awk 'NR % 4 == 2'`` pre-pass
-  ([S52]) silently corrupts the wrong lines if any upstream
-  step ever starts folding the sequence onto multiple lines.
-  Every per-process nf-test of a vsearch fastq-emitting module
-  (`merge_fastq_pairs`, `strip_reads`, `join_notmerged`) asserts
-  the layout of each emitted fastq.
+  by default; the spec exists as a regression guard so that
+  downstream consumers (further vsearch invocations, awk-based
+  helpers, etc.) which assume the 4-line layout cannot drift
+  unnoticed from the upstream contract. Every per-process nf-test
+  of a vsearch fastq-emitting module (`merge_fastq_pairs`,
+  `strip_reads`, `join_notmerged`) asserts the layout of each
+  emitted fastq.
   - **Pass when:** every non-empty fastq output of those processes
     has a length divisible by 4 lines; lines (4k+1) start with
     `@`, lines (4k+3) start with `+`, and lines (4k+2) and (4k+4)
@@ -775,33 +757,31 @@ from placeholder values to real taxonomic assignments.
     has a length divisible by 2 lines, with even-indexed lines
     starting with `>` and odd-indexed lines containing no `>`
     character.
-- `[S56]` shadow Part B is a separate workflow
-  (`part_B_shadow`) called alongside `part_B`
-  from both the end-to-end (`--project_name`) and the standalone
-  (`--fasta_folder`) entry points. It runs the same processes as
-  the regular Part B with two differences:
-    1. `mask_ns_for_swarm` ([S04]) runs on the globally-dereplicated
-       fasta before `global_clustering`, rewriting `N`→`U` on
-       sequence lines only. The masked fasta is transient
-       (not published);
-    2. immediately after `global_clustering`, a sibling process
-       `restore_ns_in_representatives` rewrites `U`→`N` on sequence
-       lines of `<basename>_notmerged_1f_representatives.fas`,
-       restoring the join padding. All downstream Part B steps
-       consume the restored (N-containing) representatives.
+- `[S56]` shadow Part B is a separate workflow (`part_B_shadow`)
+  called alongside `part_B` from both the end-to-end
+  (`--project_name`) and the standalone (`--fasta_folder`) entry
+  points. It runs the **same processes as regular Part B with no
+  mask / restore wrapping around `global_clustering`** — the
+  A-padding emitted by Part A ([S04]) is composed entirely of
+  A/C/G/T, so swarm accepts the sequences as-is and the
+  representatives carry the run of `A`s through every downstream
+  step unchanged.
   The shadow basename is `<project_name>_<N>_samples_notmerged`,
   so every published artefact carries the `_notmerged` token (e.g.
   `<basename>_notmerged_table.tsv`,
   `<basename>_notmerged_1f.swarms`). The shadow path consumes the
   Part A shadow outputs (`<sampleId>_notmerged.{fas,qual,stats}`,
   see [S04]); when no shadow samples are present (no fastq pair
-  failed to merge), the shadow workflow is not invoked.
+  failed to merge), the shadow workflow is not invoked. The run
+  of `A`s in shadow representatives is artificial join padding,
+  not biological sequence — see [S04] for the user-facing caveat.
   - **Pass when:** an end-to-end run on a paired-end fixture that
     produces at least one `_notmerged` sample publishes both the
     regular `<project>_<N>_samples_table.tsv` and the shadow
     `<project>_<M>_samples_notmerged_table.tsv` under
     `--results_folder`; the shadow representatives FASTA contains
-    `N`s (not `U`s) on its sequence lines.
+    a run of `params.join_padding_length` `A`s on its sequence
+    lines and no `N` or `U`.
 - `[S57]` `nextflow run main.nf --help` (and the short form
   `--help` set via config) prints a usage block to stdout and
   exits cleanly without running any process. The usage block:
@@ -917,6 +897,25 @@ from placeholder values to real taxonomic assignments.
     in the same directory publishes both `_table_assigned.tsv`
     files; running with only `<basename>_table.tsv` publishes
     only the regular assigned table and exits cleanly.
+- `[S63]` `params.join_padding_length` (positive integer, default
+  `8`) sets the length of the run of `A`s that
+  `vsearch --fastq_join` inserts between R1 and R2 in the shadow
+  Part A path ([S04]). The same length is used for the matching
+  `--join_padgapq` quality string (Phred 40, `I`). The parameter
+  is the workflow's single knob over the join padding: increase
+  it to make the artificial join site more visible to a human
+  reader at the cost of slightly larger fastas; decrease it to
+  shave bytes when downstream tooling already handles the
+  metadata. Non-positive values, non-integers, and other invalid
+  inputs abort the workflow at startup before any process runs.
+  - **Pass when:** running Part A on a paired-end fixture whose
+    reads cannot overlap, with `--join_padding_length 16`,
+    publishes a shadow `.fas` whose sequence lines contain a run
+    of 16 `A`s (and no run of 8 `A`s introduced by a stale
+    default); running without the flag uses 8; running with
+    `--join_padding_length 0` aborts the workflow before
+    `merge_fastq_pairs` is scheduled, with stderr naming the
+    parameter.
 
 
 ## Dependencies

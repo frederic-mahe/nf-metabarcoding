@@ -21,6 +21,12 @@ params.no_trimming = false
 // not-merged R1/R2 read before they are joined (shadow pipeline).
 // Set to 0 to disable.
 params.stripright = 30
+// [S63] length (in nt) of the run of `A`s that vsearch --fastq_join
+// inserts between R1 and R2 in the shadow Part A path ([S04]). The
+// same length is used for the matching --join_padgapq Phred-40 ('I')
+// quality string. Increase to make the artificial join site more
+// visible to a human reader at the cost of slightly larger fastas.
+params.join_padding_length = 8
 
 // forward_primer, reverse_primer, fastq_folder are required and have
 // no default; the workflow asserts them at startup (see [S18]).
@@ -196,6 +202,14 @@ Part A — fastq → per-sample fasta:
   --no_trimming               skip cutadapt primer trimming (default: ${params.no_trimming})
   --stripright INT            3' nt trimmed in the shadow pipeline
                               before R1/R2 are joined (default: ${params.stripright})
+  --join_padding_length INT   length of the A run inserted between R1
+                              and R2 by the shadow pipeline's
+                              vsearch --fastq_join. The same length is
+                              used for the matching Phred-40 ('I')
+                              quality string. The A run is artificial
+                              padding, not biological sequence — keep
+                              that in mind when interpreting shadow
+                              output (default: ${params.join_padding_length})
 
 Part B — per-sample fasta → occurrence table:
   --project_name NAME         basename prefix for Part B output
@@ -318,8 +332,12 @@ process strip_reads {
 
 process join_notmerged {
     // Shadow pipeline ([S04]) entry point: concatenate fwd/rev reads
-    // that failed --fastq_mergepairs with the default 8-N padding so
-    // they can be processed by the rest of Part A as a single fastq.
+    // that failed --fastq_mergepairs with a run of As (length
+    // params.join_padding_length, default 8 — see [S63]) so they can
+    // be processed by the rest of Part A as a single fastq. `A` is
+    // used instead of vsearch's default `N` so the joined sequence
+    // carries only A/C/G/T and swarm accepts it as-is later in the
+    // shadow Part B path ([S56]) — no mask/restore round-trip needed.
     //
     // [S04]: the shadow path has no merging step — by definition the
     // reads in this branch could not be merged — so no `_merging.log`
@@ -345,58 +363,10 @@ process join_notmerged {
         --fastq_join !{notmerged_fwd} \
         --reverse !{notmerged_rev} \
         --fastq_ascii !{params.fastq_encoding} \
+        --join_padgap  !{'A' * (params.join_padding_length as int)} \
+        --join_padgapq !{'I' * (params.join_padding_length as int)} \
         --quiet \
         --fastqout joined_fastq
-    '''
-}
-
-
-process mask_ns_for_swarm {
-    // Shadow pipeline ([S04]) only: swarm rejects N but silently
-    // accepts U (treated as T), so every N in sequence lines is
-    // rewritten to U just before clustering. Header lines are left
-    // untouched so the SHA1 IDs computed by
-    // filter_and_convert_to_fasta stay consistent across .fas, .qual,
-    // and .stats. U was chosen over A because U cannot appear in
-    // Part A output sequences ([S52]) — restore_ns_in_representatives
-    // ([S56]) can therefore do a literal U->N pass on swarm's
-    // representatives without ever colliding with a natural motif.
-    // The masked fasta is intentionally NOT published.
-
-    input:
-    val sampleId
-    path fasta
-
-    output:
-    val sampleId
-    path "masked_fasta"
-
-    shell:
-    '''
-    sed '/^>/!s/N/U/g' !{fasta} > masked_fasta
-    '''
-}
-
-
-process restore_ns_in_representatives {
-    // Shadow Part B ([S56]) only: inverse of mask_ns_for_swarm.
-    // Swarm's representatives carry the U-masked sequences; rewrite
-    // every sequence-line U back to N so downstream Part B steps
-    // (chimera detection, occurrence table, etc.) see the original
-    // join padding. Headers are left untouched. Safe because [S52]
-    // guarantees no natural U survives Part A normalisation.
-
-    input:
-    val basename
-    path masked_representatives
-
-    output:
-    val basename
-    path "restored_representatives"
-
-    shell:
-    '''
-    sed '/^>/!s/U/N/g' !{masked_representatives} > restored_representatives
     '''
 }
 
@@ -452,20 +422,13 @@ process trim_primers {
 
 process filter_and_convert_to_fasta {
     // use SHA1 values as sequence names, compute expected error
-    // values (ee), and apply the minimum-length / max-N filters.
-    // max_n is a caller-supplied input so the same process can serve
-    // merged reads (max_n=0) and the [S04] unmerged-pair path (max_n
-    // = size of the N-join insert).
-    //
-    // [S52]: sequence lines are passed through awk to map U->T (and
-    // u->t) before vsearch hashes them, so the Part A output contract
-    // is "no U on sequence lines". Quality lines (every fourth line)
-    // are left untouched because the printable ASCII byte 'U' is a
-    // valid Phred-33 quality score (Q52).
+    // values (ee), and apply the minimum-length / max-N filter
+    // (--fastq_maxns 0: every N drops the read). The shadow path
+    // ([S04]) pads with A/C/G/T (see [S63]), so the same max-N=0
+    // threshold serves both the regular and the shadow path.
     input:
     val sampleId
     path trimmed_fastq
-    val max_n
 
     output:
     val sampleId
@@ -477,23 +440,10 @@ process filter_and_convert_to_fasta {
 
     readonly MIN_LENGTH=32
 
-    # Decompress (when needed) so the awk pre-pass sees plain fastq.
-    # vsearch normally auto-detects gzip/bz2 on its input file, but we
-    # feed it via stdin (`--fastq_filter -`) so it can't peek-rewind.
-    # The --no_trimming path ([S20]) is the only branch where the file
-    # may still be compressed; trim_primers always emits plain fastq.
-    case "!{trimmed_fastq}" in
-        *.gz)  reader=(zcat)  ;;
-        *.bz2) reader=(bzcat) ;;
-        *)     reader=(cat)   ;;
-    esac
-
-    "${reader[@]}" !{trimmed_fastq} | \
-    awk 'NR % 4 == 2 { gsub(/U/, "T"); gsub(/u/, "t") } { print }' | \
     vsearch \
-        --fastq_filter - \
+        --fastq_filter !{trimmed_fastq} \
         --fastq_minlen "${MIN_LENGTH}" \
-        --fastq_maxns !{max_n} \
+        --fastq_maxns 0 \
         --relabel_sha1 \
         --fastq_ascii !{params.fastq_encoding} \
         --quiet \
@@ -1427,23 +1377,14 @@ workflow part_B {
 
 
 workflow part_B_shadow {
-    // [S56]: shadow Part B. Runs the same pipeline as
-    // part_B on the Part A shadow outputs
-    // (<sampleId>_notmerged.{fas,qual,stats} — see [S04]), with two
-    // shadow-specific steps glued around global_clustering:
-    //
-    //   1. mask_ns_for_swarm rewrites every sequence-line N to U on
-    //      the globally-dereplicated fasta before swarm sees it
-    //      (swarm rejects N, accepts U as T).
-    //   2. restore_ns_in_representatives undoes the substitution on
-    //      <basename>_notmerged_1f_representatives.fas immediately
-    //      after global_clustering, so every downstream step that
-    //      consumes the representatives (chimera detection,
-    //      occurrence table, mumu) sees the original N padding.
-    //
-    // The basename carries a trailing _notmerged token so every
-    // published artefact is distinguishable from the regular
-    // Part B output.
+    // [S56]: shadow Part B. Runs the **same processes** as part_B on
+    // the Part A shadow outputs (<sampleId>_notmerged.{fas,qual,stats}
+    // — see [S04]). The A-padding emitted by Part A is composed
+    // entirely of A/C/G/T (see [S63]), so swarm accepts the sequences
+    // as-is and no mask/restore wrapping is needed around
+    // global_clustering. The basename carries a trailing _notmerged
+    // token so every published artefact is distinguishable from the
+    // regular Part B output.
 
     take:
     fasta_list   // value channel: List<Path>, one _notmerged.fas per sample
@@ -1460,37 +1401,31 @@ workflow part_B_shadow {
     list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
     global_dereplication(fasta_list, basename)
 
-    // [S04]/[S56]: N -> U just before swarm.
-    mask_ns_for_swarm(basename, global_dereplication.out[0])
-    global_clustering(mask_ns_for_swarm.out[1], basename)
+    global_clustering(global_dereplication.out[0], basename)
+    def representatives = global_clustering.out[3]
 
-    // [S56]: U -> N immediately after swarm so every downstream
-    // step sees the original N-padded representatives.
-    restore_ns_in_representatives(basename, global_clustering.out[3])
-    def restored_reps = restore_ns_in_representatives.out[1]
-
-    fake_taxonomic_assignment(restored_reps, basename)
-    chimera_detection(restored_reps, basename)
+    fake_taxonomic_assignment(representatives, basename)
+    chimera_detection(representatives, basename)
 
     cleaving(
         global_clustering.out[1],            // .stats
         global_clustering.out[2],            // .struct
         global_clustering.out[0],            // .swarms
-        global_dereplication.out[0],         // global .fas (already N-containing)
+        global_dereplication.out[0],         // global .fas
         list_all_cluster_seeds_of_size_greater_than_2.out[0],
         basename
     )
 
     fake_taxonomic_assignment2(cleaving.out[2], basename)
     chimera_detection_post_cleave(
-        restored_reps,
+        representatives,
         cleaving.out[2],
         chimera_detection.out[1],
         basename
     )
 
     build_occurrence_table(
-        restored_reps,
+        representatives,
         cleaving.out[2],
         global_clustering.out[1],
         cleaving.out[0],
@@ -1981,10 +1916,14 @@ workflow part_A {
     merge_fastq_pairs(paired_ch)
 
     // [S04] shadow pipeline: optionally strip the low-quality 3' tails
-    // ([S24]) and then join unmerged R1/R2 with 8-N padding. The
-    // shadow sampleId is `<sampleId>_notmerged`, so all subsequent
-    // processes naturally publish artefacts at `<sampleId>_notmerged.*`
-    // without touching the regular pipeline.
+    // ([S24]) and then join unmerged R1/R2 with A-padding (length
+    // params.join_padding_length, default 8 — see [S63]). The shadow
+    // sampleId is `<sampleId>_notmerged`, so all subsequent processes
+    // naturally publish artefacts at `<sampleId>_notmerged.*` without
+    // touching the regular pipeline. Because the padding uses A/C/G/T
+    // only, the shadow and regular paths share the same downstream
+    // filters (--fastq_maxns 0) and the same swarm invocation —
+    // no per-path branching is needed after this point.
     strip_reads(
         merge_fastq_pairs.out[0],
         merge_fastq_pairs.out[3],
@@ -1993,53 +1932,34 @@ workflow part_A {
     def shadow_id = strip_reads.out[0].map { it + "_notmerged" }
     join_notmerged(shadow_id, strip_reads.out[1], strip_reads.out[2])
 
-    // Build a unified (id, fastq, max_n) stream for the rest of Part A.
-    //   regular path uses max_n=0; shadow path uses max_n=8 (the
-    //   vsearch --fastq_join default padding length).
+    // Build a unified (id, fastq) stream for the rest of Part A.
     def regular_ch = merge_fastq_pairs.out[0]
         .merge(merge_fastq_pairs.out[1])
         .mix(unpaired_ch)
-        .map { id, f -> tuple(id, f, 0) }
     def shadow_ch = join_notmerged.out[0]
         .merge(join_notmerged.out[1])
-        .map { id, f -> tuple(id, f, 8) }
 
-    def to_process = regular_ch.mix(shadow_ch).multiMap { id, f, max_n ->
-        id:    id
-        file:  f
-        max_n: max_n
+    def to_process = regular_ch.mix(shadow_ch).multiMap { id, f ->
+        id:   id
+        file: f
     }
 
     // trim primers (skipped when --no_trimming is set)
     def sampleId_ch
     def fastq_ch
-    def max_n_ch
     if ( params.no_trimming ) {
         sampleId_ch = to_process.id
         fastq_ch    = to_process.file
-        max_n_ch    = to_process.max_n
     } else {
         trim_primers(to_process.id, to_process.file)
-        // trim_primers may reorder items (parallel execution), so
-        // re-attach max_n by joining on sampleId.
-        def id_max_n = to_process.id.merge(to_process.max_n)
-        def joined = trim_primers.out[0]
-            .merge(trim_primers.out[1])
-            .join(id_max_n)
-            .multiMap { id, f, m ->
-                id:    id
-                file:  f
-                max_n: m
-            }
-        sampleId_ch = joined.id
-        fastq_ch    = joined.file
-        max_n_ch    = joined.max_n
+        sampleId_ch = trim_primers.out[0]
+        fastq_ch    = trim_primers.out[1]
     }
 
-    // convert to fasta with SHA1 + ee, apply min-length / max-N
-    // filters (max_n=0 for the regular path, max_n=8 for the shadow
-    // path so the join-padding Ns survive)
-    filter_and_convert_to_fasta(sampleId_ch, fastq_ch, max_n_ch)
+    // convert to fasta with SHA1 + ee, apply min-length / max-N=0
+    // filters. The A-padded shadow reads carry no Ns, so they pass
+    // the same max-N=0 threshold as the regular path.
+    filter_and_convert_to_fasta(sampleId_ch, fastq_ch)
 
     // set aside EE values
     extract_expected_error_values(
@@ -2051,27 +1971,7 @@ workflow part_A {
         filter_and_convert_to_fasta.out[0], filter_and_convert_to_fasta.out[1]
     )
 
-    // [S04] swarm rejects Ns, so the shadow path's dereplicated fasta
-    // gets a transient N->A pass before clustering. Regular-path items
-    // (no _notmerged suffix) bypass the mask step.
-    def derep_branched = dereplicate_fasta.out[0]
-        .merge(dereplicate_fasta.out[1])
-        .branch { id, _f ->
-            shadow:  id.endsWith("_notmerged")
-            regular: true
-        }
-    mask_ns_for_swarm(
-        derep_branched.shadow.map { id, _f -> id },
-        derep_branched.shadow.map { _id, f -> f }
-    )
-    def ready_for_swarm = derep_branched.regular
-        .mix(mask_ns_for_swarm.out[0].merge(mask_ns_for_swarm.out[1]))
-        .multiMap { id, f ->
-            id:   id
-            file: f
-        }
-
-    list_local_clusters(ready_for_swarm.id, ready_for_swarm.file)
+    list_local_clusters(dereplicate_fasta.out[0], dereplicate_fasta.out[1])
 
     emit:
     // (sampleId, path) tuples — shadow samples carry a _notmerged
@@ -2107,6 +2007,14 @@ workflow {
     def allowed_taxonomy_methods = ['stampa', 'sintax']
     assert params.taxonomy_method in allowed_taxonomy_methods :
         "--taxonomy_method must be one of ${allowed_taxonomy_methods}, got '${params.taxonomy_method}'"
+
+    // [S63]: validate --join_padding_length as a positive integer
+    // before any process is scheduled. Non-positive values, non-integers,
+    // and other invalid inputs would otherwise surface as a confusing
+    // vsearch error mid-pipeline.
+    def jpl = params.join_padding_length
+    assert (jpl instanceof Number) && (jpl as int) == jpl && (jpl as int) >= 1 :
+        "--join_padding_length must be a positive integer, got '${jpl}'"
 
     // [S60]: every path-typed param is read through `normalize_path()`
     // at its use site (file(), publishDir, etc.) — see the helper at the
