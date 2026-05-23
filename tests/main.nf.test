@@ -1145,19 +1145,21 @@ nextflow_pipeline {
     }
 
     test("Part C standalone runs the regular path through sintax when --taxonomy_method=sintax") {
-        // COVERAGE: [S61]
+        // COVERAGE: [S61], [S64]
         // The regular path can opt into sintax via params.taxonomy_method.
-        // Same input shape as the stampa standalone test; the published
-        // file is still <basename>_table_assigned.tsv (no _notmerged token).
+        // [S64]: with --taxonomy_method=sintax the regular path consumes
+        // --reference_dataset_sintax (not --reference_dataset). The
+        // published file is still <basename>_table_assigned.tsv (no
+        // _notmerged token).
         tag "ci"
         when {
             params {
-                threads           = 1
-                taxonomy_method   = "sintax"
-                results_folder    = "${outputDir}/part_c_regular_sintax"
-                reference_dataset = "${outputDir}/part_c_regular_sintax_ref.fas"
-                occurrence_table  = "${outputDir}/part_c_regular_sintax_table.tsv"
-                sintax_cutoff     = 0.5
+                threads                  = 1
+                taxonomy_method          = "sintax"
+                results_folder           = "${outputDir}/part_c_regular_sintax"
+                reference_dataset_sintax = "${outputDir}/part_c_regular_sintax_ref.fas"
+                occurrence_table         = "${outputDir}/part_c_regular_sintax_table.tsv"
+                sintax_cutoff            = 0.5
             }
         }
         setup {
@@ -1195,25 +1197,28 @@ nextflow_pipeline {
     }
 
     test("Part C standalone runs shadow Part C when <basename>_notmerged_table.tsv sibling exists") {
-        // COVERAGE: [S50], [S62]
+        // COVERAGE: [S50], [S62], [S64]
         // [S62]: presence of a <basename>_notmerged_table.tsv sibling
         // alongside the --occurrence_table input is the toggle for the
         // shadow Part C workflow. Both assigned tables must reach the
-        // results folder when the sibling is present.
+        // results folder when the sibling is present **and**
+        // --reference_dataset_sintax is set ([S64]).
         //
         // The reference header carries both formats so a single fixture
         // serves the regular (stampa, space-separated lineage) and
         // shadow (sintax, `;tax=...;`) paths at once. stampa_merge.py
         // splits the target on the first space, sintax picks up the
-        // `tax=...` annotation.
+        // `tax=...` annotation. Production users would supply two
+        // distinct files; the hybrid fixture is a test-only shortcut.
         tag "ci"
         when {
             params {
-                threads           = 1
-                results_folder    = "${outputDir}/part_c_shadow"
-                reference_dataset = "${outputDir}/part_c_shadow_ref.fas"
-                occurrence_table  = "${outputDir}/part_c_shadow_table.tsv"
-                sintax_cutoff     = 0.5
+                threads                  = 1
+                results_folder           = "${outputDir}/part_c_shadow"
+                reference_dataset        = "${outputDir}/part_c_shadow_ref.fas"
+                reference_dataset_sintax = "${outputDir}/part_c_shadow_ref.fas"
+                occurrence_table         = "${outputDir}/part_c_shadow_table.tsv"
+                sintax_cutoff            = 0.5
             }
         }
         setup {
@@ -1305,6 +1310,152 @@ nextflow_pipeline {
             )
             assert !shadow.exists() :
                 "no sibling → no shadow Part C → no _notmerged_table_assigned.tsv"
+        }
+    }
+
+    test("shadow Part C reads --reference_dataset_sintax, not --reference_dataset") {
+        // COVERAGE: [S50], [S64]
+        // The shadow path always runs sintax. Point --reference_dataset
+        // at a stampa-only fasta (no `;tax=...;` header) and
+        // --reference_dataset_sintax at a separate sintax-formatted
+        // fasta. The published shadow assigned table must carry sintax
+        // lineage from the *sintax* file — i.e. the shadow path did not
+        // fall back to --reference_dataset.
+        tag "ci"
+        when {
+            params {
+                threads                  = 1
+                results_folder           = "${outputDir}/part_c_two_refs"
+                reference_dataset        = "${outputDir}/part_c_two_refs_stampa_ref.fas"
+                reference_dataset_sintax = "${outputDir}/part_c_two_refs_sintax_ref.fas"
+                occurrence_table         = "${outputDir}/part_c_two_refs_table.tsv"
+                sintax_cutoff            = 0.5
+            }
+        }
+        setup {
+            // 80-nt non-periodic sequence — sintax samples 8-mers and
+            // needs enough unique kmers to bootstrap a lineage.
+            def SEQ = "ACGGAATTCAGTATTCGATGCAATCAGTAGCATGCAGTTAATCGATGCATTAGCATGCAGTCATGCAATCGAGCATTAGC"
+            // stampa-only reference: no ;tax=...; annotation, so a
+            // sintax run against this file would produce no taxonomy
+            // hit (empty col 2 → "NA" after the reshape in [S50]).
+            def stampa_ref = file("${outputDir}/part_c_two_refs_stampa_ref.fas")
+            stampa_ref.parentFile.mkdirs()
+            stampa_ref.text = ">refStampa Bacteria|Proteobacteria\n${SEQ}\n"
+            // sintax-only reference: ;tax=...; annotation; a stampa
+            // run against this file would carry the entire ;tax=...;
+            // string into the references column instead of a clean
+            // lineage. Distinct taxonomy from the stampa file so the
+            // assertion below can tell which one was consumed.
+            def sintax_ref = file("${outputDir}/part_c_two_refs_sintax_ref.fas")
+            sintax_ref.text = ">refSintax;tax=d:Archaea,p:Crenarchaeota;\n${SEQ}\n"
+            def tab = file("${outputDir}/part_c_two_refs_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t80\t10\tN\t1\t0.001\t${SEQ}\t0.0\tNA\tNA\t10\n"
+            )
+            def shadow_tab = file("${outputDir}/part_c_two_refs_notmerged_table.tsv")
+            shadow_tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t7\tNA\tampS\t80\t7\tN\t1\t0.001\t${SEQ}\t0.0\tNA\tNA\t7\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def shadow_assigned = file(
+                "${outputDir}/part_c_two_refs/part_c_two_refs_notmerged_table_assigned.tsv"
+            )
+            assert shadow_assigned.exists() :
+                "shadow Part C should publish <basename>_notmerged_table_assigned.tsv"
+            def rows = shadow_assigned.readLines()
+            assert rows.size() == 2 :
+                "expected header + 1 shadow row, got: ${rows}"
+            def taxonomy = rows[1].split("\t", -1)[11]
+            // Sintax must have read the sintax-formatted file: lineage
+            // names "Archaea/Crenarchaeota" from the sintax ref, not
+            // "Bacteria/Proteobacteria" from the stampa ref. If shadow
+            // Part C had silently fallen back to --reference_dataset
+            // (stampa-only), the taxonomy column would be "NA" (no
+            // ;tax=...; in the stampa file).
+            assert taxonomy.contains("d:Archaea") :
+                "shadow taxonomy should come from --reference_dataset_sintax, got: ${taxonomy}"
+            assert !taxonomy.contains("d:Bacteria") :
+                "shadow path must not consume --reference_dataset, got: ${taxonomy}"
+        }
+    }
+
+    test("shadow Part C is silently skipped when --reference_dataset_sintax is unset") {
+        // COVERAGE: [S50], [S64]
+        // Sibling <basename>_notmerged_table.tsv on disk but no
+        // --reference_dataset_sintax → shadow Part C must not run; the
+        // regular stampa path still publishes its assigned table and
+        // the workflow exits cleanly.
+        tag "ci"
+        when {
+            params {
+                threads           = 1
+                results_folder    = "${outputDir}/part_c_shadow_skip"
+                reference_dataset = "${outputDir}/part_c_shadow_skip_ref.fas"
+                occurrence_table  = "${outputDir}/part_c_shadow_skip_table.tsv"
+                // reference_dataset_sintax deliberately unset
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_shadow_skip_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = ">refA Kingdom|Phylum|Class\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            def tab = file("${outputDir}/part_c_shadow_skip_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t32\t10\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t10\n"
+            )
+            def shadow_tab = file("${outputDir}/part_c_shadow_skip_notmerged_table.tsv")
+            shadow_tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t7\tNA\tampS\t32\t7\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t7\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def regular = file(
+                "${outputDir}/part_c_shadow_skip/part_c_shadow_skip_table_assigned.tsv"
+            )
+            assert regular.exists() :
+                "regular Part C should publish <basename>_table_assigned.tsv"
+            def shadow = file(
+                "${outputDir}/part_c_shadow_skip/part_c_shadow_skip_notmerged_table_assigned.tsv"
+            )
+            assert !shadow.exists() :
+                "no --reference_dataset_sintax → shadow Part C must not publish"
+        }
+    }
+
+    test("regular Part C aborts when --taxonomy_method=sintax but --reference_dataset_sintax is missing") {
+        // COVERAGE: [S47], [S61], [S64]
+        // Selecting the sintax method on the regular path without
+        // supplying a sintax-formatted reference must abort at startup,
+        // with stderr naming the missing parameter.
+        tag "ci"
+        when {
+            params {
+                threads          = 1
+                taxonomy_method  = "sintax"
+                results_folder   = "${outputDir}/part_c_sintax_no_ref"
+                occurrence_table = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                // reference_dataset_sintax deliberately unset
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("reference_dataset_sintax") :
+                "expected error to name reference_dataset_sintax, got: ${msg}"
         }
     }
 

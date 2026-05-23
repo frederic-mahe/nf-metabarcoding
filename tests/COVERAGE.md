@@ -90,6 +90,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S61]`| `params.taxonomy_method` validated at startup: accepts `stampa` (default) and `sintax`; invalid value aborts before any process runs | `tests/main.nf.test` | done | — |
 | `[S62]`| Part C standalone probes for `<basename>_notmerged_table.tsv` sibling; runs `part_C_shadow` iff present, no-op otherwise | `tests/main.nf.test` | done | — |
 | `[S63]`| `params.join_padding_length` (default 8): A-padding length used by `vsearch --fastq_join` in the shadow Part A path | `tests/processes/part_a/join_notmerged.nf.test`, `tests/main.nf.test` | red    | —          |
+| `[S64]`| `params.reference_dataset_sintax`: optional sintax-formatted reference; gates `part_C_shadow`; required by regular Part C when `--taxonomy_method=sintax` | `tests/main.nf.test` | done   | —          |
 
 
 ## Per-process tests

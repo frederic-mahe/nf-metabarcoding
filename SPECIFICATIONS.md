@@ -604,16 +604,27 @@ optionally compressed). Output: an occurrence table whose
 `taxonomy` / `identity` / `references` columns have been updated
 from placeholder values to real taxonomic assignments.
 
-- `[S47]` Part C requires `--reference_dataset` (no default). The
-  value is an absolute or relative path to a fasta file (plain
+- `[S47]` Part C requires a reference fasta whose **format
+  matches the selected assignment method** ([S61]). The value is
+  an absolute or relative path to a fasta file (plain
   `.fasta`/`.fas`, gzip-compressed `.gz`, or bzip2-compressed
-  `.bz2`). The workflow aborts at startup if Part C is asked to
-  run without `--reference_dataset`. The parameter is **only**
-  required for Part C; Parts A and B do not consume it.
-  - **Pass when:** running Part C without `--reference_dataset`
-    exits non-zero and stderr names the missing parameter;
-    supplying it via `-params-file` or `--key value` lets the
-    workflow proceed.
+  `.bz2`). Two flags expose the two formats:
+    - `--reference_dataset` — stampa-formatted reference (header
+      `>id space-separated lineage`); consumed by the regular
+      path when `--taxonomy_method=stampa` (default).
+    - `--reference_dataset_sintax` — sintax-formatted reference
+      (header `>id;tax=d:Dom,p:Phy,...;`); consumed by the
+      regular path when `--taxonomy_method=sintax` and by the
+      shadow Part C path ([S50] / [S64]).
+  The workflow aborts at startup if Part C is asked to run with
+  the method-appropriate flag missing. Both flags are **only**
+  required for Part C; Parts A and B do not consume them.
+  - **Pass when:** running Part C with `--taxonomy_method=stampa`
+    (default) but no `--reference_dataset` exits non-zero and
+    stderr names `reference_dataset`; running Part C with
+    `--taxonomy_method=sintax` but no `--reference_dataset_sintax`
+    exits non-zero and stderr names `reference_dataset_sintax`;
+    supplying the matching flag lets the workflow proceed.
 - `[S48]` Part C accepts either an occurrence table (the
   `[S46]` `_table.tsv`) or a fasta file as its primary input.
   When given an occurrence table, the process
@@ -671,7 +682,7 @@ from placeholder values to real taxonomic assignments.
     and LCA correctness is pinned at the helper level by
     `tests/python/test_stampa_merge.py`.
 - `[S50]` Part C's **shadow path** runs `vsearch --sintax`
-  against the same `--reference_dataset` ([S47]) on the shadow
+  against `--reference_dataset_sintax` ([S64]) on the shadow
   occurrence table `<basename>_notmerged_table.tsv` produced by
   shadow Part B ([S56]) and emits
   `<basename>_notmerged_table_assigned.tsv` (the shadow sibling
@@ -687,11 +698,13 @@ from placeholder values to real taxonomic assignments.
   at their `[S33]`/`[S46]` placeholder values (`0.0` / `NA`).
   The shadow Part C workflow (`part_C_shadow`) is invoked
   alongside the regular `part_C` from all three entry points
-  (end-to-end Part A→B→C, Part B standalone with
-  `--reference_dataset`, and Part C standalone — see [S61]).
-  When no shadow occurrence table is available (no `_notmerged`
-  sample upstream, or no sibling file in standalone mode), the
-  shadow Part C workflow is not invoked.
+  (end-to-end Part A→B→C, Part B standalone with a reference,
+  and Part C standalone — see [S61]) **only when
+  `--reference_dataset_sintax` is set** ([S64]). When the
+  sintax-formatted reference is missing, or when no shadow
+  occurrence table is available (no `_notmerged` sample upstream,
+  or no sibling file in standalone mode), the shadow Part C
+  workflow is not invoked — silently, no error.
   - **Pass when:** an end-to-end run on a paired-end fixture
     that produces at least one `_notmerged` sample publishes
     both `<basename>_table_assigned.tsv` (stampa, regular path)
@@ -852,8 +865,9 @@ from placeholder values to real taxonomic assignments.
   the CLI, or read from a `-params-file`) still resolve to the
   intended location instead of being joined to the launch directory.
   The parameters covered are `--reference_dataset`,
-  `--occurrence_table`, `--fastq_folder`, `--fasta_folder`, and
-  `--results_folder`. A bare `~` or a leading `~/` is replaced with
+  `--reference_dataset_sintax` ([S64]), `--occurrence_table`,
+  `--fastq_folder`, `--fasta_folder`, and `--results_folder`. A
+  bare `~` or a leading `~/` is replaced with
   the current user's home directory (`$HOME`); a leading `~user/` is
   replaced with that user's home directory when it can be resolved
   (best-effort lookup via `getent passwd` then `/etc/passwd`).
@@ -869,34 +883,44 @@ from placeholder values to real taxonomic assignments.
 - `[S61]` `params.taxonomy_method` controls the **regular** Part
   C assignment method only ([S49] / [S50]'s sibling sintax run on
   the regular table). Accepted values: `'stampa'` (default, the
-  [S49] scatter-gather) and `'sintax'` (use `vsearch --sintax` on
-  the regular table with the same reshape rules as [S50]). The
-  shadow path always uses sintax regardless of this flag. The
-  value is validated at workflow startup; an unknown method
-  aborts with a clear message before any process runs.
+  [S49] scatter-gather, consumes `--reference_dataset`) and
+  `'sintax'` (use `vsearch --sintax` on the regular table with
+  the same reshape rules as [S50]; consumes
+  `--reference_dataset_sintax` — see [S64]). The shadow path
+  always uses sintax regardless of this flag and reads
+  `--reference_dataset_sintax`. The value is validated at workflow
+  startup; an unknown method aborts with a clear message before
+  any process runs.
   - **Pass when:** `--taxonomy_method bogus` aborts the workflow
     with an error naming `taxonomy_method`; `--taxonomy_method
-    sintax` runs the regular path through
-    `assign_taxonomy_sintax` and still publishes
-    `<basename>_table_assigned.tsv`.
+    sintax` with `--reference_dataset_sintax` set runs the
+    regular path through `assign_taxonomy_sintax` and still
+    publishes `<basename>_table_assigned.tsv`;
+    `--taxonomy_method sintax` without
+    `--reference_dataset_sintax` aborts with a clear message.
 - `[S62]` In Part C **standalone mode** (`--occurrence_table
   /path/to/<basename>_table.tsv`), the workflow probes for a
   shadow occurrence-table sibling at
   `<dirname>/<basename>_notmerged_table.tsv`. If that file
-  exists, `part_C_shadow` ([S50]) runs on it alongside the
+  exists **and** `--reference_dataset_sintax` is set ([S64]),
+  `part_C_shadow` ([S50]) runs on the sibling alongside the
   regular `part_C`, publishing both
   `<basename>_table_assigned.tsv` and
   `<basename>_notmerged_table_assigned.tsv` under
-  `--results_folder`. If the sibling does **not** exist, the
-  shadow workflow is not invoked and only the regular
-  `_table_assigned.tsv` is published — no error. There is no CLI
-  flag to opt in or out: presence of the sibling file is the
-  toggle.
-  - **Pass when:** running Part C standalone with both
-    `<basename>_table.tsv` and `<basename>_notmerged_table.tsv`
-    in the same directory publishes both `_table_assigned.tsv`
-    files; running with only `<basename>_table.tsv` publishes
-    only the regular assigned table and exits cleanly.
+  `--results_folder`. If the sibling does **not** exist, or if
+  `--reference_dataset_sintax` is unset, the shadow workflow is
+  not invoked and only the regular `_table_assigned.tsv` is
+  published — no error. There is no boolean CLI flag to opt in or
+  out: the presence of the sibling file **and** the sintax
+  reference together are the toggle.
+  - **Pass when:** running Part C standalone with
+    `<basename>_table.tsv`, `<basename>_notmerged_table.tsv`, and
+    `--reference_dataset_sintax` set publishes both
+    `_table_assigned.tsv` files; running with the sibling file
+    on disk but no `--reference_dataset_sintax` publishes only
+    the regular assigned table and exits cleanly; running with
+    only `<basename>_table.tsv` publishes only the regular
+    assigned table and exits cleanly.
 - `[S63]` `params.join_padding_length` (positive integer, default
   `8`) sets the length of the run of `A`s that
   `vsearch --fastq_join` inserts between R1 and R2 in the shadow
@@ -916,6 +940,38 @@ from placeholder values to real taxonomic assignments.
     `--join_padding_length 0` aborts the workflow before
     `merge_fastq_pairs` is scheduled, with stderr naming the
     parameter.
+- `[S64]` `params.reference_dataset_sintax` (optional, default
+  `null`) is a path to a **sintax-formatted** reference fasta
+  (header `>id;tax=d:Dom,p:Phy,...;` — see vsearch's
+  `--sintax` documentation). The same `.fasta`/`.fas`/`.gz`/`.bz2`
+  shapes accepted by `[S47]`'s `--reference_dataset` apply. The
+  flag is consumed by:
+    1. the shadow Part C path ([S50]), which always uses
+       `vsearch --sintax`; and
+    2. the regular Part C path ([S49] / [S61]) when
+       `--taxonomy_method=sintax`, where it replaces
+       `--reference_dataset` (stampa- and sintax-formatted
+       references differ in incompatible ways; a single file
+       cannot satisfy both methods in production use).
+  When `--reference_dataset_sintax` is **unset**, the shadow Part
+  C workflow is silently skipped from every entry point (no
+  error, no published shadow artefact) and the regular path
+  must run through stampa. Path-typed normalisation ([S60])
+  applies — a leading `~` is expanded at workflow startup. This
+  parameter is a stop-gap exposed to give users a way out of the
+  one-format-fits-all bind until a better solution is identified
+  (e.g. an on-the-fly format converter or a multi-format reference
+  loader); the existence of two separate flags is the visible
+  workaround.
+  - **Pass when:** an end-to-end run that produces at least one
+    `_notmerged` sample publishes
+    `<basename>_notmerged_table_assigned.tsv` only when
+    `--reference_dataset_sintax` is set; the same run without the
+    flag publishes only the regular `<basename>_table_assigned.tsv`
+    and no shadow artefact; running Part C with
+    `--taxonomy_method=sintax` and no `--reference_dataset_sintax`
+    aborts at startup with stderr naming
+    `reference_dataset_sintax`.
 
 
 ## Dependencies

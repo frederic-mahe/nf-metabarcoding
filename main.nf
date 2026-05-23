@@ -66,7 +66,18 @@ params.fastidious = true
 // `local` profile in nextflow.config overrides this to 0
 // (sentinel: bypass splitFasta and feed the whole fasta into
 // one task).
-params.reference_dataset = null
+// [S47]/[S64]: two reference flags, one per assignment method.
+// `--reference_dataset` carries the stampa-formatted file (header
+// `>id space-separated lineage`); consumed by the regular path when
+// taxonomy_method='stampa' (default). `--reference_dataset_sintax`
+// carries the sintax-formatted file (header `>id;tax=d:...,p:...;`);
+// consumed by `part_C_shadow` (always sintax) and by the regular
+// path when taxonomy_method='sintax'. The split is a stop-gap until
+// a single multi-format reference loader lands — until then, the
+// two formats differ in incompatible ways and a single file cannot
+// satisfy both methods in production use.
+params.reference_dataset        = null
+params.reference_dataset_sintax = null
 params.occurrence_table  = null
 params.taxonomy_method   = 'stampa'
 params.iddef             = 1
@@ -225,7 +236,15 @@ Part B — per-sample fasta → occurrence table:
                               (default: ${params.fastidious})
 
 Part C — taxonomic assignment:
-  --reference_dataset PATH    reference fasta (.gz / .bz2 OK; required)
+  --reference_dataset PATH    stampa-formatted reference fasta
+                              (.gz / .bz2 OK). Required when
+                              --taxonomy_method=stampa (default).
+  --reference_dataset_sintax PATH
+                              sintax-formatted reference fasta
+                              (.gz / .bz2 OK). Required when
+                              --taxonomy_method=sintax; gates the
+                              shadow Part C path — when unset, shadow
+                              Part C is silently skipped.
   --taxonomy_method NAME      regular-path method: 'stampa' (default)
                               or 'sintax'. The shadow path always uses
                               sintax regardless of this flag.
@@ -1624,7 +1643,14 @@ workflow part_C {
     basename           // value channel: <project>_<N>_samples
 
     main:
-    def reference = file(normalize_path(params.reference_dataset))
+    // [S47]/[S64]: pick the reference matching the assignment method.
+    // The two formats are not interchangeable; stampa expects a
+    // space-separated lineage in the header and sintax expects a
+    // `;tax=...;` annotation. The relevant assert in the entry point
+    // already guarantees the matching flag is set before we land here.
+    def reference = ( params.taxonomy_method == 'sintax' )
+        ? file(normalize_path(params.reference_dataset_sintax))
+        : file(normalize_path(params.reference_dataset))
 
     // [S48]: extract a representatives FASTA from the occurrence
     // table. (The fasta-input branch promised by [S48] is blocked
@@ -1740,7 +1766,11 @@ workflow part_C_shadow {
     basename           // value channel: <project>_<N>_samples_notmerged
 
     main:
-    def reference = file(normalize_path(params.reference_dataset))
+    // [S64]: shadow Part C consumes the sintax-formatted reference.
+    // Entry points gate this workflow on params.reference_dataset_sintax
+    // being non-null, so the file() call below is safe by the time the
+    // workflow is invoked.
+    def reference = file(normalize_path(params.reference_dataset_sintax))
 
     def populated = occurrence_table.filter { tbl ->
         // any non-empty line after the header → there is at least one
@@ -1769,11 +1799,17 @@ workflow part_C_shadow {
 
 workflow part_c {
     // Standalone Part C ([S47]/[S48]): the user provides
-    // --occurrence_table (Part B's <basename>_table.tsv) and
-    // --reference_dataset. The fasta-input branch is blocked on D04
-    // and is not exposed by this skeleton.
-    assert params.reference_dataset :
-        "--reference_dataset must be set when running Part C"
+    // --occurrence_table (Part B's <basename>_table.tsv) and a
+    // reference whose format matches --taxonomy_method ([S47]/[S64]).
+    // The fasta-input branch is blocked on D04 and is not exposed by
+    // this skeleton.
+    if ( params.taxonomy_method == 'sintax' ) {
+        assert params.reference_dataset_sintax :
+            "--reference_dataset_sintax must be set when --taxonomy_method=sintax"
+    } else {
+        assert params.reference_dataset :
+            "--reference_dataset must be set when --taxonomy_method=stampa"
+    }
     assert params.occurrence_table :
         "--occurrence_table must be set when running Part C standalone " +
         "(fasta input is blocked on DECISIONS.md D04)"
@@ -1790,17 +1826,19 @@ workflow part_c {
 
     part_C(table_ch, basename_ch)
 
-    // [S62]: probe for a shadow sibling next to the input table. The
-    // file lookup is done at workflow-build time (not inside a channel
-    // operator) so the toggle is "the file exists on disk now". When
-    // the sibling is present, route it through part_C_shadow alongside
-    // the regular part_C invocation — DSL2 allows two distinct
-    // sub-workflows in the same scope. When absent, the shadow
-    // workflow is simply not invoked.
+    // [S62]/[S64]: probe for a shadow sibling next to the input
+    // table. The file lookup is done at workflow-build time (not
+    // inside a channel operator) so the toggle is "the file exists on
+    // disk now". When the sibling is present **and**
+    // --reference_dataset_sintax is set, route the sibling through
+    // part_C_shadow alongside the regular part_C invocation — DSL2
+    // allows two distinct sub-workflows in the same scope. When
+    // either condition is unmet, the shadow workflow is simply not
+    // invoked.
     def shadow_table_path = file(
         "${table_path.parent}/${derived_basename}_notmerged_table.tsv"
     )
-    if ( shadow_table_path.exists() ) {
+    if ( shadow_table_path.exists() && params.reference_dataset_sintax ) {
         def shadow_basename_ch = Channel.value("${derived_basename}_notmerged")
         def shadow_table_ch    = Channel.fromPath(shadow_table_path.toString())
         part_C_shadow(shadow_table_ch, shadow_basename_ch)
@@ -1859,15 +1897,22 @@ workflow part_b {
         .collect()
     part_B_shadow(s_fasta_list, s_qual_list, s_stats_list)
 
-    if ( params.reference_dataset ) {
+    // [S47]/[S64]: invoke Part C when the user supplied the reference
+    // matching the selected method. Shadow Part C ([S50]) additionally
+    // requires --reference_dataset_sintax — see [S64].
+    def regular_ref_present = ( params.taxonomy_method == 'sintax' )
+        ? params.reference_dataset_sintax
+        : params.reference_dataset
+    if ( regular_ref_present ) {
         def basename_ch = fasta_list.map { files ->
             "${params.project_name}_${files.size()}_samples"
         }
         part_C(part_B.out.table, basename_ch)
-
-        // [S50]: shadow taxonomy on part_B_shadow's occurrence table.
-        // The header-only gate inside part_C_shadow suppresses output
-        // when the shadow side had no samples upstream.
+    }
+    if ( params.reference_dataset_sintax ) {
+        // [S50]/[S64]: shadow taxonomy on part_B_shadow's occurrence
+        // table. The header-only gate inside part_C_shadow suppresses
+        // output when the shadow side had no samples upstream.
         def shadow_basename_ch = s_fasta_list.map { files ->
             "${params.project_name}_${files.size()}_samples_notmerged"
         }
@@ -2099,15 +2144,25 @@ workflow {
         def s_stats = joined_shadow.map { _id, _f, _q, s -> s }.collect()
         part_B_shadow(s_fasta, s_qual, s_stats)
 
-        if ( params.reference_dataset ) {
+        // [S47]/[S64]: same routing as `workflow part_b`. Run regular
+        // Part C when the reference matching --taxonomy_method is set;
+        // run shadow Part C ([S50]) when --reference_dataset_sintax is
+        // set. The two gates are independent: a stampa-only run still
+        // produces regular taxonomy; supplying just the sintax flag
+        // skips the regular part_C and produces shadow taxonomy only.
+        def regular_ref_present = ( params.taxonomy_method == 'sintax' )
+            ? params.reference_dataset_sintax
+            : params.reference_dataset
+        if ( regular_ref_present ) {
             def basename_ch = b_fasta.map { files ->
                 "${params.project_name}_${files.size()}_samples"
             }
             part_C(part_B.out.table, basename_ch)
-
-            // [S50]: shadow taxonomy on part_B_shadow's table. The
-            // header-only gate inside part_C_shadow suppresses output
-            // when the shadow side had zero _notmerged samples.
+        }
+        if ( params.reference_dataset_sintax ) {
+            // [S50]/[S64]: shadow taxonomy on part_B_shadow's table.
+            // The header-only gate inside part_C_shadow suppresses
+            // output when the shadow side had zero _notmerged samples.
             def shadow_basename_ch = s_fasta.map { files ->
                 "${params.project_name}_${files.size()}_samples_notmerged"
             }
