@@ -38,9 +38,21 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
   - **Pass when:** running the full pipeline on a paired-end fixture
     produces, in order, per-sample `.fas` (Part A), an occurrence
     table (Part B), and a taxonomy-annotated occurrence table (Part C)
-- `[S02]` each part can be run separately, or all at once
-  - **Pass when:** `--only=A|B|C` (or equivalent flag) runs that part
-    in isolation; default runs all three
+- `[S02]` each part can be run separately, or all at once. The
+  entry point is selected implicitly by which input param is set
+  (no explicit `--only=` flag): `--occurrence_table` runs Part C
+  standalone (and the shadow path when its preconditions hold, see
+  [S62]); otherwise `--fasta_folder` runs Part B standalone (with
+  Part C chained on when `--reference_dataset` is set); otherwise
+  `--fastq_folder` runs Part A end-to-end (with Part B / Part C
+  chained on when `--project_name` / `--reference_dataset` are set).
+  At most one of `--occurrence_table` / `--fasta_folder` /
+  `--fastq_folder` should be set per run; the dispatcher uses the
+  first match in that order.
+  - **Pass when:** running with only `--fastq_folder` set invokes
+    every Part A process and no Part B / Part C process; the existing
+    Part B standalone (`--fasta_folder`) and Part C standalone
+    (`--occurrence_table`) tests cover the other two cases.
 - `[S03]` fastq files can be paired-end or single-end, compressed
   (`.gz`, `.bz2`) or not
   - **Pass when:** the same input data in any of these forms produces
@@ -693,7 +705,12 @@ from placeholder values to real taxonomic assignments.
   `--dbmask none`, and `--tabbedout`; the assignment lifted into
   the occurrence table's `taxonomy` column is **column 2** of
   the tabbed output (the bootstrap-annotated lineage, e.g.
-  `d:Bacteria(0.99),p:Proteobacteria(0.85)`). The `identity` and
+  `d:Bacteria(0.99),p:Proteobacteria(0.85)`). `params.sintax_cutoff`
+  is passed to vsearch for completeness but only affects vsearch's
+  internal column 4 (the cutoff-filtered lineage); since the workflow
+  lifts column 2 (unfiltered, with per-rank bootstrap), the value is
+  forward-compatible config — visible in the vsearch log but not in
+  the published `taxonomy` column. The `identity` and
   `references` columns are not populated by sintax — they stay
   at their `[S33]`/`[S46]` placeholder values (`0.0` / `NA`).
   The shadow Part C workflow (`part_C_shadow`) is invoked
