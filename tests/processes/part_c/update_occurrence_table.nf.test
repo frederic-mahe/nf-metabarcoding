@@ -47,4 +47,54 @@ nextflow_process {
             assert row2[11] == "NA"
         }
     }
+
+    test("leaves the input occurrence table untouched") {
+        // COVERAGE: [S51]
+        // [S51] guarantees Part C is non-destructive: the input
+        // `_table.tsv` is not modified — the annotated table is a
+        // sibling, not an overwrite. A regression that switched to
+        // an in-place update (e.g. `sed -i` instead of stdout
+        // redirection) would not be caught by the join assertions
+        // above. Stash the input's bytes before the process runs and
+        // compare after.
+        tag "ci"
+        setup {
+            def t = file("${outputDir}/persisted_input_table.tsv")
+            t.parentFile.mkdirs()
+            t.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\t" +
+                "chimera\tspread\tquality\tsequence\tidentity\t" +
+                "taxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t10\t10\tN\t1\t0.001\tACGTACGTAC" +
+                "\t0.0\tNA\tNA\t10\n"
+            )
+            def a = file("${outputDir}/persisted_assignments")
+            a.text = "amp1\t10\t99.0\tBacteria|Firmicutes\trefA\n"
+        }
+        when {
+            process {
+                """
+                input[0] = file("${outputDir}/persisted_input_table.tsv")
+                input[1] = file("${outputDir}/persisted_assignments")
+                input[2] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            // The input file on disk must be byte-identical to what
+            // setup{} wrote — neither truncated, rewritten, nor
+            // appended to.
+            def expected = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\t" +
+                "chimera\tspread\tquality\tsequence\tidentity\t" +
+                "taxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t10\t10\tN\t1\t0.001\tACGTACGTAC" +
+                "\t0.0\tNA\tNA\t10\n"
+            )
+            def actual = file("${outputDir}/persisted_input_table.tsv").text
+            assert actual == expected :
+                "Part C must not modify its input table. Got:\n${actual}\nExpected:\n${expected}"
+        }
+    }
 }
