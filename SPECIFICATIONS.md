@@ -143,8 +143,14 @@ isolation.
 ## Workflow requirements
 
 - `[S06]` configurable via a config file or command-line parameters
-  - **Pass when:** the same run can be reproduced from either a
-    `nextflow.config`/`params.yml` or from `--key value` flags
+  - Not part of automated CI: the workflow accesses every user-facing
+    value through `params.X`, a hashmap Nextflow populates from
+    `nextflow.config`, `-params-file params.yml`, and `--key value`
+    flags indistinguishably. There is nothing in the workflow code to
+    test — the equivalence is structurally guaranteed upstream. `[S18]`
+    asserts the contract explicitly for required parameters
+    ("supplying the parameter via either `-params-file` or
+    `--key value` lets the run proceed"); that is the meaningful gate.
 - `[S07]` runs locally or on HPC with slurm
   - Not part of automated CI; covered by manual smoke tests on the
     cluster. Profiles live in `nextflow.config`.
