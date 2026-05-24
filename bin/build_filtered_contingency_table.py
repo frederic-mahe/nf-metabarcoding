@@ -67,6 +67,14 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
                         required=True,
                         help="sequence-to-sample distribution TSV "
                              "(build_distribution_file output)")
+    parser.add_argument("--samples",
+                        default="",
+                        help="comma-separated list of sample IDs to "
+                             "include as columns (empty samples that "
+                             "contribute no rows to --distribution "
+                             "still need a zero column — [S09]). "
+                             "Union-merged with the samples seen in "
+                             "the distribution file.")
     return parser.parse_args(argv)
 
 
@@ -208,7 +216,9 @@ def quality_parse(
 
 
 def distribution_parse(
-    path: str, valid_otus: dict[str, str],
+    path: str,
+    valid_otus: dict[str, str],
+    extra_samples: Optional[list[str]] = None,
 ) -> tuple[dict[str, dict[str, int]], list[str]]:
     """Aggregate amplicon abundances onto their seed, per sample.
 
@@ -219,16 +229,18 @@ def distribution_parse(
       duplicate ``(amplicon, sample)`` row in the distribution simply
       adds to the running total ("deal with duplicated samples" in the
       legacy code).
-    * ``samples`` is the sorted list of every sample name seen in the
-      distribution file, even for amplicons that are not in
-      ``valid_otus`` — so a sample that lives only in filtered-out
-      clusters still surfaces as a zero column.
+    * ``samples`` is the sorted union of every sample name seen in the
+      distribution file (so a sample that lives only in filtered-out
+      clusters still surfaces as a zero column) and any
+      ``extra_samples`` supplied by the caller (so a sample that
+      contributes **zero** rows to the distribution — i.e. an
+      entirely-empty input — also gets a zero column, ``[S09]``).
     """
     print("PROGRESS: parsing distribution file", file=sys.stderr)
     seeds2samples: dict[str, dict[str, int]] = {
         seed: {} for seed in set(valid_otus.values())
     }
-    sample_set: set[str] = set()
+    sample_set: set[str] = set(extra_samples or [])
     with open(path) as f:
         for line in f:
             amplicon, sample, abundance = line.strip().split("\t")
@@ -312,6 +324,11 @@ def write_table(
 def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
 
+    extra_samples = [
+        s for s in (args.samples.split(",") if args.samples else [])
+        if s
+    ]
+
     stampa = stampa_parse(args.assignments)
     representatives = representatives_parse(args.representatives, stampa)
     _, sorted_stats, seeds = stats_parse(args.stats, representatives)
@@ -319,7 +336,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     uchime = uchime_parse(args.chimera, representatives)
     quality = quality_parse(args.quality, representatives)
     seeds2samples, samples = distribution_parse(
-        args.distribution, valid_otus,
+        args.distribution, valid_otus, extra_samples=extra_samples,
     )
 
     write_table(
