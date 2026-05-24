@@ -60,4 +60,42 @@ nextflow_process {
                 "uchime stderr log should not be empty"
         }
     }
+
+    test("params.chimera_minsize threads through to --fastx_filter --minsize") {
+        // COVERAGE: [S34]
+        // The part_b fixture's global representatives have sizes 4, 4,
+        // and 2 after global_dereplication. Setting chimera_minsize=5
+        // pushes every record below the threshold, so uchime sees an
+        // empty stream and the .uchime table comes back empty — even
+        // though the same fixture under the default minsize=2 keeps
+        // all three records (as the test above demonstrates implicitly
+        // via the populated .log). A stale wiring (e.g. hard-coded
+        // --minsize 2) would still let the size-4 records through and
+        // leave a non-empty .uchime, so the empty .uchime + the
+        // matching "0 unique sequences" line in the stderr log are
+        // both sufficient and necessary witnesses that the param
+        // reached vsearch.
+        tag "ci"
+        when {
+            params {
+                chimera_minsize = 5
+            }
+            process {
+                """
+                input[0] = global_clustering.out[3]
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def uchimePath = process.out[0].get(0)
+            def logPath    = process.out[1].get(0)
+
+            assert path(uchimePath).readLines().isEmpty() :
+                "expected an empty .uchime table when minsize filters every record"
+            assert path(logPath).text.contains("0 unique sequences") :
+                "expected uchime to report 0 unique sequences, got:\n${path(logPath).text}"
+        }
+    }
 }
