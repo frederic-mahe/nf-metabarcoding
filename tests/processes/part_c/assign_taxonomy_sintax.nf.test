@@ -67,6 +67,43 @@ nextflow_process {
         }
     }
 
+    test("params.sintax_cutoff threads through to vsearch --sintax_cutoff") {
+        // COVERAGE: [S50]
+        // [S50] specifies the process lifts vsearch's tabbed-output
+        // column 2 (the unfiltered bootstrap-annotated lineage), so
+        // params.sintax_cutoff does NOT change the taxonomy column
+        // value — it only affects vsearch's internal col-4 lineage
+        // (which the process ignores). The wiring is therefore only
+        // observable through vsearch's own --log echo of the full
+        // command line. A hard-coded cutoff or a dropped param would
+        // leave the default value in the log and fail this assertion.
+        tag "ci"
+        when {
+            params {
+                threads       = 1
+                sintax_cutoff = 0.93   // non-default sentinel
+            }
+            process {
+                """
+                def SEQ = 'ACGGAATTCAGTATTCGATGCAATCAGTAGCATGCAGTTAATCGATGCATTAGCATGCAGTCATGCAATCGAGCATTAGC'
+                def reps = workDir.resolve("reps.fas")
+                reps.text = '>amp1;size=10;\\n' + SEQ + '\\n'
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>refA;tax=d:Bacteria,p:Proteobacteria;\\n' + SEQ + '\\n'
+                input[0] = file(reps.toString())
+                input[1] = file(ref.toString())
+                input[2] = "proj_1_samples_notmerged"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def log = path(process.out[1].get(0)).text
+            assert log.contains("--sintax_cutoff 0.93") :
+                "expected vsearch log to echo --sintax_cutoff 0.93 from params, got:\n${log}"
+        }
+    }
+
     test("emits NA in the taxonomy column when sintax produces no classification") {
         // COVERAGE: [S50]
         // Short / low-complexity sequences come back unclassified from
