@@ -278,13 +278,18 @@ def _write_inputs(
 
 
 def _run_cleaver(
-    inputs: dict[str, Path], *, cwd: Path, fastidious: bool = True,
+    inputs: dict[str, Path],
+    *,
+    cwd: Path,
+    fastidious: bool = True,
+    percentage: float | None = None,
 ) -> None:
     """Invoke ``bin/cluster_cleaver.py``.
 
     The script defaults to ``--fastidious`` (the legacy pipeline always
     runs swarm with ``--fastidious``). Pass ``fastidious=False`` to
-    exercise the ``_1_`` filename branch.
+    exercise the ``_1_`` filename branch. ``percentage`` overrides the
+    sub-seed presence threshold (default 0.05; see [S22]).
     """
     cmd = [
         "python3",
@@ -297,6 +302,8 @@ def _run_cleaver(
     ]
     if not fastidious:
         cmd.append("--no-fastidious")
+    if percentage is not None:
+        cmd += ["--percentage", str(percentage)]
     subprocess.run(cmd, cwd=cwd, check=True)
 
 
@@ -422,3 +429,61 @@ def test_cleaver_explicit_out_paths(tmp_path: Path) -> None:
     assert not (tmp_path / "cleaver_1f.stats2").exists()
     assert not (tmp_path / "cleaver_1f.swarms2").exists()
     assert not (tmp_path / "cleaver_1f_representatives.fas2").exists()
+
+
+def test_cleaver_percentage_raises_threshold(tmp_path: Path) -> None:
+    """[S22]: ``--percentage`` controls the sub-seed presence threshold.
+
+    The PER_SAMPLE_STATS fixture spans 21 samples. At the default
+    ``--percentage 0.05`` the threshold is 1.05, so any sub-seed
+    appearing in ≥2 samples survives. Five clusters end up cleaved
+    (A, D, E, F, 11 — see ``EXPECTED_SWARMS2``).
+
+    Sub-seed presence counts in the fixture:
+        aa02:  5 samples   (samples 01–05)
+        cc02:  1 sample    (sample 06; dropped at every threshold)
+        dd02:  21 samples  (all samples)
+        ee02:  21 samples  (all samples)
+        ff02:  21 samples  (all samples)
+        1102:  21 samples  (all samples)
+
+    Raising ``--percentage`` to 0.30 lifts the threshold to 6.3 — only
+    ``aa02`` falls below it. Cluster A's only sub-seed is dropped, so
+    cluster A is NOT re-emitted; clusters D / E / F / 11 still split.
+    Four cleaved clusters × 2 sub-clusters each = 8 swarms2 lines
+    (down from the default's 10).
+
+    A regression that hard-coded the threshold (or ignored the flag)
+    would still emit cluster A's two sub-cluster lines and fail both
+    the count assertion and the per-key check.
+    """
+    inputs = _write_inputs(tmp_path, swarm_parameters="1f")
+    _run_cleaver(inputs, cwd=tmp_path, percentage=0.30)
+
+    swarms2 = (tmp_path / "cleaver_1f.swarms2").read_text().splitlines()
+    assert len(swarms2) == 8, (
+        f"expected 8 sub-cluster lines under --percentage 0.30, got "
+        f"{len(swarms2)}:\n" + "\n".join(swarms2)
+    )
+
+    # aa02 is the only sub-seed dropped at this threshold. It must not
+    # lead a sub-cluster line (i.e. it never appears as the surviving
+    # sub-cluster's key) and the parent aa01 cluster must therefore be
+    # absent from the output entirely.
+    leading_keys = {line.split(";", 1)[0] for line in swarms2}
+    assert "aa02" not in leading_keys, (
+        f"aa02 should be filtered out at --percentage 0.30 "
+        f"(5/21 samples = 23.8%), got sub-cluster keys: {leading_keys}"
+    )
+    assert "aa01" not in leading_keys, (
+        f"cluster A has no surviving sub-seed at --percentage 0.30; its "
+        f"master sub-cluster (keyed on aa01) must not be emitted, got "
+        f"sub-cluster keys: {leading_keys}"
+    )
+
+    # The 21/21 sub-seeds still drive their splits.
+    for kept_seed in ("dd02", "ee02", "ff03", "1102"):
+        assert kept_seed in leading_keys, (
+            f"{kept_seed} should still drive a split at --percentage "
+            f"0.30; got sub-cluster keys: {leading_keys}"
+        )
