@@ -43,4 +43,54 @@ ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGA
             }
         }
     }
+
+    test("--id 0.84 threshold excludes pairs below the lulu-recommended cutoff") {
+        // COVERAGE: [S42]
+        // [S42] pins the legacy lulu parameters; the threshold most
+        // likely to drift unnoticed is `--id 0.84`. The fixture mixes
+        // a 98%-identity pair (amp1/amp2) with a distant amp3 that
+        // shares only ~73% identity with both. Under the wired
+        // --id 0.84, amp3 must not appear in the match list at all.
+        // Any loosening (--id 0.50 say) would surface amp3 with two
+        // hits, which the assertions below would catch.
+        tag "ci"
+        when {
+            params {
+                threads = 1
+            }
+            process {
+                """
+                def f = workDir.resolve("otus.fas")
+                f.text = '''>amp1;size=10;
+ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
+>amp2;size=5;
+ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGA
+>amp3;size=3;
+ACGAACTAACGAACGTAGGGAGGAACGTAGCTACGAAGGTACGTACGAACAT
+'''
+                input[0] = file(f.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[0].get(0)).readLines()
+            // amp1 ↔ amp2 survives in both directions; amp3 is below
+            // 0.84 → absent. Collect only the query/target columns
+            // (cols 0 and 1) — the identity column is a float string,
+            // which would otherwise pollute the set.
+            def amplicons = lines.collectMany { line ->
+                def cols = line.split("\t")
+                [cols[0], cols[1]]
+            } as Set
+            assert amplicons == ["amp1", "amp2"] as Set :
+                "expected only amp1/amp2 to clear --id 0.84, got: ${lines}"
+            // Sanity: every reported identity is above the cutoff.
+            lines.each { line ->
+                def id = (line.split("\t")[2]) as double
+                assert id >= 84.0 :
+                    "reported identity ${id} should be >= 84.0 under --id 0.84, got: ${line}"
+            }
+        }
+    }
 }
