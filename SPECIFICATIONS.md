@@ -384,7 +384,7 @@ isolation.
     `--statistics-file` layout.
 - `[S31]` Part B's `global_dereplication` concatenates every
   `.fas` in the `[S27]` channel and runs
-  `vsearch --derep_fulllength` with `--sizein --sizeout --fasta_width
+  `vsearch --fastx_uniques` with `--sizein --sizeout --fasta_width
   0`. The output is `<project_name>_<N>_samples.fas`; the vsearch
   log is published as `<project_name>_<N>_samples.log`.
   - **Pass when:** running on two `.fas` fixtures that share a
