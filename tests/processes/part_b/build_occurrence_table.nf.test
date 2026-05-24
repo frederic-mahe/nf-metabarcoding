@@ -36,6 +36,7 @@ nextflow_process {
                 input[10] = file(empty.toString())   // empty results2
                 input[11] = distr
                 input[12] = "proj"
+                input[13] = "s1,s2,s3,s4,s5"   // [S09] sample list
                 """
             }
         }

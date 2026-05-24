@@ -980,6 +980,9 @@ process build_occurrence_table {
     path assignments_2,     stageAs: 'assignments_cleaved'
     path distribution
     val basename
+    val sample_ids   // [S09]: comma-separated sample IDs; empty samples
+                     // contribute no .distr rows but still need a zero
+                     // column in the occurrence table.
 
     output:
     path "${basename}.OTU.filtered.cleaved.table"
@@ -994,6 +997,7 @@ process build_occurrence_table {
         --quality         !{quality} \
         --assignments     <(cat !{assignments_2} !{assignments}) \
         --distribution    !{distribution} \
+        --samples         '!{sample_ids}' \
         > !{basename}.OTU.filtered.cleaved.table
     '''
 }
@@ -1322,6 +1326,14 @@ workflow part_B {
         "${params.project_name}_${files.size()}_samples"
     }
 
+    // [S09]: empty samples write no rows to .distr, so the column list
+    // derived inside build_filtered_contingency_table from the .distr
+    // alone misses them. Hand the authoritative sample list down via
+    // build_occurrence_table's --samples so zero columns appear.
+    def sample_ids = fasta_list.map { files ->
+        files.collect { it.baseName }.toSorted().join(",")
+    }
+
     build_expected_error_file(qual_list, basename)
     build_distribution_file(fasta_list, basename)
     list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
@@ -1367,6 +1379,7 @@ workflow part_B {
         fake_taxonomic_assignment2.out[0],   // _1f_representatives.results2
         build_distribution_file.out[0],      // .distr
         basename,
+        sample_ids,                          // [S09]
     )
 
     // [S38]/[S39]: collapse sub- and super-string OTUs. The combined
@@ -1415,6 +1428,12 @@ workflow part_B_shadow {
         "${params.project_name}_${files.size()}_samples_notmerged"
     }
 
+    // [S09]: same column-list contract as the regular Part B path —
+    // empty shadow samples must still appear as zero columns.
+    def sample_ids = fasta_list.map { files ->
+        files.collect { it.baseName }.toSorted().join(",")
+    }
+
     build_expected_error_file(qual_list, basename)
     build_distribution_file(fasta_list, basename)
     list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
@@ -1457,6 +1476,7 @@ workflow part_B_shadow {
         fake_taxonomic_assignment2.out[0],
         build_distribution_file.out[0],
         basename,
+        sample_ids,                          // [S09]
     )
 
     search_for_terminal_gaps(build_occurrence_table.out[0])
