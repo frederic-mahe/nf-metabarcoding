@@ -24,7 +24,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S01]`| three-part workflow (fastq→fasta, fasta→occurrence, taxonomic assignment)  | `tests/main.nf.test`, `tests/bin/reverse_complement.bats` | done    | —          |
 | `[S02]`| each part can be run separately or all at once                             | `tests/main.nf.test`                            | TODO    | —          |
 | `[S03]`| paired-end or single-end, compressed (gz/bz2) or uncompressed input        | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/main.nf.test` | done | — |
-| `[S04]`| unmerged paired reads → shadow pipeline (A-padded join, no mask round-trip)| `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/join_notmerged.nf.test`, `tests/main.nf.test` | red    | —          |
+| `[S04]`| unmerged paired reads → shadow pipeline (A-padded join, no mask round-trip)| `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/join_notmerged.nf.test`, `tests/main.nf.test` | done   | —          |
 | `[S05]`| unmerged clusters appear in occurrence table with per-sample marker        | —                                               | blocked | D01, D02   |
 
 
@@ -82,14 +82,14 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S53]`| **Retired** (was: `discover_fasta.py` rejects U/u; dropped with the A-padding redesign — see `[S04]`, `[S63]`) | —                                | retired | —          |
 | `[S54]`| every vsearch fastq-emitting module preserves the canonical 4-line layout            | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/strip_reads.nf.test`, `tests/processes/part_a/join_notmerged.nf.test` | done | — |
 | `[S55]`| every vsearch fasta-emitting module preserves the single-line-sequence layout        | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_b/global_dereplication.nf.test` | done | — |
-| `[S56]`| shadow Part B workflow — runs Part B as-is on A-padded shadow inputs; publishes `_notmerged` artefacts | `tests/main.nf.test` | red    | —          |
+| `[S56]`| shadow Part B workflow — runs Part B as-is on A-padded shadow inputs; publishes `_notmerged` artefacts | `tests/main.nf.test` | done   | —          |
 | `[S57]`| `--help` prints a usage block describing all modes/params and exits without running any process | `tests/main.nf.test` | done | — |
 | `[S58]`| `params.publish_mode` threads through every `publishDir` directive; invalid values abort at startup | `tests/main.nf.test` | done   | —          |
 | `[S59]`| Part B `--results_folder` whitelist: table + post-mumu fasta + six step logs only                  | `tests/main.nf.test`                            | done    | —          |
 | `[S60]`| path-typed params normalise leading `~` / `~user` at workflow startup (reference_dataset, occurrence_table, fastq_folder, fasta_folder, results_folder) | `tests/functions/normalize_path.nf.test`, `tests/main.nf.test` | done | — |
 | `[S61]`| `params.taxonomy_method` validated at startup: accepts `stampa` (default) and `sintax`; invalid value aborts before any process runs | `tests/main.nf.test` | done | — |
 | `[S62]`| Part C standalone probes for `<basename>_notmerged_table.tsv` sibling; runs `part_C_shadow` iff present, no-op otherwise | `tests/main.nf.test` | done | — |
-| `[S63]`| `params.join_padding_length` (default 8): A-padding length used by `vsearch --fastq_join` in the shadow Part A path | `tests/processes/part_a/join_notmerged.nf.test`, `tests/main.nf.test` | red    | —          |
+| `[S63]`| `params.join_padding_length` (default 8): A-padding length used by `vsearch --fastq_join` in the shadow Part A path | `tests/processes/part_a/join_notmerged.nf.test`, `tests/main.nf.test` | done   | —          |
 | `[S64]`| `params.reference_dataset_sintax`: optional sintax-formatted reference; gates `part_C_shadow`; required by regular Part C when `--taxonomy_method=sintax` | `tests/main.nf.test` | done   | —          |
 
 
@@ -103,7 +103,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `extract_expected_error_values` | `tests/processes/part_a/extract_expected_error_values.nf.test`| S01          | done   |
 | `dereplicate_fasta`             | `tests/processes/part_a/dereplicate_fasta.nf.test`            | S01, S19, S55| done   |
 | `list_local_clusters`           | `tests/processes/part_a/list_local_clusters.nf.test`          | S17, S19     | done   |
-| `join_notmerged`                | `tests/processes/part_a/join_notmerged.nf.test`               | S04, S19, S54, S63 | red    |
+| `join_notmerged`                | `tests/processes/part_a/join_notmerged.nf.test`               | S04, S19, S54, S63 | done   |
 | `strip_reads`                   | `tests/processes/part_a/strip_reads.nf.test`                  | S24, S54     | done   |
 | `build_expected_error_file`     | `tests/processes/part_b/build_expected_error_file.nf.test`    | S28          | done   |
 | `build_distribution_file`       | `tests/processes/part_b/build_distribution_file.nf.test`      | S29          | done   |
