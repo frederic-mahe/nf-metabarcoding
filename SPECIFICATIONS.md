@@ -127,17 +127,50 @@ isolation.
 
 ## Occurrence table schema
 
-- **single-table mode** (default)
-  - columns: `cluster_id`, `sequence`, `abundance_total`, one column
-    per sample (`<sampleId>` — integer read count), `taxonomy` (Part
-    C, empty until then)
-  - rows: one per cluster; empty samples (`[S08]`) contribute a
-    zero-filled column
-- **two-table mode** (`--split-occurrence-table`)
-  - `occurrences.tsv` (long format): `clusterId`, `sampleId`,
-    `abundance`
-  - `clusters.tsv`: `clusterId`, `sequence`, `abundance_total`,
-    `taxonomy`
+The Part B occurrence table (`<basename>_table.tsv`, [S46]) and Part C's
+annotated sibling (`<basename>_table_assigned.tsv`, [S51]) carry 13
+metadata columns followed by one column per sample, in this order:
+
+| #  | Column       | Notes                                                                                          |
+|----|--------------|------------------------------------------------------------------------------------------------|
+| 1  | `OTU`        | renumbered 1..N after mumu ([S44])                                                             |
+| 2  | `total`      | sum of the sample columns; size=0 → 1 hotfix ([S44]) so vsearch `--sizein` consumers can read it |
+| 3  | `cloud`      | swarm `--statistics-file` cloud size; forced to `"NA"` after mumu ([S44])                      |
+| 4  | `amplicon`   | SHA1 seed ID; the join key against `.qual` / `.distr`                                          |
+| 5  | `length`     | seed sequence length                                                                           |
+| 6  | `abundance`  | seed abundance                                                                                 |
+| 7  | `chimera`    | uchime `Y` / `N` / `NA`; forced to `"N"` after mumu ([S44])                                    |
+| 8  | `spread`     | count of samples with `abundance > 0`; recomputed at [S39] / [S44]                             |
+| 9  | `quality`    | ee/length ratio from [S28]'s per-sample `.qual` merge                                          |
+| 10 | `sequence`   | seed nucleotides, single-line                                                                  |
+| 11 | `identity`   | top-hit identity %, or `0.0`; placeholder until Part C runs                                    |
+| 12 | `taxonomy`   | LCA lineage, or `NA`; placeholder until Part C runs                                            |
+| 13 | `references` | top-hit accessions, or `NA`; placeholder until Part C runs                                     |
+| 14–N | `<sampleId>` | integer read count per sample, sorted; empty samples ([S09]) contribute a zero-filled column  |
+
+Part C never adds or removes columns or rows; it only overwrites
+columns 11–13 (`identity`, `taxonomy`, `references`) on rows whose
+amplicon appears in the taxonomy assignments.
+
+### Two-table mode
+
+When `--split-occurrence-table` is set (default `false`, see [S15]),
+the single-table `<basename>_table.tsv` is **replaced** by a pair of
+sibling files under `--results_folder`:
+
+- `<basename>_clusters.tsv` — columns 1–13 above (every metadata
+  column; no per-sample columns). One row per cluster.
+- `<basename>_occurrences.tsv` — long format with three columns:
+  `OTU`, `sampleId`, `abundance`. One row per non-zero
+  `<OTU, sampleId, abundance>` triple — zero-abundance cells and
+  empty samples ([S09]) contribute no rows. The `OTU` column is the
+  join key against `<basename>_clusters.tsv`.
+
+Only one of `_table.tsv` / (`_clusters.tsv` + `_occurrences.tsv`) is
+published per run; the [S59] whitelist picks the active set. The
+split applies to both the regular Part B path ([S46]) and the shadow
+Part B path ([S56]); the basename carries the `_notmerged` token in
+the latter case.
 
 
 ## Workflow requirements
@@ -207,10 +240,28 @@ isolation.
     `check_unique_sample_ids()` helper that raises on duplicates,
     and each CLI exits non-zero with a stderr message listing every
     duplicate file path.
-- `[S15]` users can choose between a single occurrence table or a
-  two-part table (long-format + per-cluster metadata)
-  - **Pass when:** `--split-occurrence-table` toggles between the two
-    schemas defined above
+- `[S15]` users can choose between a single occurrence table and a
+  two-part table by setting `--split-occurrence-table` (default
+  `false`). When the flag is set, Part B publishes
+  `<basename>_clusters.tsv` and `<basename>_occurrences.tsv` under
+  `--results_folder` and **does not** publish
+  `<basename>_table.tsv` — the split pair replaces the single table;
+  the [S59] whitelist swaps accordingly. The two forms carry the
+  same information modulo layout: every non-zero cell of the
+  single-form table corresponds to exactly one row of
+  `_occurrences.tsv` with matching `OTU` / `sampleId` / `abundance`
+  values. The split applies to both the regular and the shadow
+  ([S56]) Part B paths. Part C's output shape is unaffected by this
+  flag for now (it continues to emit a single
+  `<basename>_table_assigned.tsv` regardless) — see
+  [`DECISIONS.md`](DECISIONS.md) D05 sub-question 6.
+  - **Pass when:** an end-to-end Part B run with
+    `--split-occurrence-table true` publishes
+    `<basename>_clusters.tsv` and `<basename>_occurrences.tsv` (and
+    no `<basename>_table.tsv`); the same run without the flag
+    publishes only `<basename>_table.tsv` (no split pair); every
+    non-zero cell of the single-form table appears as exactly one
+    row in `_occurrences.tsv`.
 - `[S16]` expects demultiplexed fastq files
   - **Pass when:** documented in README; demultiplexing is out of
     scope (could be added later as a subworkflow)

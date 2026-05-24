@@ -160,3 +160,75 @@ beyond skeleton:
 Until D04 lands, the Part C `[Sxx]` tests stay tagged `pending` and
 the workflow stub exposes no user-visible CLI surface for the
 ambiguous parts.
+
+
+## D05 — Two-table occurrence output (`--split-occurrence-table`)
+
+**Blocks:** `[S15]` (sub-questions 1–5 resolved, unblocking Part B
+implementation; sub-question 6 affects Part C output only and is
+deferred)
+**Status:** `partial` — sub-questions 1–5 resolved 2026-05-24;
+sub-question 6 open, no current `[Sxx]` depends on it
+
+`[S15]` promises a wide single-table form and a sparse two-table form
+selected by `--split-occurrence-table`. The original spec wording
+left the filenames, replacement semantics, and column projections
+unspecified. The scoping pass on 2026-05-24 settled the following:
+
+**Resolution of sub-question 1 — filename convention (2026-05-24):**
+`<basename>_clusters.tsv` and `<basename>_occurrences.tsv`. Matches
+the `<basename>_*` pattern every other Part B artefact follows
+(`[S46]`'s `_table.tsv`, `[S45]`'s step logs, the shadow path's
+`_notmerged` token), so a results folder for project `X` stays
+grep-friendly per basename.
+
+**Resolution of sub-question 2 — coexist vs replace (2026-05-24):**
+**replace**. When the flag is set, only the split pair is published;
+`_table.tsv` stays in the Nextflow work directory but does not reach
+`--results_folder`. Rationale: the user picked a mode; publishing
+both forms doubles the artefact count without giving downstream
+consumers a stable contract about which to read.
+
+**Resolution of sub-question 3 — long-format cluster key
+(2026-05-24):** the `OTU` column (the renumbered 1..N integer). It
+matches what users read off the wide-format table and is the natural
+join key against `_clusters.tsv`. The SHA1 `amplicon` column lives
+only in `_clusters.tsv` (recoverable via the join when needed).
+
+**Resolution of sub-question 4 — zero-abundance rows in the
+long-format (2026-05-24):** dropped. `[S09]` already states this
+for empty samples ("not in the two-table mode long-format"); the
+same rule applies to zero cells in non-empty samples for
+consistency. The long form is sparse by design.
+
+**Resolution of sub-question 5 — schema-section reconciliation
+(2026-05-24):** the spec's "Occurrence table schema" section follows
+the code (the 13 real metadata columns), not the other way round.
+The original section listed four idealised columns (`cluster_id`,
+`sequence`, `abundance_total`, `taxonomy`) that never matched the
+bash port; the rewrite is honest about the legacy bookkeeping
+columns (`cloud`, `length`, `abundance`, `chimera`, `spread`,
+`quality`, `identity`, `references`) that downstream consumers
+already rely on. Changing the published shape would be a separate
+breaking-change decision.
+
+**Sub-question 6 — Part C output shape in split mode (OPEN):**
+should `update_occurrence_table` (`[S51]`) emit a split pair
+(`<basename>_clusters_assigned.tsv` +
+`<basename>_occurrences_assigned.tsv`) when the upstream Part B ran
+in split mode, or always emit a single
+`<basename>_table_assigned.tsv` regardless of upstream mode? The
+working default (and what the current `[S15]` spec wording assumes)
+is "Part C always emits a single assigned table", because:
+
+  - Part C's contract is "splice taxonomy onto the per-cluster
+    metadata columns" — those columns live in `_clusters.tsv`, so
+    the long form is unaffected by Part C and would just be passed
+    through unchanged.
+  - Users who picked split mode for Part B may want the same layout
+    for Part C, but that is a usage assumption, not a structural
+    necessity.
+
+This sub-question does not block `[S15]` (which scopes Part B's
+output only). It can be resolved once Part B split lands and a real
+consumer asks for split assigned output.
