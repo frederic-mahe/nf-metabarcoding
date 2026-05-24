@@ -1502,6 +1502,58 @@ nextflow_pipeline {
         }
     }
 
+    test("Part A runs in isolation when only --fastq_folder is set") {
+        // COVERAGE: [S02]
+        // [S02]: "each part can be run separately, or all at once". The
+        // dispatch mechanism is implicit-by-params (covered by the
+        // "(or equivalent flag)" clause in the spec's Pass-when): with
+        // only --fastq_folder set, the workflow runs Part A and
+        // returns before Part B/Part C wiring is reached. Part B and C
+        // standalone modes are already covered by sibling tests above.
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                threads        = 1
+                // project_name / fasta_folder / occurrence_table
+                // deliberately unset → Part A only.
+            }
+        }
+        then {
+            assert workflow.success
+            def out = workflow.stdout.toString()
+
+            // Every Part A process appears in the trace.
+            ["merge_fastq_pairs",
+             "trim_primers",
+             "filter_and_convert_to_fasta",
+             "dereplicate_fasta",
+             "list_local_clusters"].each { proc ->
+                assert out.contains(proc) :
+                    "expected Part A's ${proc} to run, got: ${out}"
+            }
+
+            // No Part B / Part C process is wired when project_name,
+            // fasta_folder, and occurrence_table are all unset.
+            ["global_dereplication",
+             "global_clustering",
+             "build_occurrence_table",
+             "cleaving",
+             "run_mumu",
+             "rebuild_post_mumu_table",
+             "discover_part_b_fasta",
+             "assign_taxonomy_stampa",
+             "assign_taxonomy_sintax",
+             "update_occurrence_table"].each { proc ->
+                assert !out.contains(proc) :
+                    "Part A-only run must not invoke ${proc}, got: ${out}"
+            }
+        }
+    }
+
     test("plain / .gz / .bz2 inputs produce byte-identical Part A outputs") {
         // COVERAGE: [S03]
         // [S03]: "the same input data in any of these forms produces
