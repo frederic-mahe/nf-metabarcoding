@@ -1105,22 +1105,93 @@ nextflow_pipeline {
     }
 
     test("empty input samples travel through to the occurrence table") {
-        // COVERAGE: [S09] — pending until empty-sample passthrough lands.
-        // Tagged "pending" so CI (`nf-test test --tag '!pending'`) skips
-        // it. Run `nf-test test` locally to see the red.
+        // COVERAGE: [S09]
+        // [S09] requires an empty fastq pair to (a) flow through Part A
+        // without errors, and (b) appear in the Part B occurrence
+        // table as a zero-abundance sample column on rows produced by
+        // non-empty samples. The fixture pairs the empty_{1,2}.fastq.gz
+        // pair (zero records) with paired_merge_ok_{1,2}.fastq.gz
+        // (three records) so Part B has at least one cluster to emit a
+        // row about — without that, the table is header-only and the
+        // empty-sample contribution can't be observed.
+        //
+        // RED (probed 2026-05-24): Part A handles empty input fine and
+        // emits empty .fas/.qual/.stats. The gap is in Part B:
+        // `build_distribution_file` (S29) writes one row per FASTA
+        // header, so an empty sample contributes no rows to .distr.
+        // `build_filtered_contingency_table.py` then derives its sample
+        // column list from the .distr (see distribution_parse), so the
+        // empty sample never appears as a column at all. The pytest
+        // golden for build_filtered_contingency_table already covers a
+        // "sample present only in a filtered-out cluster" case, but
+        // entirely-empty samples need the workflow to hand the column
+        // list down explicitly (e.g. via --samples ${sample_ids} on
+        // build_occurrence_table). Test stays "pending" until that
+        // wiring lands.
+        //
+        // setup{} copies the two pairs into an isolated folder so the
+        // discovery globs against exactly those two samples (the main
+        // tests/data/ folder has many more fastq pairs).
         tag "pending"
+        setup {
+            def dir = file("${outputDir}/empty_e2e")
+            dir.mkdirs()
+            ["empty_1.fastq.gz",
+             "empty_2.fastq.gz",
+             "paired_merge_ok_1.fastq.gz",
+             "paired_merge_ok_2.fastq.gz"].each { name ->
+                file("${dir}/${name}").bytes =
+                    file("${projectDir}/tests/data/${name}").bytes
+            }
+        }
         when {
             params {
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
-                fastq_folder   = "${projectDir}/tests/data"
-                fastq_pattern  = "/empty_{1,2}.fastq.gz"
+                fastq_folder   = "${outputDir}/empty_e2e"
+                fastq_pattern  = ""   // use the canonical pattern table
+                project_name   = "empty_e2e"
+                results_folder = "${outputDir}/empty_e2e_results"
                 threads        = 1
             }
         }
         then {
             assert workflow.success
-            // TODO: assert occurrence table contains a row for the empty sample with abundance 0
+
+            // Part A on the empty pair must produce empty .fas/.qual/.stats
+            // siblings — these feed Part B's empty-sample path ([S27]).
+            ["fas", "qual", "stats"].each { ext ->
+                def f = file("${outputDir}/empty_e2e/empty.${ext}")
+                assert f.exists() :
+                    "Part A must emit empty.${ext} for the empty fastq pair: ${f}"
+                assert f.size() == 0 :
+                    "empty.${ext} must be zero-length, got ${f.size()} bytes"
+            }
+
+            // Part B's occurrence table: header + at least one data
+            // row (from paired_merge_ok). Both samples appear as
+            // columns; the `empty` column must be zero on every row.
+            def table = file("${outputDir}/empty_e2e_results/empty_e2e_2_samples_table.tsv")
+            assert table.exists() :
+                "Part B should publish the occurrence table end-to-end"
+
+            def lines = table.readLines()
+            assert lines.size() >= 2 :
+                "table must have header + at least one row from the non-empty sample, got: ${lines}"
+
+            def header = lines[0].split("\t", -1)
+            def emptyCol = header.indexOf("empty")
+            assert emptyCol >= 0 :
+                "expected an 'empty' sample column in the header, got: ${header}"
+
+            // [S09] core assertion: every data row's empty-column
+            // value is 0.
+            lines[1..-1].each { row ->
+                def cols = row.split("\t", -1)
+                assert cols[emptyCol] == "0" :
+                    "empty sample must contribute 0 on every row, got " +
+                    "'${cols[emptyCol]}' in: ${row}"
+            }
         }
     }
 

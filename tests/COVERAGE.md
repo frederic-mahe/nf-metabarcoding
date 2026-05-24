@@ -35,7 +35,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S06]`| read config file *or* command-line parameters                              | `tests/main.nf.test`                            | TODO    | —          |
 | `[S07]`| runs locally or on HPC (slurm)                                             | —                                               | n/a     | —          |
 | `[S08]`| runs local *or* containerized applications                                 | —                                               | n/a     | —          |
-| `[S09]`| empty input samples travel through and appear in the occurrence table      | `tests/main.nf.test`                            | red     | —          |
+| `[S09]`| empty input samples travel through and appear in the occurrence table      | `tests/main.nf.test`                            | red     | needs Part B fix — see [S09] test comment for the gap (build_distribution_file → distribution_parse never sees empty samples) |
 | `[S10]`| accept a directory or a list of directories (absolute or relative)         | `tests/python/test_discover_fastq.py`, `tests/bin/discover_fastq.bats`, `tests/main.nf.test` | done | —          |
 | `[S11]`| auto-discover fastq files using common name patterns                       | `tests/python/test_discover_fastq.py`, `tests/bin/discover_fastq.bats`, `tests/main.nf.test` | done | —          |
 | `[S12]`| auto-deduce sample names from fastq file names                             | `tests/python/test_discover_fastq.py`, `tests/bin/discover_fastq.bats`, `tests/main.nf.test` | done | —          |
