@@ -19,7 +19,15 @@ the entry) and update the matching bullets in
 ## D01 — N↔A round-trip for unmerged pairs
 
 **Blocks:** `[S04]` (resolved), `[S05]` (still blocked on marker name)
-**Status:** `resolved`
+**Status:** `resolved` — **superseded by `[S04]` / `[S63]` (A-padding redesign, 2026-05-23)**
+
+> **Superseded.** The N→A mask described below was retired by the
+> A-padding redesign in `[S04]` / `[S63]`. Shadow Part A now injects
+> the padding directly via `vsearch --fastq_join --join_padgap`, so
+> there is no mask, no rewrite, and no round-trip to track. The
+> resolution body is kept for historical context only —
+> `[S04]` / `[S63]` in [`SPECIFICATIONS.md`](SPECIFICATIONS.md) are
+> the current contract.
 
 **Resolution (2026-05-18):** the `N→A` rewrite is applied uniformly
 to **every** `N` in the fasta sequence lines (no per-position
