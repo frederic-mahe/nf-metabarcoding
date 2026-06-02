@@ -16,6 +16,7 @@ nextflow_process {
                     file("\${projectDir}/tests/data/part_b/E.qual")
                 ]
                 input[1] = "proj_3_samples"
+                input[2] = 40
                 """
             }
         }
@@ -50,14 +51,11 @@ nextflow_process {
     test("--hash_function md5 merges and uniqs by the 32-char name width") {
         // COVERAGE: [S65]
         // Same merge as above but with 32-char (MD5-width) names. The
-        // uniq --check-chars width must come from hash_function (32);
+        // uniq --check-chars width is passed explicitly as input[2] (32);
         // at the SHA1 width (40) the trailing ee digits would enter the
         // comparison and the shared name would not collapse.
         tag "ci"
         when {
-            params {
-                hash_function = "md5"
-            }
             process {
                 """
                 input[0] = [
@@ -65,6 +63,7 @@ nextflow_process {
                     file("\${projectDir}/tests/data/hash_function/S2_md5.qual")
                 ]
                 input[1] = "proj_md5"
+                input[2] = 32
                 """
             }
         }

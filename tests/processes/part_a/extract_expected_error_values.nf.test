@@ -34,6 +34,7 @@ nextflow_process {
                 """
                 input[0] = trim_primers.out[0]
                 input[1] = trim_primers.out[1]
+                input[2] = "--relabel_sha1"
                 """
             }
         }
@@ -52,6 +53,7 @@ nextflow_process {
                 """
                 input[0] = filter_and_convert_to_fasta.out[0]
                 input[1] = filter_and_convert_to_fasta.out[1]
+                input[2] = 40
                 """
             }
         }
@@ -110,15 +112,16 @@ nextflow_process {
             params {
                 // primers satisfy the file-level setup chain; this test
                 // feeds the fixture below directly and ignores its output.
+                // The 32-char width is passed explicitly as input[2].
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
-                hash_function  = "md5"
                 fastq_folder   = "tests/data"
             }
             process {
                 """
                 input[0] = "md5_sample"
                 input[1] = file("\${projectDir}/tests/data/hash_function/md5_filtered.fas")
+                input[2] = 32
                 """
             }
         }

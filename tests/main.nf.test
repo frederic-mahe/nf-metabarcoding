@@ -244,6 +244,36 @@ nextflow_pipeline {
         }
     }
 
+    test("--hash_function md5 names per-sample amplicons with 32-char MD5 digests") {
+        // COVERAGE: [S65]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                hash_function  = "md5"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            // [S65] end-to-end: hash_relabel_flag() / hash_id_length()
+            // thread md5 through filter_and_convert_to_fasta and the
+            // .qual dedup. The published per-sample .qual carries
+            // 32-hex-char names (vs the 40 of the default sha1 runs).
+            def qual = file("${projectDir}/tests/data/paired_merge_ok.qual")
+            assert qual.exists() : "missing published .qual"
+            def lines = qual.readLines()
+            assert lines.size() > 0 : "expected at least one .qual row"
+            lines.each { line ->
+                assert line.split(' ')[0] ==~ /[0-9a-f]{32}/ :
+                    "expected 32-char MD5 name in .qual, got: ${line}"
+            }
+        }
+    }
+
     test("discovers a MiSeq-style paired sample via the canonical pattern table") {
         // COVERAGE: [S11], [S12]
         tag "ci"

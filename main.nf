@@ -35,17 +35,6 @@ params.join_padding_length = 8
 // step assumes a fixed hash-string length.
 params.hash_function = 'sha1'
 
-// [S65]: single source of truth derived from hash_function and read
-// directly in the process shell blocks (script-level functions are
-// not visible there; params are). These are computed, not user knobs
-// — hash_function itself is the validated input ([S65] assert below).
-//   - hash_relabel_flag: the vsearch flag (--relabel_sha1/--relabel_md5)
-//   - hash_id_length:     the digest hex width (SHA1 → 40, MD5 → 32),
-//     fed to `uniq --check-chars` so the .qual dedup steps collapse
-//     rows by the whole amplicon name without assuming a fixed width.
-params.hash_relabel_flag = ( params.hash_function == 'md5' ) ? '--relabel_md5' : '--relabel_sha1'
-params.hash_id_length    = ( params.hash_function == 'md5' ) ? 32 : 40
-
 // forward_primer, reverse_primer, fastq_folder are required and have
 // no default; the workflow asserts them at startup (see [S18]).
 // [S20]: when params.no_trimming is true, forward_primer and
@@ -198,6 +187,25 @@ def lookup_user_home(String user) {
         }
     }
     return null
+}
+
+
+def hash_relabel_flag() {
+    // [S65]: the vsearch relabel flag matching params.hash_function,
+    // threaded into filter_and_convert_to_fasta as an explicit input.
+    // params.hash_function is validated at startup, so only the two
+    // expected values reach here.
+    return ( params.hash_function == 'md5' ) ? '--relabel_md5' : '--relabel_sha1'
+}
+
+
+def hash_id_length() {
+    // [S65]: hex-string width of a params.hash_function digest — SHA1
+    // is 40 chars, MD5 is 32 — threaded into the .qual dedup steps as
+    // an explicit input so they feed `uniq --check-chars` the right
+    // width without assuming a fixed hash length. (Helper functions are
+    // not visible inside process shell blocks, hence the input route.)
+    return ( params.hash_function == 'md5' ) ? 32 : 40
 }
 
 
@@ -469,6 +477,7 @@ process filter_and_convert_to_fasta {
     input:
     val sampleId
     path trimmed_fastq
+    val relabel_flag
 
     output:
     val sampleId
@@ -484,7 +493,7 @@ process filter_and_convert_to_fasta {
         --fastq_filter !{trimmed_fastq} \
         --fastq_minlen "${MIN_LENGTH}" \
         --fastq_maxns 0 \
-        !{params.hash_relabel_flag} \
+        !{relabel_flag} \
         --fastq_ascii !{params.fastq_encoding} \
         --quiet \
         --eeout \
@@ -503,6 +512,7 @@ process extract_expected_error_values {
     input:
     val sampleId
     path filtered_fasta
+    val id_length
 
     output:
     val sampleId
@@ -510,7 +520,7 @@ process extract_expected_error_values {
 
     shell:
     '''
-    length_of_sequence_IDs=!{params.hash_id_length}
+    length_of_sequence_IDs=!{id_length}
     extract_ee.awk !{filtered_fasta} | \
         sort --key=3,3n --key=1,1d --key=2,2n | \
         uniq --check-chars=${length_of_sequence_IDs} > !{sampleId}.qual
@@ -664,6 +674,7 @@ process build_expected_error_file {
     input:
     path quals
     val basename
+    val id_length
 
     output:
     path "${basename}.qual"
@@ -671,7 +682,7 @@ process build_expected_error_file {
     shell:
     '''
     sort --key=3,3n --key=1,1d --key=2,2n --merge !{quals} | \
-        uniq --check-chars=!{params.hash_id_length} > !{basename}.qual
+        uniq --check-chars=!{id_length} > !{basename}.qual
     '''
 }
 
@@ -1356,7 +1367,7 @@ workflow part_B {
         files.collect { it.baseName }.toSorted().join(",")
     }
 
-    build_expected_error_file(qual_list, basename)
+    build_expected_error_file(qual_list, basename, hash_id_length())
     build_distribution_file(fasta_list, basename)
     list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
     global_dereplication(fasta_list, basename)
@@ -1456,7 +1467,7 @@ workflow part_B_shadow {
         files.collect { it.baseName }.toSorted().join(",")
     }
 
-    build_expected_error_file(qual_list, basename)
+    build_expected_error_file(qual_list, basename, hash_id_length())
     build_distribution_file(fasta_list, basename)
     list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
     global_dereplication(fasta_list, basename)
@@ -2043,14 +2054,16 @@ workflow part_A {
         fastq_ch    = trim_primers.out[1]
     }
 
-    // convert to fasta with SHA1 + ee, apply min-length / max-N=0
-    // filters. The A-padded shadow reads carry no Ns, so they pass
-    // the same max-N=0 threshold as the regular path.
-    filter_and_convert_to_fasta(sampleId_ch, fastq_ch)
+    // convert to fasta with the hash digest + ee ([S65]), apply
+    // min-length / max-N=0 filters. The A-padded shadow reads carry no
+    // Ns, so they pass the same max-N=0 threshold as the regular path.
+    filter_and_convert_to_fasta(sampleId_ch, fastq_ch, hash_relabel_flag())
 
     // set aside EE values
     extract_expected_error_values(
-        filter_and_convert_to_fasta.out[0], filter_and_convert_to_fasta.out[1]
+        filter_and_convert_to_fasta.out[0],
+        filter_and_convert_to_fasta.out[1],
+        hash_id_length()
     )
 
     // dereplicate
