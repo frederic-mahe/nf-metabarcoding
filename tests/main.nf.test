@@ -1218,6 +1218,26 @@ nextflow_pipeline {
         }
     }
 
+    test("--hash_function rejects an unknown value before any process runs") {
+        // COVERAGE: [S65]
+        tag "ci"
+        when {
+            params {
+                occurrence_table  = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                results_folder    = "${outputDir}/bad_hashfunction"
+                reference_dataset = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                hash_function     = "sha256"
+                threads           = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("hash_function") :
+                "error should mention 'hash_function', got: ${msg}"
+        }
+    }
+
     test("Part C standalone runs the regular path through sintax when --taxonomy_method=sintax") {
         // COVERAGE: [S61], [S64]
         // The regular path can opt into sintax via params.taxonomy_method.

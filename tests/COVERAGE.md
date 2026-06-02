@@ -91,6 +91,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S62]`| Part C standalone probes for `<basename>_notmerged_table.tsv` sibling; runs `part_C_shadow` iff present, no-op otherwise | `tests/main.nf.test` | done | — |
 | `[S63]`| `params.join_padding_length` (default 8): A-padding length used by `vsearch --fastq_join` in the shadow Part A path | `tests/processes/part_a/join_notmerged.nf.test`, `tests/main.nf.test` | done   | —          |
 | `[S64]`| `params.reference_dataset_sintax`: optional sintax-formatted reference; gates `part_C_shadow`; required by regular Part C when `--taxonomy_method=sintax` | `tests/main.nf.test` | done   | —          |
+| `[S65]`| `params.hash_function` (default `sha1`, accepts `md5`): selects vsearch `--relabel_*`; `.qual` dedup width derived from the hash; invalid value aborts at startup | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`, `tests/processes/part_a/extract_expected_error_values.nf.test`, `tests/processes/part_b/build_expected_error_file.nf.test`, `tests/main.nf.test` | done   | —          |
 
 
 ## Per-process tests
@@ -99,13 +100,13 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 |---------------------------------|--------------------------------------------------------|--------------|--------|
 | `merge_fastq_pairs`             | `tests/processes/part_a/merge_fastq_pairs.nf.test`            | S01, S03, S04, S54 | done   |
 | `trim_primers`                  | `tests/processes/part_a/trim_primers.nf.test`                 | S01, S19     | done   |
-| `filter_and_convert_to_fasta`   | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`  | S01, S55     | done   |
-| `extract_expected_error_values` | `tests/processes/part_a/extract_expected_error_values.nf.test`| S01          | done   |
+| `filter_and_convert_to_fasta`   | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`  | S01, S55, S65 | done  |
+| `extract_expected_error_values` | `tests/processes/part_a/extract_expected_error_values.nf.test`| S01, S65     | done   |
 | `dereplicate_fasta`             | `tests/processes/part_a/dereplicate_fasta.nf.test`            | S01, S19, S55| done   |
 | `list_local_clusters`           | `tests/processes/part_a/list_local_clusters.nf.test`          | S17, S19     | done   |
 | `join_notmerged`                | `tests/processes/part_a/join_notmerged.nf.test`               | S04, S19, S54, S63 | done   |
 | `strip_reads`                   | `tests/processes/part_a/strip_reads.nf.test`                  | S24, S54     | done   |
-| `build_expected_error_file`     | `tests/processes/part_b/build_expected_error_file.nf.test`    | S28          | done   |
+| `build_expected_error_file`     | `tests/processes/part_b/build_expected_error_file.nf.test`    | S28, S65     | done   |
 | `build_distribution_file`       | `tests/processes/part_b/build_distribution_file.nf.test`      | S29          | done   |
 | `list_all_cluster_seeds_of_size_greater_than_2` | `tests/processes/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf.test` | S30 | done |
 | `global_dereplication`          | `tests/processes/part_b/global_dereplication.nf.test`         | S31, S55     | done   |

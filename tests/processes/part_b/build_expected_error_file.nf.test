@@ -46,4 +46,44 @@ nextflow_process {
                 "expected the lower-ee row to win, got: ${rowA}"
         }
     }
+
+    test("--hash_function md5 merges and uniqs by the 32-char name width") {
+        // COVERAGE: [S65]
+        // Same merge as above but with 32-char (MD5-width) names. The
+        // uniq --check-chars width must come from hash_function (32);
+        // at the SHA1 width (40) the trailing ee digits would enter the
+        // comparison and the shared name would not collapse.
+        tag "ci"
+        when {
+            params {
+                hash_function = "md5"
+            }
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/data/hash_function/S1_md5.qual"),
+                    file("\${projectDir}/tests/data/hash_function/S2_md5.qual")
+                ]
+                input[1] = "proj_md5"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[0].get(0)).readLines()
+            // md5_a shared (lower ee in S2), md5_b (S1), md5_c (S2).
+            assert lines.size() == 3 :
+                "expected 3 rows after uniq, got ${lines.size()}: ${lines}"
+            lines.each { line ->
+                assert line.split(/\s+/)[0] ==~ /[0-9a-f]{32}/ :
+                    "expected 32-char MD5 hex in column 1: ${line}"
+            }
+            def rowA = lines.find {
+                it.startsWith("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            }
+            assert rowA != null
+            assert rowA.contains("0.005000") :
+                "expected the lower-ee row to win, got: ${rowA}"
+        }
+    }
 }

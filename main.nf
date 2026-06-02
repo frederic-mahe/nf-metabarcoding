@@ -28,6 +28,24 @@ params.stripright = 30
 // visible to a human reader at the cost of slightly larger fastas.
 params.join_padding_length = 8
 
+// [S65] hash vsearch uses to rename amplicons in
+// filter_and_convert_to_fasta (--relabel_sha1 / --relabel_md5).
+// 'sha1' (default) or 'md5'; validated at workflow startup. The .qual
+// dedup steps derive their uniq --check-chars width from this so no
+// step assumes a fixed hash-string length.
+params.hash_function = 'sha1'
+
+// [S65]: single source of truth derived from hash_function and read
+// directly in the process shell blocks (script-level functions are
+// not visible there; params are). These are computed, not user knobs
+// — hash_function itself is the validated input ([S65] assert below).
+//   - hash_relabel_flag: the vsearch flag (--relabel_sha1/--relabel_md5)
+//   - hash_id_length:     the digest hex width (SHA1 → 40, MD5 → 32),
+//     fed to `uniq --check-chars` so the .qual dedup steps collapse
+//     rows by the whole amplicon name without assuming a fixed width.
+params.hash_relabel_flag = ( params.hash_function == 'md5' ) ? '--relabel_md5' : '--relabel_sha1'
+params.hash_id_length    = ( params.hash_function == 'md5' ) ? 32 : 40
+
 // forward_primer, reverse_primer, fastq_folder are required and have
 // no default; the workflow asserts them at startup (see [S18]).
 // [S20]: when params.no_trimming is true, forward_primer and
@@ -208,6 +226,8 @@ Part A — fastq → per-sample fasta:
   --fastq_pattern GLOB        R1/R2 pair pattern (canonical patterns
                               auto-detected; default: ${params.fastq_pattern})
   --fastq_encoding INT        Phred offset, 33 or 64 (default: ${params.fastq_encoding})
+  --hash_function NAME        hash used to rename amplicons: 'sha1'
+                              (default) or 'md5' (default: ${params.hash_function})
   --forward_primer SEQ        IUPAC forward primer (required unless --no_trimming)
   --reverse_primer SEQ        IUPAC reverse primer (required unless --no_trimming)
   --no_trimming               skip cutadapt primer trimming (default: ${params.no_trimming})
@@ -440,7 +460,8 @@ process trim_primers {
 
 
 process filter_and_convert_to_fasta {
-    // use SHA1 values as sequence names, compute expected error
+    // use the params.hash_function digest (SHA1 or MD5, see [S65]) as
+    // sequence names, compute expected error
     // values (ee), and apply the minimum-length / max-N filter
     // (--fastq_maxns 0: every N drops the read). The shadow path
     // ([S04]) pads with A/C/G/T (see [S63]), so the same max-N=0
@@ -463,7 +484,7 @@ process filter_and_convert_to_fasta {
         --fastq_filter !{trimmed_fastq} \
         --fastq_minlen "${MIN_LENGTH}" \
         --fastq_maxns 0 \
-        --relabel_sha1 \
+        !{params.hash_relabel_flag} \
         --fastq_ascii !{params.fastq_encoding} \
         --quiet \
         --eeout \
@@ -489,7 +510,7 @@ process extract_expected_error_values {
 
     shell:
     '''
-    length_of_sequence_IDs=40
+    length_of_sequence_IDs=!{params.hash_id_length}
     extract_ee.awk !{filtered_fasta} | \
         sort --key=3,3n --key=1,1d --key=2,2n | \
         uniq --check-chars=${length_of_sequence_IDs} > !{sampleId}.qual
@@ -632,9 +653,10 @@ process discover_part_b_fasta {
 process build_expected_error_file {
     // [S28]: merge every per-sample <sampleId>.qual into one
     // project-wide <basename>.qual. The input files are already sorted
-    // by length / SHA1 / ee (see extract_expected_error_values), so
-    // `sort --merge` is a straight k-way merge; uniq --check-chars=40
-    // keeps the lowest-ee row per SHA1.
+    // by length / hash / ee (see extract_expected_error_values), so
+    // `sort --merge` is a straight k-way merge; uniq --check-chars
+    // (width from params.hash_function, see [S65]) keeps the lowest-ee
+    // row per amplicon name.
     //
     // [S59]: the .qual is an internal intermediate consumed by
     // build_occurrence_table — not published.
@@ -649,7 +671,7 @@ process build_expected_error_file {
     shell:
     '''
     sort --key=3,3n --key=1,1d --key=2,2n --merge !{quals} | \
-        uniq --check-chars=40 > !{basename}.qual
+        uniq --check-chars=!{params.hash_id_length} > !{basename}.qual
     '''
 }
 
@@ -2072,6 +2094,13 @@ workflow {
     def allowed_taxonomy_methods = ['stampa', 'sintax']
     assert params.taxonomy_method in allowed_taxonomy_methods :
         "--taxonomy_method must be one of ${allowed_taxonomy_methods}, got '${params.taxonomy_method}'"
+
+    // [S65]: validate --hash_function up-front so an unsupported hash
+    // aborts before any process is wired rather than surfacing as an
+    // obscure vsearch --relabel error mid-pipeline.
+    def allowed_hash_functions = ['sha1', 'md5']
+    assert params.hash_function in allowed_hash_functions :
+        "--hash_function must be one of ${allowed_hash_functions}, got '${params.hash_function}'"
 
     // [S63]: validate --join_padding_length as a positive integer
     // before any process is scheduled. Non-positive values, non-integers,

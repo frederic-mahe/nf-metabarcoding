@@ -97,4 +97,49 @@ nextflow_process {
             }
         }
     }
+
+    test("--hash_function md5 dedups by the 32-char name width") {
+        // COVERAGE: [S65]
+        // Fed a filtered fasta with 32-char (MD5-width) names where two
+        // records share a name with different ee. The dedup must derive
+        // uniq --check-chars from hash_function (32, not the SHA1 40):
+        // at width 40 the trailing ee digits enter the comparison and
+        // the duplicate names survive.
+        tag "ci"
+        when {
+            params {
+                // primers satisfy the file-level setup chain; this test
+                // feeds the fixture below directly and ignores its output.
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                hash_function  = "md5"
+                fastq_folder   = "tests/data"
+            }
+            process {
+                """
+                input[0] = "md5_sample"
+                input[1] = file("\${projectDir}/tests/data/hash_function/md5_filtered.fas")
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out[1].get(0)).readLines()
+            def shas = lines.collect { it.split(' ')[0] }
+            assert shas == shas.unique() :
+                "one row per unique MD5 name expected, got duplicates: ${shas}"
+            lines.each { line ->
+                assert line.split(' ')[0] ==~ /[0-9a-f]{32}/ :
+                    "expected 32-char MD5 hex in column 1: ${line}"
+            }
+            // The shared name 'a*32' appears with ee 0.020000 and
+            // 0.010000; the lower-ee row must be the survivor.
+            def rowA = lines.find { it.startsWith("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") }
+            assert rowA != null : "shared MD5 name missing from .qual"
+            assert rowA.contains("0.010000") :
+                "expected the lower-ee row to win, got: ${rowA}"
+            assert lines.size() == 2 :
+                "expected 2 unique names after dedup, got ${lines.size()}: ${lines}"
+        }
+    }
 }

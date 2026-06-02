@@ -1047,6 +1047,34 @@ from placeholder values to real taxonomic assignments.
     aborts at startup with stderr naming
     `reference_dataset_sintax`.
 
+- `[S65]` `params.hash_function` (optional, default `'sha1'`) selects
+  the hash vsearch uses to rename amplicons. Accepted values are
+  `'sha1'` and `'md5'`; any other value aborts at startup with stderr
+  naming `hash_function`. The flag is consumed only by
+  `filter_and_convert_to_fasta` ([S01]), which passes the matching
+  `--relabel_sha1` / `--relabel_md5` to vsearch — every amplicon name
+  downstream is therefore a SHA1 (40 hex chars) or MD5 (32 hex chars)
+  digest. No pipeline step assumes a fixed hash-string length:
+    1. the `uniq --check-chars=<width>` dedup in
+       `extract_expected_error_values` ([S01]) and
+       `build_expected_error_file` ([S28]) derives `<width>` from
+       `hash_function` (40 for sha1, 32 for md5) rather than
+       hard-coding it;
+    2. `extract_ee.awk` ([S01]) splits the fasta header on `>;=`
+       delimiters and never measures the name; and
+    3. the Python occurrence-table builders key amplicons on the
+       hash **string** (dictionary lookup), with no length or
+       prefix-bucketing assumption.
+  Switching `hash_function` changes only the amplicon names; the set
+  of clusters, abundances, and the occurrence-table shape are
+  otherwise identical.
+  - **Pass when:** a run with `--hash_function md5` produces
+    per-sample fastas whose headers carry 32-hex-character names and a
+    `.qual` file with one row per unique 32-char name (lowest ee per
+    name preserved); the default (`sha1`) run keeps 40-char names; and
+    a run with an unsupported `--hash_function` value aborts at startup
+    with stderr naming `hash_function`.
+
 
 ## Dependencies
 

@@ -335,6 +335,44 @@ emit_compression_variants() {
 }
 
 
+emit_hash_function_fixtures() {
+    # [S65]: MD5-width (32 hex char) fixtures used to prove the .qual
+    # dedup steps track params.hash_function rather than assuming the
+    # 40-char SHA1 width. IDs are built from a single letter so tests
+    # can assert on them readably (these stand in for md5 digests).
+    local -r dir="hash_function"
+    mkdir -p "${dir}"
+
+    local -r md5_a="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    local -r md5_b="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    local -r md5_c="cccccccccccccccccccccccccccccccc"
+    local -r seq_a="ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT"
+    local -r seq_c="GGGGTTTTAAAACCCCGGGGTTTTAAAACCCCGGGGTTTT"
+
+    # filter_and_convert_to_fasta output shape: `>MD5;ee=<f>;length=<i>`
+    # at --fasta_width 0. Two records share md5_a with different ee so
+    # extract_expected_error_values must collapse them onto the lower-ee
+    # row — which only works when uniq --check-chars is 32, not 40.
+    {
+        printf '>%s;ee=0.020000;length=40\n%s\n' "${md5_a}" "${seq_a}"
+        printf '>%s;ee=0.010000;length=40\n%s\n' "${md5_a}" "${seq_a}"
+        printf '>%s;ee=0.030000;length=40\n%s\n' "${md5_c}" "${seq_c}"
+    } > "${dir}/md5_filtered.fas"
+
+    # Per-sample .qual (extract_ee.awk format) with 32-char names, for
+    # build_expected_error_file. S2 carries the lower ee for md5_a so
+    # the merge must keep S2's row.
+    {
+        printf '%s 0.010000 40\n' "${md5_a}"
+        printf '%s 0.020000 40\n' "${md5_b}"
+    } > "${dir}/S1_md5.qual"
+    {
+        printf '%s 0.005000 40\n' "${md5_a}"
+        printf '%s 0.030000 40\n' "${md5_c}"
+    } > "${dir}/S2_md5.qual"
+}
+
+
 emit_paired "paired_merge_ok"   "${AMPLICONS_OK[@]}"
 emit_paired "paired_merge_fail" "${AMPLICONS_LONG[@]}"
 emit_single
@@ -347,5 +385,6 @@ emit_duplicate_sample_ids
 emit_part_b_fixtures
 emit_e2e_part_b_fixture
 emit_compression_variants
+emit_hash_function_fixtures
 
 echo "Wrote fixtures to ${DATA_DIR}"

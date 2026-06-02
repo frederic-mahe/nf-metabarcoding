@@ -4,14 +4,19 @@
 #
 # Read a vsearch fasta where headers carry both `ee=` (from --eeout)
 # and `length=` (from --lengthout), and emit a three-column TSV:
-#   <SHA1>  <ee>  <length>
+#   <hash>  <ee>  <length>
+#
+# <hash> is the amplicon name vsearch assigned via --relabel_sha1 /
+# --relabel_md5 (a SHA1 or MD5 digest, see [S65]). This splitter is
+# delimiter-based and never measures the name, so it is agnostic to
+# the hash width.
 #
 # Header layout:
-#   >SHA1;ee=<float>;length=<int>
+#   >hash;ee=<float>;length=<int>
 #
 # Field separator splits on '>', ';', and '=':
 #   $1 = "" (before '>')
-#   $2 = SHA1
+#   $2 = hash
 #   $3 = "ee" (literal key)
 #   $4 = ee value
 #   $5 = "length" (literal key)

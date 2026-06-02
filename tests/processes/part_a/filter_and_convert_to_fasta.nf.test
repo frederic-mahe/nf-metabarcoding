@@ -67,6 +67,37 @@ nextflow_process {
         }
     }
 
+    test("--hash_function md5 produces 32-char MD5 amplicon names") {
+        // COVERAGE: [S65]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                hash_function  = "md5"
+            }
+            process {
+                """
+                input[0] = trim_primers.out[0]
+                input[1] = trim_primers.out[1]
+                """
+            }
+        }
+        then {
+            assert process.success
+            // [S65]: vsearch is invoked with --relabel_md5, so every
+            // amplicon name is a 32-hex-character MD5 digest (vs the
+            // 40-char SHA1 of the default run above).
+            def lines = path(process.out[1].get(0)).readLines()
+            assert lines.size() > 0 : "expected at least one fasta record"
+            for (int i = 0; i < lines.size(); i += 2) {
+                def header = lines[i]
+                assert header ==~ /^>[0-9a-f]{32};ee=[0-9.]+;length=\d+$/ :
+                    "header does not match >MD5;ee=<float>;length=<int>: ${header}"
+            }
+        }
+    }
+
     test("emits single-line fasta (one record = two lines)") {
         // COVERAGE: [S55]
         // Regression guard: vsearch is invoked with --fasta_width 0
