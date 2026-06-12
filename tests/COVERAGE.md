@@ -92,6 +92,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S63]`| `params.join_padding_length` (default 8): A-padding length used by `vsearch --fastq_join` in the shadow Part A path | `tests/processes/part_a/join_notmerged.nf.test`, `tests/main.nf.test` | done   | —          |
 | `[S64]`| `params.reference_dataset_sintax`: optional sintax-formatted reference; gates `part_C_shadow`; required by regular Part C when `--taxonomy_method=sintax` | `tests/main.nf.test` | done   | —          |
 | `[S65]`| `params.hash_function` (default `sha1`, accepts `md5`): selects vsearch `--relabel_*`; `.qual` dedup width derived from the hash; invalid value aborts at startup | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`, `tests/processes/part_a/extract_expected_error_values.nf.test`, `tests/processes/part_b/build_expected_error_file.nf.test`, `tests/main.nf.test` | done   | —          |
+| `[S66]`| `params.majority_assignment` (opt-in, default `false`): regular Part C's final majority-rule step; publishes `<basename>_table_assigned_majority.tsv`; requires `--taxonomy_method=stampa` (sintax combo aborts at startup) | `tests/python/test_majority_assignment.py`, `tests/processes/part_c/compute_majority_assignment.nf.test`, `tests/main.nf.test` | done | — |
 
 
 ## Per-process tests
@@ -129,3 +130,4 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `assign_taxonomy_stampa`        | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`       | S49          | done   |
 | `assign_taxonomy_sintax`        | `tests/processes/part_c/assign_taxonomy_sintax.nf.test`       | S50          | done   |
 | `update_occurrence_table`       | `tests/processes/part_c/update_occurrence_table.nf.test`      | S51          | done   |
+| `compute_majority_assignment`   | `tests/processes/part_c/compute_majority_assignment.nf.test`  | S66          | done   |

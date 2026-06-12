@@ -1075,6 +1075,50 @@ from placeholder values to real taxonomic assignments.
     a run with an unsupported `--hash_function` value aborts at startup
     with stderr naming `hash_function`.
 
+- `[S66]` `params.majority_assignment` (boolean, default `false`) is an
+  **opt-in** step that runs at the very end of the **regular** Part C
+  path ([S49] / [S51]), after `update_occurrence_table`. When set, the
+  process `compute_majority_assignment` runs
+  `bin/majority_assignment.py` on the regular assigned table
+  (`<basename>_table_assigned.tsv`, [S51]) plus the stampa-formatted
+  `--reference_dataset` ([S47]), and publishes an **independent** table
+  `<basename>_table_assigned_majority.tsv` under `--results_folder`
+  (a sibling of [S51]'s output — the assigned table is not modified).
+  The new table has three columns,
+  `OTU\tamplicon\ttaxonomy_majority`, one row per OTU. For each OTU the
+  step takes every reference accession in the `references` column,
+  looks up its `|`-separated lineage in the reference, and reports —
+  per taxonomic rank — the most frequent name annotated with its
+  support as `name (hits/total)` (`total` = number of accessions,
+  `hits` = how many carry that name at the rank); ranks are
+  `|`-joined. Lineages of unequal depth are padded with `NA`
+  (`itertools.zip_longest`); ties are broken by first-seen order
+  (`Counter.most_common`). A `No_hit` row is passed through verbatim as
+  `No_hit`. The reference is read transparently whether plain, gzip- or
+  bzip2-compressed (detected by magic bytes). The step is wired into
+  every entry point where the regular `part_C` runs (end-to-end
+  A→B→C, Part B standalone with a reference, and Part C standalone)
+  and **never** on the shadow path ([S50]). Because the majority vote
+  needs the per-hit accessions that only the stampa method populates
+  (sintax leaves `references` at the `NA` placeholder, [S50]), the flag
+  requires `--taxonomy_method=stampa`: setting `--majority_assignment`
+  together with `--taxonomy_method=sintax` aborts at startup with a
+  message naming `majority_assignment`.
+  - **Pass when:** golden-file characterization tests for
+    `bin/majority_assignment.py` reproduce the byte-exact output of the
+    legacy `majority_assignment.py` on a fixture covering: (a) a single
+    reference accession, (b) several accessions that agree at every
+    rank, (c) accessions that disagree at a rank (most-frequent wins,
+    ties broken by first-seen order), (d) lineages of unequal depth
+    (`NA` fill), and (e) a `No_hit` row; the same output is produced
+    from a plain, a `.gz`, and a `.bz2` reference. A Part C run with
+    `--majority_assignment true` (stampa) publishes
+    `<basename>_table_assigned_majority.tsv` alongside
+    `<basename>_table_assigned.tsv`; the same run without the flag
+    publishes no majority table; running with
+    `--majority_assignment true --taxonomy_method sintax` aborts at
+    startup with stderr naming `majority_assignment`.
+
 
 ## Dependencies
 
