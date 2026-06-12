@@ -905,6 +905,125 @@ nextflow_pipeline {
         }
     }
 
+    test("Part C standalone with --majority_assignment publishes the majority table") {
+        // COVERAGE: [S66]
+        // [S66]: the opt-in majority step runs after
+        // update_occurrence_table on the regular path and publishes an
+        // independent <basename>_table_assigned_majority.tsv alongside
+        // the assigned table. The reference accession in the
+        // `references` column resolves against the stampa reference so
+        // the majority vote produces a real lineage.
+        tag "ci"
+        when {
+            params {
+                threads            = 1
+                results_folder     = "${outputDir}/part_c_majority"
+                reference_dataset  = "${outputDir}/part_c_majority_ref.fas"
+                occurrence_table   = "${outputDir}/part_c_majority_table.tsv"
+                majority_assignment = true
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_majority_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA Kingdom|Phylum|Class\n" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            )
+            def tab = file("${outputDir}/part_c_majority_table.tsv")
+            // `references` already carries the stampa accession `refA`
+            // so the majority step has something to look up (Part C's
+            // update step would also fill it in, but pinning it here
+            // keeps the majority assertion independent of vsearch).
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t32\t10\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\trefA\t10\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def assigned = file(
+                "${outputDir}/part_c_majority/part_c_majority_table_assigned.tsv"
+            )
+            assert assigned.exists() :
+                "Part C should still publish <basename>_table_assigned.tsv"
+            def majority = file(
+                "${outputDir}/part_c_majority/part_c_majority_table_assigned_majority.tsv"
+            )
+            assert majority.exists() :
+                "--majority_assignment should publish <basename>_table_assigned_majority.tsv"
+            def lines = majority.readLines()
+            assert lines[0] == "OTU\tamplicon\ttaxonomy_majority"
+            assert lines.size() == 2  // header + 1 OTU
+            assert lines[1] == "1\tamp1\tKingdom (1/1)|Phylum (1/1)|Class (1/1)" :
+                "unexpected majority row: ${lines[1]}"
+        }
+    }
+
+    test("Part C standalone without --majority_assignment publishes no majority table") {
+        // COVERAGE: [S66]
+        // Default is opt-out: the majority table must not appear unless
+        // the flag is set.
+        tag "ci"
+        when {
+            params {
+                threads           = 1
+                results_folder    = "${outputDir}/part_c_no_majority"
+                reference_dataset = "${outputDir}/part_c_no_majority_ref.fas"
+                occurrence_table  = "${outputDir}/part_c_no_majority_table.tsv"
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_no_majority_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA Kingdom|Phylum|Class\n" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            )
+            def tab = file("${outputDir}/part_c_no_majority_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t32\t10\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\trefA\t10\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def majority = file(
+                "${outputDir}/part_c_no_majority/part_c_no_majority_table_assigned_majority.tsv"
+            )
+            assert !majority.exists() :
+                "majority table must not be published when --majority_assignment is unset"
+        }
+    }
+
+    test("--majority_assignment with --taxonomy_method=sintax aborts at startup") {
+        // COVERAGE: [S66]
+        // Majority assignment needs the per-hit accessions only the
+        // stampa method writes to the `references` column; the sintax
+        // combination is rejected before any process runs.
+        tag "ci"
+        when {
+            params {
+                threads                  = 1
+                occurrence_table         = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                results_folder           = "${outputDir}/majority_sintax_abort"
+                reference_dataset_sintax = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                taxonomy_method          = "sintax"
+                majority_assignment      = true
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("majority_assignment") :
+                "error should mention 'majority_assignment', got: ${msg}"
+        }
+    }
+
     test("Part C stampa path scatters the representatives via splitFasta") {
         // COVERAGE: [S49]
         // [S49] revised (2026-05-19): with params.stampa_chunk_size

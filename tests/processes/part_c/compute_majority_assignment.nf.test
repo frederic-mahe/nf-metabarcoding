@@ -1,0 +1,95 @@
+nextflow_process {
+
+    name "compute_majority_assignment"
+    script "main.nf"
+    process "compute_majority_assignment"
+
+    test("recomputes a majority-rule taxonomy table from the assigned table") {
+        // COVERAGE: [S66]
+        // [S66]: compute_majority_assignment is the opt-in final step
+        // of the regular Part C path. It consumes the assigned table
+        // (<basename>_table_assigned.tsv) and the stampa-formatted
+        // reference, and emits an independent three-column table
+        // <basename>_table_assigned_majority.tsv
+        // (OTU\tamplicon\ttaxonomy_majority). This test pins the output
+        // filename and the per-rank majority vote (most-frequent name
+        // with support, No_hit passthrough). LCA-vote correctness is
+        // pinned at the helper level by test_majority_assignment.py.
+        tag "ci"
+        when {
+            params {
+                threads        = 1
+                results_folder = "${outputDir}/majority"
+            }
+            process {
+                """
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>AB001 Bacteria|Firmicutes|Bacilli\\n' +
+                    'ACGTACGTACGTACGTACGT\\n' +
+                    '>AB002 Bacteria|Firmicutes|Clostridia\\n' +
+                    'ACGTACGTACGTACGTACGA\\n'
+                def tab = workDir.resolve("input_table.tsv")
+                tab.text = 'OTU\\ttotal\\tcloud\\tamplicon\\tlength\\tabundance\\tchimera\\tspread\\tquality\\tsequence\\tidentity\\ttaxonomy\\treferences\\ts1\\n' +
+                    '1\\t10\\tNA\\tamp1\\t20\\t10\\tN\\t1\\t0.001\\tACGTACGTACGTACGTACGT\\t99.0\\tX\\tAB001\\t10\\n' +
+                    '2\\t8\\tNA\\tamp2\\t20\\t8\\tN\\t1\\t0.001\\tACGTACGTACGTACGTACGA\\t98.0\\tX\\tAB001,AB002\\t8\\n' +
+                    '3\\t2\\tNA\\tamp3\\t20\\t2\\tN\\t1\\t0.001\\tACGTACGTACGTACGTACGT\\t0.0\\tNA\\tNo_hit\\t2\\n'
+                input[0] = file(tab.toString())
+                input[1] = file(ref.toString())
+                input[2] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def out = process.out[0].get(0)
+            assert out.endsWith("proj_3_samples_table_assigned_majority.tsv") :
+                "expected <basename>_table_assigned_majority.tsv, got: ${out}"
+            def lines = path(out).readLines()
+            assert lines.size() == 4   // header + 3 rows
+            assert lines[0] == "OTU\tamplicon\ttaxonomy_majority"
+            // single accession -> full support at every rank.
+            assert lines[1] == "1\tamp1\tBacteria (1/1)|Firmicutes (1/1)|Bacilli (1/1)"
+            // two accessions agree on the first two ranks, disagree on
+            // the third (tie -> first-seen "Bacilli").
+            assert lines[2] == "2\tamp2\tBacteria (2/2)|Firmicutes (2/2)|Bacilli (1/2)"
+            // No_hit row passes through verbatim.
+            assert lines[3] == "3\tamp3\tNo_hit"
+        }
+    }
+
+    test("reads a gzip-compressed reference") {
+        // COVERAGE: [S66]
+        // The legacy script only handled gzip; the port detects the
+        // codec by magic bytes. This pins the gzip path end-to-end
+        // through the process (the .bz2 / plain paths are pinned by
+        // test_majority_assignment.py).
+        tag "ci"
+        when {
+            params {
+                threads        = 1
+                results_folder = "${outputDir}/majority_gz"
+            }
+            process {
+                """
+                def plain = workDir.resolve("reference.fas")
+                plain.text = '>AB001 Bacteria|Firmicutes|Bacilli\\n' +
+                    'ACGTACGTACGTACGTACGT\\n'
+                def proc = ["gzip", "-f", plain.toString()].execute()
+                proc.waitFor()
+                def tab = workDir.resolve("input_table.tsv")
+                tab.text = 'OTU\\ttotal\\tcloud\\tamplicon\\tlength\\tabundance\\tchimera\\tspread\\tquality\\tsequence\\tidentity\\ttaxonomy\\treferences\\ts1\\n' +
+                    '1\\t10\\tNA\\tamp1\\t20\\t10\\tN\\t1\\t0.001\\tACGTACGTACGTACGTACGT\\t99.0\\tX\\tAB001\\t10\\n'
+                input[0] = file(tab.toString())
+                input[1] = file(workDir.resolve("reference.fas.gz").toString())
+                input[2] = "proj_1_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def out = process.out[0].get(0)
+            def lines = path(out).readLines()
+            assert lines[1] == "1\tamp1\tBacteria (1/1)|Firmicutes (1/1)|Bacilli (1/1)"
+        }
+    }
+}

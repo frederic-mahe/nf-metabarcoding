@@ -100,6 +100,14 @@ params.stampa_id         = 0.5
 // Used by the shadow Part C path (always) and by the regular Part C
 // path when params.taxonomy_method == 'sintax'.
 params.sintax_cutoff     = 0.9
+// [S66]: opt-in majority-rule taxonomic assignment. When true, the
+// regular Part C path runs `compute_majority_assignment` as a final
+// step on <basename>_table_assigned.tsv ([S51]) and publishes an
+// independent <basename>_table_assigned_majority.tsv. Requires the
+// stampa method — sintax leaves the `references` column at the NA
+// placeholder ([S50]), so the workflow forbids the combination at
+// startup. Never runs on the shadow path.
+params.majority_assignment = false
 
 
 def normalize_path(value) {
@@ -288,6 +296,12 @@ Part C — taxonomic assignment:
                               the shadow path and by --taxonomy_method
                               sintax on the regular path
                               (default: ${params.sintax_cutoff})
+  --majority_assignment       opt-in final step: recompute a
+                              majority-rule taxonomy per OTU from the
+                              reference accessions and publish
+                              <basename>_table_assigned_majority.tsv.
+                              Requires --taxonomy_method=stampa
+                              (default: ${params.majority_assignment})
 
 Runtime:
   --threads INT               threads per process (default: ${params.threads})
@@ -1687,6 +1701,37 @@ process update_occurrence_table {
 }
 
 
+process compute_majority_assignment {
+    // [S66]: opt-in final step of the regular Part C path. Recompute a
+    // majority-rule taxonomy per OTU from the reference accessions in
+    // the `references` column of the assigned table
+    // (<basename>_table_assigned.tsv, [S51]) and the stampa-formatted
+    // reference dataset ([S47]). Emits an independent three-column
+    // table <basename>_table_assigned_majority.tsv
+    // (OTU\tamplicon\ttaxonomy_majority). Never runs on the shadow
+    // path; gated on params.majority_assignment and (by the startup
+    // assert) on --taxonomy_method=stampa.
+    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
+        enabled: params.results_folder != null
+
+    input:
+    path assigned_table
+    path reference_dataset
+    val basename
+
+    output:
+    path "${basename}_table_assigned_majority.tsv"
+
+    shell:
+    '''
+    majority_assignment.py \
+        --input_table !{assigned_table} \
+        --reference_db !{reference_dataset} \
+        > !{basename}_table_assigned_majority.tsv
+    '''
+}
+
+
 workflow part_C {
     // Re-usable Part C wiring shared by the standalone workflow and
     // the Part B → Part C end-to-end path.
@@ -1786,6 +1831,19 @@ workflow part_C {
             merged.ifEmpty(empty_assignments),
             basename,
         )
+
+        // [S66]: opt-in majority-rule assignment, run on the freshly
+        // assigned table. Stampa branch only — the startup assert
+        // ([S66]) guarantees we never reach here under sintax, and the
+        // shadow path never calls part_C. `reference` is the
+        // stampa-formatted --reference_dataset resolved above.
+        if ( params.majority_assignment ) {
+            compute_majority_assignment(
+                update_occurrence_table.out[0],
+                reference,
+                basename,
+            )
+        }
     }
 
     emit:
@@ -2107,6 +2165,15 @@ workflow {
     def allowed_taxonomy_methods = ['stampa', 'sintax']
     assert params.taxonomy_method in allowed_taxonomy_methods :
         "--taxonomy_method must be one of ${allowed_taxonomy_methods}, got '${params.taxonomy_method}'"
+
+    // [S66]: majority assignment recomputes a per-OTU taxonomy from the
+    // reference accessions listed in the `references` column. Only the
+    // stampa method populates that column ([S50] leaves it at the NA
+    // placeholder), so --majority_assignment is incompatible with
+    // --taxonomy_method=sintax. Fail fast before any process is wired.
+    assert !(params.majority_assignment && params.taxonomy_method == 'sintax') :
+        "--majority_assignment requires --taxonomy_method=stampa " +
+        "(sintax leaves the references column unpopulated)"
 
     // [S65]: validate --hash_function up-front so an unsupported hash
     // aborts before any process is wired rather than surfacing as an
