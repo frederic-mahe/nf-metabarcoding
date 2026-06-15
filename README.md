@@ -159,6 +159,30 @@ What the `slurm` profile does:
   (`stampa_chunk_size = 1000`); the `local` profile sets `0` to feed
   the whole fasta to a single `vsearch` instead.
 
+Launching the run:
+
+- The `nextflow` driver process is long-lived (it stays up submitting
+  and reaping sbatch jobs for the whole run), so start it from a login
+  node inside `tmux` or `screen` — not as an sbatch job itself, and
+  not on a session that will disconnect:
+
+  ```bash
+  tmux new -s metabarcoding
+  export NXF_OPTS='-Xms512m -Xmx4g'   # cap the driver JVM heap
+  nextflow run main.nf -profile slurm,conda \
+      --fastq_folder /scratch/me/run17 \
+      --slurm_queue  normal \
+      --threads      8 \
+      -resume                          # reuse cached tasks after a stop
+  ```
+
+- `-resume` lets an interrupted run pick up where it left off, but it
+  needs the per-task `work/` directories to still exist. The default
+  `cleanup = true` deletes them on success, which defeats `-resume`
+  across separate invocations — set `cleanup = false` (e.g. a small
+  `-c` override) for long or flaky runs, and clean `work/` by hand
+  afterwards.
+
 Notes:
 
 - Run `work/` on shared scratch visible to every compute node, and
