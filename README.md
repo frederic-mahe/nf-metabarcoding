@@ -148,11 +148,13 @@ What the `slurm` profile does:
   fastidious global clustering asks for ~3× the dataset size (the
   heaviest step), the other whole-dataset steps (`vsearch` global
   dereplication, chimera detection, the all-vs-all self-search,
-  `sintax`, `mumu` and occurrence-table assembly) ~1×. The stampa
-  scatter is the exception — each chunk is fixed-size, so it stays at
-  a flat per-job request. Fixed fallbacks (16/32/64 GB) apply when
-  `--dataset_size_gb` is unset. On an OOM or timeout kill, a process
-  retries up to twice with proportionally more memory and wall-time.
+  `mumu` and occurrence-table assembly) ~1×. The taxonomic-assignment
+  steps (`vsearch --usearch_global`/`--sintax`) are reference-bound
+  instead — they load the reference database and a k-mer index, so
+  they scale off `--reference_size_gb` (~4× to cover the index).
+  Fixed fallbacks apply when those params are unset. On an OOM or
+  timeout kill, a process retries up to twice with proportionally
+  more memory and wall-time.
 - keeps the `[S49]` stampa scatter at its slurm default
   (`stampa_chunk_size = 1000`); the `local` profile sets `0` to feed
   the whole fasta to a single `vsearch` instead.
