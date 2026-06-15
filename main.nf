@@ -341,7 +341,7 @@ process merge_fastq_pairs {
     vsearch \
         --fastq_mergepairs !{fastq_pair[0]} \
         --reverse !{fastq_pair[1]} \
-        --threads !{params.threads} \
+        --threads !{task.cpus} \
         --fastq_ascii !{params.fastq_encoding} \
         --fastq_allowmergestagger \
         --quiet \
@@ -461,7 +461,7 @@ process trim_primers {
     MIN_R=$(( !{params.reverse_primer.length()} * 2 / 3 ))
     {
         cutadapt \
-            --cores=!{params.threads} \
+            --cores=!{task.cpus} \
             --error-rate "${ERROR_RATE}" \
             --revcomp \
             --rename="{id}" \
@@ -470,7 +470,7 @@ process trim_primers {
             --discard-untrimmed \
             !{merged_fastq} | \
             cutadapt \
-                --cores=!{params.threads} \
+                --cores=!{task.cpus} \
                 --error-rate "${ERROR_RATE}" \
                 --adapter "${reverse_primer_revcomp}" \
                 --overlap "${MIN_R}" \
@@ -594,7 +594,7 @@ process list_local_clusters {
     #!/bin/bash
 
     swarm \
-        --threads !{params.threads} \
+        --threads !{task.cpus} \
         --differences 1 \
         --usearch-abundance \
         --log !{sampleId}_clustering.log \
@@ -826,7 +826,7 @@ process global_clustering {
     def fastidious_flag = params.fastidious ? '--fastidious' : ''
     """
     swarm \\
-        --threads ${params.threads} \\
+        --threads ${task.cpus} \\
         --differences 1 \\
         ${fastidious_flag} \\
         --usearch-abundance \\
@@ -1122,7 +1122,7 @@ process search_for_terminal_gaps {
     '''
     awk 'NR > 1 {printf ">"$1"\\n"$10"\\n"}' !{otu_table} | \
         vsearch \
-            --threads !{params.threads} \
+            --threads !{task.cpus} \
             --cluster_smallmem - \
             --id 1.0 \
             --qmask none \
@@ -1281,7 +1281,7 @@ process find_similar_sequences {
         --usearch_global !{otu_fasta} \
         --db !{otu_fasta} \
         --self \
-        --threads !{params.threads} \
+        --threads !{task.cpus} \
         --id 0.84 \
         --iddef 1 \
         --userfields query+target+id \
@@ -1319,7 +1319,7 @@ process run_mumu {
     def new_table = "${reduced_table.baseName.replaceFirst(/_reduced$/, '_raw_mumu')}.table"
     """
     mumu \\
-        --threads ${params.threads} \\
+        --threads ${task.cpus} \\
         --otu_table ${reduced_table} \\
         --match_list ${match_list} \\
         --new_otu_table ${new_table} \\
@@ -1599,7 +1599,7 @@ process assign_taxonomy_stampa {
     '''
     vsearch \
         --usearch_global !{chunk} \
-        --threads !{params.threads} \
+        --threads !{task.cpus} \
         --db !{reference_dataset} \
         --dbmask none \
         --qmask none \
@@ -1655,7 +1655,7 @@ process assign_taxonomy_sintax {
     '''
     vsearch \
         --sintax !{representatives} \
-        --threads !{params.threads} \
+        --threads !{task.cpus} \
         --db !{reference_dataset} \
         --dbmask none \
         --sintax_cutoff !{params.sintax_cutoff} \
