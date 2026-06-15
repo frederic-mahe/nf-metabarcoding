@@ -39,8 +39,9 @@ Required to run the workflow:
 
 - `nextflow >= 25.04.0`
 - `bash >= 4`
-- `vsearch`, `cutadapt`, `swarm` available on `PATH` (or run with a
-  container profile)
+- `vsearch`, `cutadapt`, `swarm`, `mumu` available on `PATH` — or
+  resolved automatically with `-profile conda` (bioconda) or
+  `-profile modules` (see "Running on an HPC cluster (slurm)" below)
 
 Required to run the test suite and the linters:
 
@@ -109,6 +110,62 @@ glob meta-characters are limited to `*` (any chars) and the `{R1,R2}`
 brace token — anything else is matched literally.
 
 
+## Running on an HPC cluster (slurm)
+
+`[S07]`/`[S08]`. Combine the `slurm` executor profile with **one**
+dependency profile:
+
+```bash
+# tools from bioconda (Nextflow builds the env once and caches it)
+nextflow run main.nf -profile slurm,conda \
+    --fastq_folder /scratch/me/run17 \
+    --slurm_queue  normal \
+    --threads      8
+
+# tools from the cluster's module system (set the module names/versions)
+nextflow run main.nf -profile slurm,modules \
+    --fastq_folder    /scratch/me/run17 \
+    --slurm_queue     normal \
+    --module_vsearch  vsearch/2.31.0 \
+    --module_swarm    swarm/3.1.5 \
+    --module_cutadapt  cutadapt/4.9 \
+    --module_mumu     mumu/1.1.1 \
+    --threads         8
+```
+
+What the `slurm` profile does:
+
+- submits every process as an sbatch job (`process.executor =
+  'slurm'`); tune the queue/account/concurrency with `--slurm_queue`,
+  `--slurm_account`, `--slurm_queue_size`.
+- sets per-process resources by tier. `--threads` is the single knob
+  for cores: it feeds `task.cpus`, which is what the tools actually
+  request (`vsearch/swarm/cutadapt --threads`/`--cores`). The
+  single-threaded `mumu` and the bash/awk/python glue stay at one
+  core; `chimera_detection` reserves two (it is a
+  `filtering | uchime_denovo` pipe).
+- scales the two memory-bound global steps off the dataset size:
+  `vsearch` global dereplication asks for ~1× and `swarm` fastidious
+  global clustering ~3× of `--dataset_size_gb` (fixed 16 GB / 64 GB
+  fallbacks when it is not set). On an OOM or timeout kill, a process
+  retries up to twice with proportionally more memory and wall-time.
+- keeps the `[S49]` stampa scatter at its slurm default
+  (`stampa_chunk_size = 1000`); the `local` profile sets `0` to feed
+  the whole fasta to a single `vsearch` instead.
+
+Notes:
+
+- Run `work/` on shared scratch visible to every compute node, and
+  point `NXF_CONDA_CACHEDIR` at shared storage so the conda env is
+  built once and reused.
+- `publishDir` defaults to hard links (`--publish_mode link`). Switch
+  to `--publish_mode copy` when `--results_folder`/`--fastq_folder`
+  live on a different filesystem than `work/`.
+- This path is not part of automated CI; it is exercised by a manual
+  smoke test on the cluster (`[S07]`/`[S08]` in
+  [`tests/COVERAGE.md`](tests/COVERAGE.md)).
+
+
 ## How to test
 
 ```bash
@@ -163,6 +220,8 @@ both and also refresh `CITATION.cff`'s `date-released`.
   local clustering with swarm
 - Per-process nf-test scaffolding chained via `setup{}` blocks
 - Reproducible fixture generation (`tests/data/generate.sh`)
+- HPC / slurm profile + conda / module dependency profiles (`[S07]`,
+  `[S08]`) — see "Running on an HPC cluster (slurm)" below
 
 ### Partial / in progress
 - Workflow-level smoke test (currently `red` on `[S01]`, `[S03]`,
@@ -172,8 +231,7 @@ both and also refresh `CITATION.cff`'s `date-released`.
 ### Planned
 - Part B: occurrence table assembly (`[S15]`)
 - Part C: taxonomic assignment
-- HPC / slurm profile (`[S07]`)
-- Container profiles (`[S08]`)
+- Container profiles — docker / singularity (`[S08]`)
 - Multiplexed-input subworkflow
 - Reference database auto-deduction from primers
 - Force-rerun controls (see "Re-run policy" below)

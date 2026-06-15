@@ -33,8 +33,8 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | Spec   | Bullet                                                                     | Test file                                       | Status  | Blocked by |
 |--------|----------------------------------------------------------------------------|-------------------------------------------------|---------|------------|
 | `[S06]`| read config file *or* command-line parameters                              | —                                               | n/a     | Nextflow's intrinsic `params` indirection; required-param branch covered by `[S18]` |
-| `[S07]`| runs locally or on HPC (slurm)                                             | —                                               | n/a     | —          |
-| `[S08]`| runs local *or* containerized applications                                 | —                                               | n/a     | —          |
+| `[S07]`| runs locally or on HPC (slurm)                                             | manual smoke test; `slurm` profile in `nextflow.config` | n/a     | per-process resource tiers, dataset-scaled memory, retry escalation |
+| `[S08]`| runs local *or* containerized applications                                 | manual smoke test; `conda`/`modules` profiles, `environment.yml` | n/a     | container (docker/singularity) profiles still planned |
 | `[S09]`| empty input samples travel through and appear in the occurrence table      | `tests/main.nf.test`, `tests/python/test_build_filtered_contingency_table.py` | done    | —          |
 | `[S10]`| accept a directory or a list of directories (absolute or relative)         | `tests/python/test_discover_fastq.py`, `tests/bin/discover_fastq.bats`, `tests/main.nf.test` | done | —          |
 | `[S11]`| auto-discover fastq files using common name patterns                       | `tests/python/test_discover_fastq.py`, `tests/bin/discover_fastq.bats`, `tests/main.nf.test` | done | —          |
