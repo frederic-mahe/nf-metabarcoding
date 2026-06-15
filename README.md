@@ -144,10 +144,14 @@ What the `slurm` profile does:
   single-threaded `mumu` and the bash/awk/python glue stay at one
   core; `chimera_detection` reserves two (it is a
   `filtering | uchime_denovo` pipe).
-- scales the two memory-bound global steps off the dataset size:
-  `vsearch` global dereplication asks for ~1× and `swarm` fastidious
-  global clustering ~3× of `--dataset_size_gb` (fixed 16 GB / 64 GB
-  fallbacks when it is not set). On an OOM or timeout kill, a process
+- scales the memory-bound steps off `--dataset_size_gb`: `swarm`
+  fastidious global clustering asks for ~3× the dataset size (the
+  heaviest step), the other whole-dataset steps (`vsearch` global
+  dereplication, chimera detection, the all-vs-all self-search,
+  `sintax`, `mumu` and occurrence-table assembly) ~1×. The stampa
+  scatter is the exception — each chunk is fixed-size, so it stays at
+  a flat per-job request. Fixed fallbacks (16/32/64 GB) apply when
+  `--dataset_size_gb` is unset. On an OOM or timeout kill, a process
   retries up to twice with proportionally more memory and wall-time.
 - keeps the `[S49]` stampa scatter at its slurm default
   (`stampa_chunk_size = 1000`); the `local` profile sets `0` to feed
