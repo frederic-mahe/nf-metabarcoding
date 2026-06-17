@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "extract_fasta_sequences_from_occurrence_table"
-    script "main.nf"
+    script "modules/local/part_c/extract_fasta_sequences_from_occurrence_table.nf"
     process "extract_fasta_sequences_from_occurrence_table"
 
     test("emits one FASTA record per data row, reading cols 4/2/10") {

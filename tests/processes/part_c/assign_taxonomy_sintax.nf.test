@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "assign_taxonomy_sintax"
-    script "main.nf"
+    script "modules/local/part_c/assign_taxonomy_sintax.nf"
     process "assign_taxonomy_sintax"
 
     test("reshapes vsearch --sintax output: column 2 (bootstrap lineage) becomes taxonomy") {

@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "compute_majority_assignment"
-    script "main.nf"
+    script "modules/local/part_c/compute_majority_assignment.nf"
     process "compute_majority_assignment"
 
     test("recomputes a majority-rule taxonomy table from the assigned table") {
