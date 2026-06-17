@@ -16,9 +16,12 @@ are grouped in a ready-to-use occurrence table.
 ## Project layout
 
 ```
-main.nf                <- workflow definition
-nextflow.config        <- manifest, profiles
+main.nf                <- entry workflow + Part B/C standalone routers
+nextflow.config        <- manifest, parameter defaults, profiles
 nf-test.config         <- nf-test wiring
+modules/local/         <- one .nf per process; functions.nf holds the
+                          Groovy helpers (normalize_path, usage, ...)
+subworkflows/local/    <- part_a / part_b / part_c subworkflow wiring
 SPECIFICATIONS.md      <- behaviour spec (single source of truth)
 DECISIONS.md           <- open spec questions blocking [Sxx] IDs
 tests/
@@ -26,7 +29,8 @@ tests/
   COVERAGE.md          <- [Sxx] -> test mapping
   coverage-gate.sh     <- audit script (run in CI)
   main.nf.test         <- workflow-level test
-  processes/           <- one .nf.test per process in main.nf
+  functions/           <- .nf.test for the Groovy helpers
+  processes/           <- one .nf.test per process (mirrors modules/local)
   data/
     README.md          <- description of each fixture
     generate.sh        <- reproducible fixture generation

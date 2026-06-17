@@ -210,3 +210,51 @@ See README.md for examples and SPECIFICATIONS.md for the behaviour
 contract ([Sxx] IDs).
 """.stripIndent()
 }
+
+
+def validate_params() {
+    // Order-independent parameter guards, run once at the top of the
+    // entry workflow (after the --help short-circuit) so an invalid value
+    // aborts immediately with a clear message instead of surfacing as an
+    // obscure tool error mid-pipeline. Mode-specific requirements
+    // (fastq_folder / primers / reference datasets) stay inline in the
+    // entry workflow because they depend on the selected run mode.
+
+    // [S58]: validate --publish_mode before any process is wired so a
+    // typo aborts the run immediately with a clear message instead of
+    // failing on the first PublishDir attempt.
+    def allowed_modes = ['copy', 'copyNoFollow', 'link', 'move', 'rellink', 'symlink']
+    assert params.publish_mode in allowed_modes :
+        "--publish_mode must be one of ${allowed_modes}, got '${params.publish_mode}'"
+
+    // [S61]: validate --taxonomy_method up-front. Only the regular
+    // Part C path consults this flag; shadow Part C always uses sintax
+    // ([S50]).
+    def allowed_taxonomy_methods = ['stampa', 'sintax']
+    assert params.taxonomy_method in allowed_taxonomy_methods :
+        "--taxonomy_method must be one of ${allowed_taxonomy_methods}, got '${params.taxonomy_method}'"
+
+    // [S66]: majority assignment recomputes a per-OTU taxonomy from the
+    // reference accessions listed in the `references` column. Only the
+    // stampa method populates that column ([S50] leaves it at the NA
+    // placeholder), so --majority_assignment is incompatible with
+    // --taxonomy_method=sintax. Fail fast before any process is wired.
+    assert !(params.majority_assignment && params.taxonomy_method == 'sintax') :
+        "--majority_assignment requires --taxonomy_method=stampa " +
+        "(sintax leaves the references column unpopulated)"
+
+    // [S65]: validate --hash_function up-front so an unsupported hash
+    // aborts before any process is wired rather than surfacing as an
+    // obscure vsearch --relabel error mid-pipeline.
+    def allowed_hash_functions = ['sha1', 'md5']
+    assert params.hash_function in allowed_hash_functions :
+        "--hash_function must be one of ${allowed_hash_functions}, got '${params.hash_function}'"
+
+    // [S63]: validate --join_padding_length as a positive integer
+    // before any process is scheduled. Non-positive values, non-integers,
+    // and other invalid inputs would otherwise surface as a confusing
+    // vsearch error mid-pipeline.
+    def jpl = params.join_padding_length
+    assert (jpl instanceof Number) && (jpl as int) == jpl && (jpl as int) >= 1 :
+        "--join_padding_length must be a positive integer, got '${jpl}'"
+}

@@ -57,10 +57,11 @@ tests/
   COVERAGE.md       <- [Sxx] -> test mapping
   coverage-gate.sh  <- audit script (scans .nf.test, .bats, test_*.py)
   main.nf.test      <- nf-test, workflow-level smoke test
-  processes/
-    part_a/         <- one .nf.test per Part A process in main.nf
-                       (Part B/C subdirs will be added when those
-                       parts of the workflow land)
+  functions/        <- .nf.test for the Groovy helpers (functions.nf)
+  processes/        <- one .nf.test per process, mirroring
+    part_a/            modules/local/<part>/<process>.nf
+    part_b/
+    part_c/
   bin/              <- bats unit tests for bin/*.sh and bin/*.awk
   python/           <- pytest unit tests for bin/*.py (conftest.py
                        adds bin/ to sys.path)

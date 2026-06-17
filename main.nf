@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-include { normalize_path; usage } from './modules/local/functions.nf'
+include { normalize_path; usage; validate_params } from './modules/local/functions.nf'
 include { part_A } from './subworkflows/local/part_a.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
 include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_fasta.nf'
@@ -141,43 +141,10 @@ workflow {
         return
     }
 
-    // [S58]: validate --publish_mode before any process is wired so a
-    // typo aborts the run immediately with a clear message instead of
-    // failing on the first PublishDir attempt.
-    def allowed_modes = ['copy', 'copyNoFollow', 'link', 'move', 'rellink', 'symlink']
-    assert params.publish_mode in allowed_modes :
-        "--publish_mode must be one of ${allowed_modes}, got '${params.publish_mode}'"
-
-    // [S61]: validate --taxonomy_method up-front. Only the regular
-    // Part C path consults this flag; shadow Part C always uses sintax
-    // ([S50]).
-    def allowed_taxonomy_methods = ['stampa', 'sintax']
-    assert params.taxonomy_method in allowed_taxonomy_methods :
-        "--taxonomy_method must be one of ${allowed_taxonomy_methods}, got '${params.taxonomy_method}'"
-
-    // [S66]: majority assignment recomputes a per-OTU taxonomy from the
-    // reference accessions listed in the `references` column. Only the
-    // stampa method populates that column ([S50] leaves it at the NA
-    // placeholder), so --majority_assignment is incompatible with
-    // --taxonomy_method=sintax. Fail fast before any process is wired.
-    assert !(params.majority_assignment && params.taxonomy_method == 'sintax') :
-        "--majority_assignment requires --taxonomy_method=stampa " +
-        "(sintax leaves the references column unpopulated)"
-
-    // [S65]: validate --hash_function up-front so an unsupported hash
-    // aborts before any process is wired rather than surfacing as an
-    // obscure vsearch --relabel error mid-pipeline.
-    def allowed_hash_functions = ['sha1', 'md5']
-    assert params.hash_function in allowed_hash_functions :
-        "--hash_function must be one of ${allowed_hash_functions}, got '${params.hash_function}'"
-
-    // [S63]: validate --join_padding_length as a positive integer
-    // before any process is scheduled. Non-positive values, non-integers,
-    // and other invalid inputs would otherwise surface as a confusing
-    // vsearch error mid-pipeline.
-    def jpl = params.join_padding_length
-    assert (jpl instanceof Number) && (jpl as int) == jpl && (jpl as int) >= 1 :
-        "--join_padding_length must be a positive integer, got '${jpl}'"
+    // [S58]/[S61]/[S65]/[S66]/[S63]: order-independent parameter guards.
+    // Mode-specific requirements (fastq_folder / primers / reference)
+    // stay inline below because they depend on the selected run mode.
+    validate_params()
 
     // [S60]: every path-typed param is read through `normalize_path()`
     // at its use site (file(), publishDir, etc.) — see the helper at the
