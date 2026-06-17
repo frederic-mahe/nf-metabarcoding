@@ -1472,15 +1472,14 @@ workflow {
         return
     }
 
-    // forward_primer, reverse_primer, fastq_folder are required and have
-    // no default; the workflow asserts them at startup (see [S18]).
-    // [S20]: when params.no_trimming is true, forward_primer and
-    // reverse_primer must be empty and the trim_primers step is skipped.
-
-    // required parameters (no default — supply via CLI or project config)
+    // [S18]: forward_primer, reverse_primer and fastq_folder are required
+    // and have no default (supply via CLI or project config); the workflow
+    // asserts them at startup.
     assert params.fastq_folder : "--fastq_folder must be set (no default)"
 
-    // [S18]/[S20]: primers and --no_trimming are mutually exclusive
+    // [S18]/[S20]: primers and --no_trimming are mutually exclusive — when
+    // params.no_trimming is true, forward_primer and reverse_primer must be
+    // empty and the trim_primers step is skipped; otherwise both are required.
     if ( params.no_trimming ) {
         assert !params.forward_primer : "--forward_primer must be empty when --no_trimming is set"
         assert !params.reverse_primer : "--reverse_primer must be empty when --no_trimming is set"
