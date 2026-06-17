@@ -1,12 +1,12 @@
 nextflow_process {
 
     name "join_notmerged"
-    script "main.nf"
+    script "modules/local/part_a/join_notmerged.nf"
     process "join_notmerged"
 
     setup {
         run("merge_fastq_pairs") {
-            script "main.nf"
+            script "modules/local/part_a/merge_fastq_pairs.nf"
             process {
                 """
                 input[0] = tuple(

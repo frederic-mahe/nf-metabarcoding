@@ -1,12 +1,12 @@
 nextflow_process {
 
     name "list_local_clusters"
-    script "main.nf"
+    script "modules/local/part_a/list_local_clusters.nf"
     process "list_local_clusters"
 
     setup {
         run("merge_fastq_pairs") {
-            script "main.nf"
+            script "modules/local/part_a/merge_fastq_pairs.nf"
             process {
                 """
                 input[0] = tuple(
@@ -20,7 +20,7 @@ nextflow_process {
             }
         }
         run("trim_primers") {
-            script "main.nf"
+            script "modules/local/part_a/trim_primers.nf"
             process {
                 """
                 input[0] = merge_fastq_pairs.out[0]
@@ -29,7 +29,7 @@ nextflow_process {
             }
         }
         run("filter_and_convert_to_fasta") {
-            script "main.nf"
+            script "modules/local/part_a/filter_and_convert_to_fasta.nf"
             process {
                 """
                 input[0] = trim_primers.out[0]
@@ -39,7 +39,7 @@ nextflow_process {
             }
         }
         run("dereplicate_fasta") {
-            script "main.nf"
+            script "modules/local/part_a/dereplicate_fasta.nf"
             process {
                 """
                 input[0] = filter_and_convert_to_fasta.out[0]

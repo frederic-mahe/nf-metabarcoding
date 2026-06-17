@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "strip_reads"
-    script "main.nf"
+    script "modules/local/part_a/strip_reads.nf"
     process "strip_reads"
 
     test("trims params.stripright bases from the 3' end of both reads") {
