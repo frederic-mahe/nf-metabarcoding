@@ -1,12 +1,12 @@
 nextflow_process {
 
     name "fake_taxonomic_assignment"
-    script "main.nf"
+    script "modules/local/part_b/fake_taxonomic_assignment.nf"
     process "fake_taxonomic_assignment"
 
     setup {
         run("global_dereplication") {
-            script "main.nf"
+            script "modules/local/part_b/global_dereplication.nf"
             process {
                 """
                 input[0] = [
@@ -19,7 +19,7 @@ nextflow_process {
             }
         }
         run("global_clustering") {
-            script "main.nf"
+            script "modules/local/part_b/global_clustering.nf"
             process {
                 """
                 input[0] = global_dereplication.out[0]

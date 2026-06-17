@@ -1,12 +1,12 @@
 nextflow_process {
 
     name "cleaving"
-    script "main.nf"
+    script "modules/local/part_b/cleaving.nf"
     process "cleaving"
 
     setup {
         run("list_all_cluster_seeds_of_size_greater_than_2") {
-            script "main.nf"
+            script "modules/local/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf"
             process {
                 """
                 input[0] = [
@@ -19,7 +19,7 @@ nextflow_process {
             }
         }
         run("global_dereplication") {
-            script "main.nf"
+            script "modules/local/part_b/global_dereplication.nf"
             process {
                 """
                 input[0] = [
@@ -32,7 +32,7 @@ nextflow_process {
             }
         }
         run("global_clustering") {
-            script "main.nf"
+            script "modules/local/part_b/global_clustering.nf"
             process {
                 """
                 input[0] = global_dereplication.out[0]

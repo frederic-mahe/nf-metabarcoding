@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "global_dereplication"
-    script "main.nf"
+    script "modules/local/part_b/global_dereplication.nf"
     process "global_dereplication"
 
     test("collapses identical sequences across samples and sums sizes") {

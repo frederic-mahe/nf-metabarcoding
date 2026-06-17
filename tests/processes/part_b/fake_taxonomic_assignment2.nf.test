@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "fake_taxonomic_assignment2"
-    script "main.nf"
+    script "modules/local/part_b/fake_taxonomic_assignment2.nf"
     process "fake_taxonomic_assignment2"
 
     test("emits one placeholder row per cleaved representative") {

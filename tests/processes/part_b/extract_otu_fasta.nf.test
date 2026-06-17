@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "extract_otu_fasta"
-    script "main.nf"
+    script "modules/local/part_b/extract_otu_fasta.nf"
     process "extract_otu_fasta"
 
     test("emits one FASTA record per row, using cols 4 (amplicon), 2 (size), 10 (sequence)") {

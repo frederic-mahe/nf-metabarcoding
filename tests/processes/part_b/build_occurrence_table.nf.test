@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "build_occurrence_table"
-    script "main.nf"
+    script "modules/local/part_b/build_occurrence_table.nf"
     process "build_occurrence_table"
 
     test("merges Part B inputs into the filtered occurrence table") {

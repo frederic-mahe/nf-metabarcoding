@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "trim_metadata_for_mumu"
-    script "main.nf"
+    script "modules/local/part_b/trim_metadata_for_mumu.nf"
     process "trim_metadata_for_mumu"
 
     test("keeps the amplicon column + every sample column") {

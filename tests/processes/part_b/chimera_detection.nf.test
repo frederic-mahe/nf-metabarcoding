@@ -1,12 +1,12 @@
 nextflow_process {
 
     name "chimera_detection"
-    script "main.nf"
+    script "modules/local/part_b/chimera_detection.nf"
     process "chimera_detection"
 
     setup {
         run("global_dereplication") {
-            script "main.nf"
+            script "modules/local/part_b/global_dereplication.nf"
             process {
                 """
                 input[0] = [
@@ -19,7 +19,7 @@ nextflow_process {
             }
         }
         run("global_clustering") {
-            script "main.nf"
+            script "modules/local/part_b/global_clustering.nf"
             process {
                 """
                 input[0] = global_dereplication.out[0]

@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "merge_substring_otus"
-    script "main.nf"
+    script "modules/local/part_b/merge_substring_otus.nf"
     process "merge_substring_otus"
 
     test("merges pupil OTUs onto masters, sorts, conserves the read count") {

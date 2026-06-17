@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "list_all_cluster_seeds_of_size_greater_than_2"
-    script "main.nf"
+    script "modules/local/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf"
     process "list_all_cluster_seeds_of_size_greater_than_2"
 
     test("prepends sample ID to every row of every input .stats") {

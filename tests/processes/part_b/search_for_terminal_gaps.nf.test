@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "search_for_terminal_gaps"
-    script "main.nf"
+    script "modules/local/part_b/search_for_terminal_gaps.nf"
     process "search_for_terminal_gaps"
 
     test("emits ^H lines from a self-clustering uc stream") {

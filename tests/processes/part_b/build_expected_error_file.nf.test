@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "build_expected_error_file"
-    script "main.nf"
+    script "modules/local/part_b/build_expected_error_file.nf"
     process "build_expected_error_file"
 
     test("merges per-sample .qual files and uniqs by SHA1") {

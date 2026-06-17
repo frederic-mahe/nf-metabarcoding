@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "find_similar_sequences"
-    script "main.nf"
+    script "modules/local/part_b/find_similar_sequences.nf"
     process "find_similar_sequences"
 
     test("vsearch --usearch_global self-search; ;size= stripped from output") {

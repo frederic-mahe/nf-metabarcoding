@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "run_mumu"
-    script "main.nf"
+    script "modules/local/part_b/run_mumu.nf"
     process "run_mumu"
 
     test("invokes mumu >=1.1.1 and emits new_otu_table + log") {

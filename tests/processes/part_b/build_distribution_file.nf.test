@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "build_distribution_file"
-    script "main.nf"
+    script "modules/local/part_b/build_distribution_file.nf"
     process "build_distribution_file"
 
     test("emits <sha1>\\t<sampleId>\\t<size> per fasta record") {

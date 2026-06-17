@@ -1,12 +1,12 @@
 nextflow_process {
 
     name "global_clustering"
-    script "main.nf"
+    script "modules/local/part_b/global_clustering.nf"
     process "global_clustering"
 
     setup {
         run("global_dereplication") {
-            script "main.nf"
+            script "modules/local/part_b/global_dereplication.nf"
             process {
                 """
                 input[0] = [
