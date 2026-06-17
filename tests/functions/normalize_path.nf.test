@@ -1,7 +1,7 @@
 nextflow_function {
 
     name "normalize_path"
-    script "main.nf"
+    script "modules/local/functions.nf"
     function "normalize_path"
 
     test("null in, null out") {
