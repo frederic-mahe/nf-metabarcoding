@@ -14,7 +14,7 @@ process assign_taxonomy_stampa {
     path reference_dataset
 
     output:
-    path "stampa_chunk.tsv"
+    path "stampa_chunk.tsv", emit: taxonomy
 
     shell:
     '''

@@ -34,7 +34,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def chunk_tsv = process.out[0].get(0)
+            def chunk_tsv = process.out.taxonomy.get(0)
             assert chunk_tsv.endsWith("stampa_chunk.tsv") :
                 "expected stampa_chunk.tsv, got: ${chunk_tsv}"
             def rows = path(chunk_tsv).readLines()
@@ -80,7 +80,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def chunk_tsv = process.out[0].get(0)
+            def chunk_tsv = process.out.taxonomy.get(0)
             def rows = path(chunk_tsv).readLines()
             assert rows.size() == 1
             def fields = rows[0].split("\t", -1)
@@ -120,7 +120,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def chunk_tsv = process.out[0].get(0)
+            def chunk_tsv = process.out.taxonomy.get(0)
             def rows = path(chunk_tsv).readLines()
             assert rows.size() == 1
             def fields = rows[0].split("\t", -1)

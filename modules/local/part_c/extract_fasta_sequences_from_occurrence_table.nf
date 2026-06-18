@@ -7,7 +7,7 @@ process extract_fasta_sequences_from_occurrence_table {
     path occurrence_table
 
     output:
-    path "${occurrence_table.baseName}_representatives.fas"
+    path "${occurrence_table.baseName}_representatives.fas", emit: fasta
 
     shell:
     '''

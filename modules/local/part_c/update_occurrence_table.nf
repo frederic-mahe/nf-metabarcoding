@@ -15,7 +15,7 @@ process update_occurrence_table {
     val basename
 
     output:
-    path "${basename}_table_assigned.tsv"
+    path "${basename}_table_assigned.tsv", emit: table
 
     shell:
     '''

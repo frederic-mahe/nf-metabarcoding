@@ -66,10 +66,10 @@ workflow part_B {
 
     // Re-cleave clusters using the per-sample stats ([S22]).
     cleaving(
-        global_clustering.out.stats,         // .stats
-        global_clustering.out.struct,        // .struct
-        global_clustering.out.swarms,        // .swarms
-        global_dereplication.out.fasta,      // global .fas
+        global_clustering.out.stats,
+        global_clustering.out.struct,
+        global_clustering.out.swarms,
+        global_dereplication.out.fasta,
         list_all_cluster_seeds_of_size_greater_than_2.out.stats,
         basename
     )
@@ -77,26 +77,26 @@ workflow part_B {
     // [S36]/[S37]: post-cleave taxonomy + chimera annotations.
     fake_taxonomic_assignment2(cleaving.out.representatives, basename)
     chimera_detection_post_cleave(
-        global_clustering.out.representatives,    // pre-cleave reps
-        cleaving.out.representatives,             // cleaved reps (fas2)
-        chimera_detection.out.log,               // pre-cleave stderr ([S45])
+        global_clustering.out.representatives,
+        cleaving.out.representatives,
+        chimera_detection.out.log,
         basename
     )
 
     // [S35]: assemble the filtered occurrence table.
     build_occurrence_table(
-        global_clustering.out.representatives,    // _1f_representatives.fas
-        cleaving.out.representatives,             // _1f_representatives.fas2
-        global_clustering.out.stats,             // _1f.stats
-        cleaving.out.stats,                      // _1f.stats2
-        global_clustering.out.swarms,            // _1f.swarms
-        cleaving.out.swarms,                     // _1f.swarms2
-        chimera_detection.out.uchime,            // _1f_representatives.uchime
-        chimera_detection_post_cleave.out.uchime,           // _1f_representatives.uchime2
-        build_expected_error_file.out.qual,      // .qual
-        fake_taxonomic_assignment.out.results,   // _1f_representatives.results
-        fake_taxonomic_assignment2.out.results,  // _1f_representatives.results2
-        build_distribution_file.out.distr,       // .distr
+        global_clustering.out.representatives,
+        cleaving.out.representatives,
+        global_clustering.out.stats,
+        cleaving.out.stats,
+        global_clustering.out.swarms,
+        cleaving.out.swarms,
+        chimera_detection.out.uchime,
+        chimera_detection_post_cleave.out.uchime,
+        build_expected_error_file.out.qual,
+        fake_taxonomic_assignment.out.results,
+        fake_taxonomic_assignment2.out.results,
+        build_distribution_file.out.distr,
         basename,
         sample_ids,                          // [S09]
     )
@@ -107,8 +107,8 @@ workflow part_B {
     search_for_terminal_gaps(build_occurrence_table.out.table)
     merge_substring_otus(
         build_occurrence_table.out.table,
-        search_for_terminal_gaps.out.uc,   // .uc hits
-        search_for_terminal_gaps.out.log,  // vsearch search.log
+        search_for_terminal_gaps.out.uc,
+        search_for_terminal_gaps.out.log,
         basename,
     )
 
@@ -165,10 +165,10 @@ workflow part_B_shadow {
     chimera_detection(representatives, basename)
 
     cleaving(
-        global_clustering.out.stats,         // .stats
-        global_clustering.out.struct,        // .struct
-        global_clustering.out.swarms,        // .swarms
-        global_dereplication.out.fasta,      // global .fas
+        global_clustering.out.stats,
+        global_clustering.out.struct,
+        global_clustering.out.swarms,
+        global_dereplication.out.fasta,
         list_all_cluster_seeds_of_size_greater_than_2.out.stats,
         basename
     )

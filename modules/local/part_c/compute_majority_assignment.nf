@@ -20,7 +20,7 @@ process compute_majority_assignment {
     val basename
 
     output:
-    path "${basename}_table_assigned_majority.tsv"
+    path "${basename}_table_assigned_majority.tsv", emit: table
 
     shell:
     '''
