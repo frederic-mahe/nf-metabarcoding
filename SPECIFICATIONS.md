@@ -1194,6 +1194,58 @@ from placeholder values to real taxonomic assignments.
     identical.
 
 
+## Input samplesheet
+
+- `[S70]` `--input <samplesheet.csv>` is the primary, validated way to
+  declare samples: a header-keyed CSV in one of two profiles, selected
+  by the columns present.
+    - **fastq profile** (Part A) — columns `sample`, `fastq_1`,
+      `fastq_2` (optional), `run` (optional). One row per sample; an
+      empty `fastq_2` marks a single-end sample (merging skipped,
+      [S21]). `run` is an optional batch label carried through as
+      provenance only (no behavioural effect yet).
+    - **fasta profile** (Part B standalone) — columns `sample`,
+      `fasta`, `qual` (optional), `stats` (optional). `qual` / `stats`
+      default to the `<fasta-dir>/<sample>.{qual,stats}` siblings when
+      omitted. A `sample` ending in `notmerged` routes the row to the
+      shadow Part B path ([S56]).
+  Structural validation runs at startup, before any process, in
+  `bin/parse_samplesheet.py`, which aborts **naming the offending row
+  and column** when: the header is missing a required column or carries
+  an unknown one; the profile cannot be inferred (neither `fastq_1` nor
+  `fasta` present); a required cell is empty; two rows share a `sample`
+  ([S13] / [S14]); or (fastq profile) a `sample` ends in the reserved
+  `notmerged` suffix ([S23]). Path cells are `~`-expanded ([S60]);
+  relative paths resolve against the launch directory (Nextflow's
+  default). The existence of each listed file is enforced downstream by
+  Nextflow's `file(..., checkIfExists: true)` when the row is staged (a
+  missing file aborts the run, naming the path). Empty fastq / fasta
+  inputs are allowed and travel through to the occurrence table ([S09]).
+  Files referenced by the samplesheet are declared `file()` inputs, so
+  Nextflow stages them and `-resume` sees a change to the samplesheet
+  or any listed file.
+
+  `--input` is mutually exclusive with the folder-scan inputs
+  (`--fastq_folder` / `--fasta_folder`); setting `--input` together
+  with either aborts at startup. The folder-scan inputs keep their
+  [S10] multi-folder and [S11] / [S12] pattern-table semantics and
+  auto-generate the same internal per-sample channel, but do not give
+  `-resume` the same guarantee (a file added to a scanned folder is not
+  seen unless the folder set changes); `--input` is recommended for
+  reproducible runs. Dispatch ([S02]) gains `--input`, with the entry
+  point (Part A vs Part B standalone) selected by the active profile.
+  - **Pass when:** `bin/parse_samplesheet.py` unit tests cover, per
+    profile — a valid sheet → normalized rows; a missing required
+    column; an unknown column; an un-inferrable profile; a duplicate
+    `sample` (error lists both rows); a reserved `notmerged` sample
+    (fastq profile); an empty required cell; a single-end row (empty
+    `fastq_2`); and sibling `qual` / `stats` defaulting (fasta
+    profile). [Workflow wiring — `--input` dispatch, mutual exclusion,
+    and an end-to-end `--input` run matching the equivalent
+    `--fastq_folder` run — is the remaining D06 work, tracked in
+    DECISIONS.md.]
+
+
 ## Dependencies
 
 In addition to the upstream-tested tools used by Part A
