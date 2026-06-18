@@ -290,11 +290,31 @@ Until D06 lands the discovery processes stay as-is; the current
 
 ## D07 — Shadow Part C standalone toggle: parse-time disk probe vs channel
 
-**Revises on resolution:** `[S62]` (and the shadow probe at
-`main.nf:52-55`)
-**Status:** `proposed` — **option 2 selected (2026-06-18); spec + code pending**
+**Revises:** `[S62]` (replaced the parse-time shadow probe in
+`workflow part_c`, `main.nf`)
+**Status:** `resolved` — option 2 (2026-06-18)
 
-`[S62]` specifies that standalone Part C decides whether to run the
+**Resolution (2026-06-18):** option 2. Replaced the
+`shadow_table_path.exists()` parse-time branch with channel logic:
+`part_C_shadow` is wired unconditionally whenever
+`--reference_dataset_sintax` is set (a param/config check), and the
+sibling is routed through
+`Channel.fromPath(..., checkIfExists: false).filter { it.exists() }`,
+which empties at runtime when the sibling is absent so the branch
+self-suppresses. The DAG shape now depends only on the parameter, not
+on head-node disk state at parse time. `[S62]` was reworded to match.
+
+Note: `Channel.fromPath` on a literal **absent** path with
+`checkIfExists: false` phantom-emits the path (it does *not* yield an
+empty channel), so the runtime `.filter { it.exists() }` is required —
+verified empirically before wiring. The existing `[S62]` tests (sibling
+present + sintax ref; sintax ref set + no sibling; no sibling, no
+sintax ref) are unchanged and stay green; the "sintax ref set + no
+sibling" case is the regression guard for the new empty-channel path.
+
+The original analysis follows, for the record.
+
+`[S62]` specified that standalone Part C decides whether to run the
 shadow path by testing `shadow_table_path.exists()` **at workflow-build
 time** (`main.nf:48-55`), and branches the DAG topology on the result.
 The DAG shape therefore depends on head-node disk state at parse time:

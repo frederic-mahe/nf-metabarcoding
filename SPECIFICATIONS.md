@@ -998,7 +998,7 @@ from placeholder values to real taxonomic assignments.
     `--taxonomy_method sintax` without
     `--reference_dataset_sintax` aborts with a clear message.
 - `[S62]` In Part C **standalone mode** (`--occurrence_table
-  /path/to/<basename>_table.tsv`), the workflow probes for a
+  /path/to/<basename>_table.tsv`), the workflow looks for a
   shadow occurrence-table sibling at
   `<dirname>/<basename>_notmerged_table.tsv`. If that file
   exists **and** `--reference_dataset_sintax` is set ([S64]),
@@ -1012,6 +1012,16 @@ from placeholder values to real taxonomic assignments.
   published — no error. There is no boolean CLI flag to opt in or
   out: the presence of the sibling file **and** the sintax
   reference together are the toggle.
+
+  The sibling toggle is expressed as **channel logic, not a
+  parse-time disk probe** (D07): `part_C_shadow` is wired
+  unconditionally whenever `--reference_dataset_sintax` is set (a
+  config check), and the sibling is fed through a staged
+  `Channel.fromPath(..., checkIfExists: false).filter { it.exists() }`
+  that empties at runtime when the file is absent, so the branch
+  self-suppresses. The DAG shape therefore depends only on the
+  parameter, never on head-node disk state at parse time — keeping
+  `-resume` correct and the workflow remote-`results_folder` safe.
   - **Pass when:** running Part C standalone with
     `<basename>_table.tsv`, `<basename>_notmerged_table.tsv`, and
     `--reference_dataset_sintax` set publishes both

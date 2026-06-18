@@ -40,21 +40,23 @@ workflow part_c {
 
     part_C(table_ch, basename_ch)
 
-    // [S62]/[S64]: probe for a shadow sibling next to the input
-    // table. The file lookup is done at workflow-build time (not
-    // inside a channel operator) so the toggle is "the file exists on
-    // disk now". When the sibling is present **and**
-    // --reference_dataset_sintax is set, route the sibling through
-    // part_C_shadow alongside the regular part_C invocation — DSL2
-    // allows two distinct sub-workflows in the same scope. When
-    // either condition is unmet, the shadow workflow is simply not
-    // invoked.
-    def shadow_table_path = file(
-        "${table_path.parent}/${derived_basename}_notmerged_table.tsv"
-    )
-    if ( shadow_table_path.exists() && params.reference_dataset_sintax ) {
+    // [S62]/[S64]/D07: route the shadow sibling through a staged
+    // channel instead of a parse-time disk probe. part_C_shadow is
+    // wired unconditionally, so the DAG shape no longer depends on
+    // head-node disk state at parse time; a runtime
+    // `.filter { it.exists() }` empties the channel when the
+    // <basename>_notmerged_table.tsv sibling is absent, so the branch
+    // self-suppresses (no work, no output). The
+    // --reference_dataset_sintax gate is a param check (config, not
+    // disk state), so it stays an `if`.
+    if ( params.reference_dataset_sintax ) {
+        def shadow_table_ch = Channel
+            .fromPath(
+                "${table_path.parent}/${derived_basename}_notmerged_table.tsv",
+                checkIfExists: false
+            )
+            .filter { it.exists() }
         def shadow_basename_ch = Channel.value("${derived_basename}_notmerged")
-        def shadow_table_ch    = Channel.fromPath(shadow_table_path.toString())
         part_C_shadow(shadow_table_ch, shadow_basename_ch)
     }
 }
