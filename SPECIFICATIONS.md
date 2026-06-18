@@ -409,10 +409,11 @@ the latter case.
     every Part B artefact filename begins with the supplied value.
 - `[S26]` Part B requires `--results_folder` (no default). The
   value is an absolute or relative path to the folder where Part B
-  publishes every artefact. The workflow creates the folder (and
-  any missing parent directories) at startup if it does not exist;
-  an existing folder is reused as-is. Like `[S25]`, this parameter
-  is **only** required for Part B.
+  publishes every artefact. Nextflow's `publishDir` materialises the
+  folder (and any missing parent directories) on first publish; the
+  workflow performs no filesystem I/O at parse time (D08). An existing
+  folder is reused as-is. Like `[S25]`, this parameter is **only**
+  required for Part B.
   - **Pass when:** running Part B with `--results_folder` set to a
     non-existent absolute or relative path succeeds, creates the
     folder, and every Part B artefact lands inside it.

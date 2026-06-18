@@ -27,9 +27,9 @@ workflow part_c {
     assert params.results_folder :
         "--results_folder must be set when running Part C"
 
-    def results_dir = new File(normalize_path(params.results_folder).toString())
-    results_dir.mkdirs()
-
+    // [S26]/D08: no startup mkdirs — publishDir materialises
+    // results_folder (and any missing parents) on first publish, so the
+    // workflow does no filesystem I/O at parse time.
     // [S68]: record tool versions alongside the Part C outputs.
     dump_software_versions()
 
@@ -79,11 +79,9 @@ workflow part_b {
     assert params.results_folder :
         "--results_folder must be set when --fasta_folder is set"
 
-    // [S26]: create the results folder (and any missing parents)
-    // before anything publishes into it.
-    def results_dir = new File(normalize_path(params.results_folder).toString())
-    results_dir.mkdirs()
-
+    // [S26]/D08: no startup mkdirs — publishDir materialises
+    // results_folder (and any missing parents) on first publish, so the
+    // workflow does no filesystem I/O at parse time.
     // [S68]: record tool versions alongside the Part B outputs.
     dump_software_versions()
 
@@ -211,9 +209,9 @@ workflow {
     if ( params.project_name ) {
         assert params.results_folder :
             "--results_folder must be set when --project_name is set"
-        def results_dir = new File(normalize_path(params.results_folder).toString())
-        results_dir.mkdirs()
-
+        // [S26]/D08: no startup mkdirs — publishDir materialises
+        // results_folder (and any missing parents) on first publish, so
+        // the workflow does no filesystem I/O at parse time.
         // [S68]: record tool versions alongside the Part B / Part C outputs.
         dump_software_versions()
 

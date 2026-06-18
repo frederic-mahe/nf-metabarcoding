@@ -324,12 +324,27 @@ The current `[S62]` test stays green until the reword lands.
 
 ## D08 — Results-folder creation: build-time `mkdirs()` vs `publishDir`
 
-**Revises on resolution:** `[S26]` (and the `new File(...).mkdirs()`
-calls at `main.nf:31`, `:85`, `:215`)
-**Status:** `proposed`
+**Revises:** `[S26]` (removed the `new File(...).mkdirs()` calls from
+the three workflow-body sites in `main.nf`)
+**Status:** `resolved` — option 2 (2026-06-18)
 
-`[S26]` mandates that the workflow "creates the folder (and any missing
-parent directories) at startup." It is implemented as side-effecting
+**Resolution (2026-06-18):** option 2. Dropped the three
+`results_dir.mkdirs()` calls from the workflow body; `publishDir`
+creates the results folder (and any missing parents) on first publish,
+so the workflow performs no filesystem I/O at parse time. `[S26]` was
+reworded to match. The `[S26]` integration test
+(`tests/main.nf.test`, "Part B standalone …") is unchanged and stays
+green — its `file(resultDir).exists()` assertion holds because the run
+publishes artefacts into the folder, which `publishDir` materialises.
+No new test was added: the change is behaviour-preserving by design (it
+swaps the creation mechanism, not the observable contract), and the
+existing test is the regression guard. The required-param assert
+(`assert params.results_folder`) is untouched.
+
+The original analysis follows, for the record.
+
+`[S26]` mandated that the workflow "creates the folder (and any missing
+parent directories) at startup." It was implemented as side-effecting
 `java.io.File.mkdirs()` in the workflow body (three sites). Build-time
 filesystem I/O runs on the head node only, so it breaks for a remote /
 object-store `--results_folder` and is non-idiomatic — Nextflow's
