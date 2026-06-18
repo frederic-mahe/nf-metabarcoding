@@ -1,17 +1,24 @@
-# [S08]: bioconda environment for the four external tools used by the
+# [S08]: bioconda environment for the external tools used by the
 # workflow, plus a Python interpreter for bin/*.py (standard library
 # only — no pip dependencies). Used by the `conda` profile in
-# nextflow.config. vsearch and mumu carry explicit minimum versions
-# (mumu >= 1.1.1 is required by SPECIFICATIONS; vsearch >= 2.31.0);
-# swarm/cutadapt/python are pinned and should be bumped deliberately,
-# not implicitly.
+# nextflow.config.
+#
+# [S69]: every tool is pinned to an EXACT version (never a floating
+# `>=`) so the byte-exact characterization tests stay reproducible, and
+# these pins must match the versions the CI workflow installs
+# (.github/workflows/test.yml). Bump deliberately, in both files at
+# once.
+#
+# mumu is NOT distributed on bioconda — it is built from source (see the
+# CI workflow and README) and must be on PATH. It is deliberately absent
+# here so the `conda` profile does not advertise a package it cannot
+# resolve.
 name: nf-metabarcoding
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bioconda::swarm=3.1.5
-  - bioconda::vsearch>=2.31.0
-  - bioconda::cutadapt=4.9
-  - bioconda::mumu>=1.1.1
-  - conda-forge::python=3.11
+  - bioconda::swarm=3.1.6
+  - bioconda::vsearch=2.31.0
+  - bioconda::cutadapt=5.2
+  - conda-forge::python=3.12

@@ -34,9 +34,9 @@ jobs:
           environment-name: nfmb
           create-args: >-
             -c bioconda -c conda-forge
-            vsearch>=2.31
-            cutadapt>=5
-            swarm>=3
+            vsearch=2.31.0
+            cutadapt=5.2
+            swarm=3.1.6
 
       - name: Install mumu (not on bioconda; requires gcc >= 11 or clang >= 17)
         run: |
