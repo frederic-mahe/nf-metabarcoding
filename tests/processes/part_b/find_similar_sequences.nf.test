@@ -27,7 +27,7 @@ ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGA
         }
         then {
             assert process.success
-            def out = process.out[0].get(0)
+            def out = process.out.matches.get(0)
             assert out.endsWith(".match_list")
             def lines = path(out).readLines()
             // self-search → expect at least one similarity hit
@@ -74,7 +74,7 @@ ACGAACTAACGAACGTAGGGAGGAACGTAGCTACGAAGGTACGTACGAACAT
         }
         then {
             assert process.success
-            def lines = path(process.out[0].get(0)).readLines()
+            def lines = path(process.out.matches.get(0)).readLines()
             // amp1 ↔ amp2 survives in both directions; amp3 is below
             // 0.84 → absent. Collect only the query/target columns
             // (cols 0 and 1) — the identity column is a float string,

@@ -20,11 +20,11 @@ process global_clustering {
     val basename
 
     output:
-    path "${basename}_${params.fastidious ? '1f' : '1'}.swarms"
-    path "${basename}_${params.fastidious ? '1f' : '1'}.stats"
-    path "${basename}_${params.fastidious ? '1f' : '1'}.struct"
-    path "${basename}_${params.fastidious ? '1f' : '1'}_representatives.fas"
-    path "${basename}_clustering.log"
+    path "${basename}_${params.fastidious ? '1f' : '1'}.swarms",              emit: swarms
+    path "${basename}_${params.fastidious ? '1f' : '1'}.stats",               emit: stats
+    path "${basename}_${params.fastidious ? '1f' : '1'}.struct",              emit: struct
+    path "${basename}_${params.fastidious ? '1f' : '1'}_representatives.fas", emit: representatives
+    path "${basename}_clustering.log",                                        emit: log
 
     shell:
     def sfx = params.fastidious ? '1f' : '1'

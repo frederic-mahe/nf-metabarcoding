@@ -23,7 +23,7 @@ nextflow_process {
             assert process.success
 
             // Output fasta is the first emitted path.
-            def fastaPath = process.out[0].get(0)
+            def fastaPath = process.out.fasta.get(0)
             assert fastaPath.endsWith("proj_3_samples.fas") :
                 "unexpected fasta output: ${fastaPath}"
 
@@ -47,7 +47,7 @@ nextflow_process {
 
             // log file is the second emitted path; [S45] pins the
             // step-specific suffix.
-            def logPath = process.out[1].get(0)
+            def logPath = process.out.log.get(0)
             assert logPath.endsWith("proj_3_samples_dereplication.log") :
                 "unexpected log filename: ${logPath}"
             assert path(logPath).readLines().size() > 0 :
@@ -74,7 +74,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def lines = path(process.out[0].get(0)).readLines()
+            def lines = path(process.out.fasta.get(0)).readLines()
             if (lines.size() == 0) {
                 return
             }

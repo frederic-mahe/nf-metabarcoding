@@ -21,7 +21,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def lines = path(process.out[0].get(0)).readLines()
+            def lines = path(process.out.fasta.get(0)).readLines()
             // The zero-abundance row (amp2) is dropped; only amp1
             // survives → 2 lines (header + sequence).
             assert lines.size() == 2

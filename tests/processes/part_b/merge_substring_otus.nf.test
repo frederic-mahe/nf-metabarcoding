@@ -21,7 +21,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def out = process.out[0].get(0)
+            def out = process.out.table.get(0)
             assert out.endsWith(".nosubstringOTUs.table")
 
             // The substring-merged table is sorted by the OTU
@@ -37,7 +37,7 @@ nextflow_process {
 
             // [S45]: combined superstring_clustering log = vsearch
             // search log + python/invariant stderr.
-            def log = process.out[1].get(0)
+            def log = process.out.log.get(0)
             assert log.endsWith("proj_3_samples_superstring_clustering.log")
             def logText = path(log).text
             assert logText.contains("search_for_terminal_gaps")

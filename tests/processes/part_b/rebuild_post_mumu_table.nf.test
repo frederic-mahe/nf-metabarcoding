@@ -18,7 +18,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def out = process.out[0].get(0)
+            def out = process.out.table.get(0)
             // [S46]: the final occurrence table uses the project-wide
             // basename construct + `_table.tsv` suffix.
             assert out.endsWith("proj_3_samples_table.tsv")

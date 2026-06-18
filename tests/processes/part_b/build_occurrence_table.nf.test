@@ -42,7 +42,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def outPath = process.out[0].get(0)
+            def outPath = process.out.table.get(0)
             assert outPath.endsWith("proj.OTU.filtered.cleaved.table") :
                 "unexpected output filename: ${outPath}"
             // The fixture concatenated with itself doubles every row,

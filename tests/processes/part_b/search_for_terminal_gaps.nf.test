@@ -31,7 +31,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def uc = process.out[0].get(0)
+            def uc = process.out.uc.get(0)
             assert uc.endsWith("table.uc")
             def lines = path(uc).readLines()
             // Every output line is an `H` row.
@@ -46,7 +46,7 @@ nextflow_process {
             // [S45]: vsearch --log captures the search step's stderr;
             // merge_substring_otus consumes it to build the combined
             // superstring_clustering log.
-            def searchLog = process.out[1].get(0)
+            def searchLog = process.out.log.get(0)
             assert searchLog.endsWith("search.log")
             assert path(searchLog).readLines().size() > 0
         }

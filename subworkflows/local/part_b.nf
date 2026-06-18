@@ -57,46 +57,46 @@ workflow part_B {
     build_distribution_file(fasta_list, basename)
     list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
     global_dereplication(fasta_list, basename)
-    global_clustering(global_dereplication.out[0], basename)
+    global_clustering(global_dereplication.out.fasta, basename)
 
     // Placeholder taxonomy + chimera flag run in parallel — both
     // consume only the swarm representatives ([S33]/[S34]).
-    fake_taxonomic_assignment(global_clustering.out[3], basename)
-    chimera_detection(global_clustering.out[3], basename)
+    fake_taxonomic_assignment(global_clustering.out.representatives, basename)
+    chimera_detection(global_clustering.out.representatives, basename)
 
     // Re-cleave clusters using the per-sample stats ([S22]).
     cleaving(
-        global_clustering.out[1],            // .stats
-        global_clustering.out[2],            // .struct
-        global_clustering.out[0],            // .swarms
-        global_dereplication.out[0],         // global .fas
-        list_all_cluster_seeds_of_size_greater_than_2.out[0],
+        global_clustering.out.stats,         // .stats
+        global_clustering.out.struct,        // .struct
+        global_clustering.out.swarms,        // .swarms
+        global_dereplication.out.fasta,      // global .fas
+        list_all_cluster_seeds_of_size_greater_than_2.out.stats,
         basename
     )
 
     // [S36]/[S37]: post-cleave taxonomy + chimera annotations.
-    fake_taxonomic_assignment2(cleaving.out[2], basename)
+    fake_taxonomic_assignment2(cleaving.out.representatives, basename)
     chimera_detection_post_cleave(
-        global_clustering.out[3],            // pre-cleave reps
-        cleaving.out[2],                     // cleaved reps (fas2)
-        chimera_detection.out[1],            // pre-cleave stderr ([S45])
+        global_clustering.out.representatives,    // pre-cleave reps
+        cleaving.out.representatives,             // cleaved reps (fas2)
+        chimera_detection.out.log,               // pre-cleave stderr ([S45])
         basename
     )
 
     // [S35]: assemble the filtered occurrence table.
     build_occurrence_table(
-        global_clustering.out[3],            // _1f_representatives.fas
-        cleaving.out[2],                     // _1f_representatives.fas2
-        global_clustering.out[1],            // _1f.stats
-        cleaving.out[0],                     // _1f.stats2
-        global_clustering.out[0],            // _1f.swarms
-        cleaving.out[1],                     // _1f.swarms2
-        chimera_detection.out[0],            // _1f_representatives.uchime
-        chimera_detection_post_cleave.out[0],           // _1f_representatives.uchime2
-        build_expected_error_file.out[0],    // .qual
-        fake_taxonomic_assignment.out[0],    // _1f_representatives.results
-        fake_taxonomic_assignment2.out[0],   // _1f_representatives.results2
-        build_distribution_file.out[0],      // .distr
+        global_clustering.out.representatives,    // _1f_representatives.fas
+        cleaving.out.representatives,             // _1f_representatives.fas2
+        global_clustering.out.stats,             // _1f.stats
+        cleaving.out.stats,                      // _1f.stats2
+        global_clustering.out.swarms,            // _1f.swarms
+        cleaving.out.swarms,                     // _1f.swarms2
+        chimera_detection.out.uchime,            // _1f_representatives.uchime
+        chimera_detection_post_cleave.out.uchime,           // _1f_representatives.uchime2
+        build_expected_error_file.out.qual,      // .qual
+        fake_taxonomic_assignment.out.results,   // _1f_representatives.results
+        fake_taxonomic_assignment2.out.results,  // _1f_representatives.results2
+        build_distribution_file.out.distr,       // .distr
         basename,
         sample_ids,                          // [S09]
     )
@@ -104,26 +104,26 @@ workflow part_B {
     // [S38]/[S39]: collapse sub- and super-string OTUs. The combined
     // vsearch + python step emits <basename>_superstring_clustering.log
     // ([S45]).
-    search_for_terminal_gaps(build_occurrence_table.out[0])
+    search_for_terminal_gaps(build_occurrence_table.out.table)
     merge_substring_otus(
-        build_occurrence_table.out[0],
-        search_for_terminal_gaps.out[0],   // .uc hits
-        search_for_terminal_gaps.out[1],   // vsearch search.log
+        build_occurrence_table.out.table,
+        search_for_terminal_gaps.out.uc,   // .uc hits
+        search_for_terminal_gaps.out.log,  // vsearch search.log
         basename,
     )
 
     // [S40]–[S44]: mumu (ex-lulu) post-clustering filter pass.
-    extract_otu_fasta(merge_substring_otus.out[0])
-    trim_metadata_for_mumu(merge_substring_otus.out[0])
-    find_similar_sequences(extract_otu_fasta.out[0])
-    run_mumu(trim_metadata_for_mumu.out[0], find_similar_sequences.out[0], basename)
-    rebuild_post_mumu_table(run_mumu.out[0], merge_substring_otus.out[0], basename)
-    extract_mumu_fasta(rebuild_post_mumu_table.out[0])
+    extract_otu_fasta(merge_substring_otus.out.table)
+    trim_metadata_for_mumu(merge_substring_otus.out.table)
+    find_similar_sequences(extract_otu_fasta.out.fasta)
+    run_mumu(trim_metadata_for_mumu.out.table, find_similar_sequences.out.matches, basename)
+    rebuild_post_mumu_table(run_mumu.out.table, merge_substring_otus.out.table, basename)
+    extract_mumu_fasta(rebuild_post_mumu_table.out.table)
 
     emit:
     // [S46] final occurrence table — consumed by part_C when Part B
     // and Part C run end-to-end.
-    table = rebuild_post_mumu_table.out[0]
+    table = rebuild_post_mumu_table.out.table
 }
 
 
@@ -158,60 +158,60 @@ workflow part_B_shadow {
     list_all_cluster_seeds_of_size_greater_than_2(stats_list, basename)
     global_dereplication(fasta_list, basename)
 
-    global_clustering(global_dereplication.out[0], basename)
-    def representatives = global_clustering.out[3]
+    global_clustering(global_dereplication.out.fasta, basename)
+    def representatives = global_clustering.out.representatives
 
     fake_taxonomic_assignment(representatives, basename)
     chimera_detection(representatives, basename)
 
     cleaving(
-        global_clustering.out[1],            // .stats
-        global_clustering.out[2],            // .struct
-        global_clustering.out[0],            // .swarms
-        global_dereplication.out[0],         // global .fas
-        list_all_cluster_seeds_of_size_greater_than_2.out[0],
+        global_clustering.out.stats,         // .stats
+        global_clustering.out.struct,        // .struct
+        global_clustering.out.swarms,        // .swarms
+        global_dereplication.out.fasta,      // global .fas
+        list_all_cluster_seeds_of_size_greater_than_2.out.stats,
         basename
     )
 
-    fake_taxonomic_assignment2(cleaving.out[2], basename)
+    fake_taxonomic_assignment2(cleaving.out.representatives, basename)
     chimera_detection_post_cleave(
         representatives,
-        cleaving.out[2],
-        chimera_detection.out[1],
+        cleaving.out.representatives,
+        chimera_detection.out.log,
         basename
     )
 
     build_occurrence_table(
         representatives,
-        cleaving.out[2],
-        global_clustering.out[1],
-        cleaving.out[0],
-        global_clustering.out[0],
-        cleaving.out[1],
-        chimera_detection.out[0],
-        chimera_detection_post_cleave.out[0],
-        build_expected_error_file.out[0],
-        fake_taxonomic_assignment.out[0],
-        fake_taxonomic_assignment2.out[0],
-        build_distribution_file.out[0],
+        cleaving.out.representatives,
+        global_clustering.out.stats,
+        cleaving.out.stats,
+        global_clustering.out.swarms,
+        cleaving.out.swarms,
+        chimera_detection.out.uchime,
+        chimera_detection_post_cleave.out.uchime,
+        build_expected_error_file.out.qual,
+        fake_taxonomic_assignment.out.results,
+        fake_taxonomic_assignment2.out.results,
+        build_distribution_file.out.distr,
         basename,
         sample_ids,                          // [S09]
     )
 
-    search_for_terminal_gaps(build_occurrence_table.out[0])
+    search_for_terminal_gaps(build_occurrence_table.out.table)
     merge_substring_otus(
-        build_occurrence_table.out[0],
-        search_for_terminal_gaps.out[0],
-        search_for_terminal_gaps.out[1],
+        build_occurrence_table.out.table,
+        search_for_terminal_gaps.out.uc,
+        search_for_terminal_gaps.out.log,
         basename,
     )
 
-    extract_otu_fasta(merge_substring_otus.out[0])
-    trim_metadata_for_mumu(merge_substring_otus.out[0])
-    find_similar_sequences(extract_otu_fasta.out[0])
-    run_mumu(trim_metadata_for_mumu.out[0], find_similar_sequences.out[0], basename)
-    rebuild_post_mumu_table(run_mumu.out[0], merge_substring_otus.out[0], basename)
-    extract_mumu_fasta(rebuild_post_mumu_table.out[0])
+    extract_otu_fasta(merge_substring_otus.out.table)
+    trim_metadata_for_mumu(merge_substring_otus.out.table)
+    find_similar_sequences(extract_otu_fasta.out.fasta)
+    run_mumu(trim_metadata_for_mumu.out.table, find_similar_sequences.out.matches, basename)
+    rebuild_post_mumu_table(run_mumu.out.table, merge_substring_otus.out.table, basename)
+    extract_mumu_fasta(rebuild_post_mumu_table.out.table)
 
     emit:
     // [S46] final shadow occurrence table — exposed so callers can
@@ -219,5 +219,5 @@ workflow part_B_shadow {
     // invocation. End-to-end wiring runs Part C on the regular path
     // only; calling it twice from the same scope is forbidden in
     // DSL2.
-    table = rebuild_post_mumu_table.out[0]
+    table = rebuild_post_mumu_table.out.table
 }

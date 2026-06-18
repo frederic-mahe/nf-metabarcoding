@@ -13,7 +13,7 @@ process build_distribution_file {
     val basename
 
     output:
-    path "${basename}.distr"
+    path "${basename}.distr", emit: distr
 
     shell:
     '''

@@ -18,8 +18,8 @@ process global_dereplication {
     val basename
 
     output:
-    path "${basename}.fas"
-    path "${basename}_dereplication.log"
+    path "${basename}.fas",                 emit: fasta
+    path "${basename}_dereplication.log",   emit: log
 
     shell:
     '''

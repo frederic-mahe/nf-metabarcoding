@@ -13,7 +13,7 @@ process fake_taxonomic_assignment2 {
     val basename
 
     output:
-    path "${basename}_1f_representatives.results2"
+    path "${basename}_1f_representatives.results2", emit: results
 
     shell:
     '''

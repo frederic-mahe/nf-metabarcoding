@@ -82,10 +82,10 @@ workflow part_b {
 
     discover_part_b_fasta()
 
-    def regular_samples_ch = discover_part_b_fasta.out[0]
+    def regular_samples_ch = discover_part_b_fasta.out.regular
         .splitCsv(sep: '\t')
         .map { row -> tuple(row[0], file(row[1])) }
-    def shadow_samples_ch = discover_part_b_fasta.out[1]
+    def shadow_samples_ch = discover_part_b_fasta.out.shadow
         .splitCsv(sep: '\t')
         .map { row -> tuple(row[0], file(row[1])) }
 

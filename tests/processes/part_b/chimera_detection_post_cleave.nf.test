@@ -22,7 +22,7 @@ nextflow_process {
             script "modules/local/part_b/global_clustering.nf"
             process {
                 """
-                input[0] = global_dereplication.out[0]
+                input[0] = global_dereplication.out.fasta
                 input[1] = "proj_3_samples"
                 """
             }
@@ -31,7 +31,7 @@ nextflow_process {
             script "modules/local/part_b/chimera_detection.nf"
             process {
                 """
-                input[0] = global_clustering.out[3]
+                input[0] = global_clustering.out.representatives
                 input[1] = "proj_3_samples"
                 """
             }
@@ -56,17 +56,17 @@ nextflow_process {
                 """
                 def empty_fas2 = workDir.resolve("empty.fas2")
                 empty_fas2.text = ""
-                input[0] = global_clustering.out[3]
+                input[0] = global_clustering.out.representatives
                 input[1] = file(empty_fas2.toString())
-                input[2] = chimera_detection.out[1]
+                input[2] = chimera_detection.out.log
                 input[3] = "proj_3_samples"
                 """
             }
         }
         then {
             assert process.success
-            def uchime2 = process.out[0].get(0)
-            def log2    = process.out[1].get(0)
+            def uchime2 = process.out.uchime.get(0)
+            def log2    = process.out.log.get(0)
             assert uchime2.endsWith("proj_3_samples_1f_representatives.uchime2")
             // [S45]: the canonical chimera_detection log uses the
             // project-wide naming construct.
@@ -106,17 +106,17 @@ AAAAAAAAAA
 >cleaved_bb;size=3
 ACACACACAC
 '''
-                input[0] = global_clustering.out[3]
+                input[0] = global_clustering.out.representatives
                 input[1] = file(fas2.toString())
-                input[2] = chimera_detection.out[1]
+                input[2] = chimera_detection.out.log
                 input[3] = "proj_3_samples"
                 """
             }
         }
         then {
             assert process.success
-            assert file(process.out[0].get(0)).exists()
-            assert path(process.out[1].get(0)).readLines().size() > 0
+            assert file(process.out.uchime.get(0)).exists()
+            assert path(process.out.log.get(0)).readLines().size() > 0
         }
     }
 }
