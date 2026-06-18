@@ -187,6 +187,15 @@ the latter case.
 - `[S07]` runs locally or on HPC with slurm
   - Not part of automated CI; covered by manual smoke tests on the
     cluster. Profiles live in `nextflow.config`.
+  - the `slurm` profile sets a `resourceLimits` ceiling
+    (`params.max_cpus` / `params.max_memory` / `params.max_time`,
+    defaults `16` / `128.GB` / `240.h`) so the per-retry escalation
+    (`memory = N.GB * task.attempt` across the tiers) is clamped to the
+    largest node a partition offers instead of requesting more than
+    exists and looping to failure. `resourceLimits` is native Nextflow
+    behaviour (>= 24.04), so — per `[S00]`'s "we do not re-test
+    upstream tools" rule — the clamp itself is not unit-tested; the
+    manual cluster smoke test confirms it.
 - `[S08]` runs local or containerized applications (vsearch, swarm,
   cutadapt)
   - Not part of automated CI; covered by a `-profile docker` /
@@ -1127,6 +1136,45 @@ from placeholder values to real taxonomic assignments.
     publishes no majority table; running with
     `--majority_assignment true --taxonomy_method sintax` aborts at
     startup with stderr naming `majority_assignment`.
+
+
+## Reproducibility
+
+- `[S68]` every run records the versions of the external tools it
+  relies on (`vsearch`, `swarm`, `cutadapt`, `mumu`) plus the Python
+  interpreter into `software_versions.yml`, published under
+  `<results_folder>/pipeline_info/`. The process
+  `dump_software_versions` queries each tool's `--version` on the
+  active environment (PATH / conda / module / container) and pipes the
+  raw output through `bin/collect_versions.py`, which extracts the
+  first `MAJOR.MINOR[.PATCH]` token per tool. A tool missing from the
+  environment is recorded as `n/a` (not dropped) so the gap is visible
+  in the report rather than silently absent. The file is published
+  wherever a `--results_folder` is established (Part B standalone,
+  Part C standalone, and the end-to-end path with `--project_name`);
+  the dev-only Part A-only path has no results folder yet and gains the
+  versions file once the unified `--outdir` lands (tracked separately).
+  - **Pass when:** a run with a `--results_folder` publishes
+    `pipeline_info/software_versions.yml` naming `vsearch`, `swarm`,
+    `cutadapt`, `mumu`, and `python`, each with a non-empty value (a
+    real `MAJOR.MINOR[.PATCH]` token or `n/a`); `bin/collect_versions.py`
+    unit tests pin the extraction for each tool's real `--version`
+    output and the missing-tool `n/a` case.
+- `[S69]` the conda environment (`environment.yml`) and the CI tool
+  setup (`.github/workflows/test.yml`) pin every shared external tool
+  to an **exact** version (`name=X.Y.Z`, never a floating `>=` / `<=`),
+  and the two files agree. This keeps the byte-exact characterization
+  tests (`[S22]`, `[S35]`, `[S39]`, `[S44]`) reproducible: a floating
+  pin lets an upstream release silently change tool output and flip the
+  golden files. `mumu` is **not** distributed on bioconda, so it is not
+  a conda dependency — it is built from source / provided on `PATH`
+  (see the CI workflow and README); `environment.yml` must not claim a
+  `bioconda::mumu` package that cannot be resolved.
+  - **Pass when:** repo-level checks assert that every tool dependency
+    in `environment.yml` uses an exact `=` pin, that `environment.yml`
+    lists no `mumu` conda package, and that the `vsearch` / `swarm` /
+    `cutadapt` pins in `environment.yml` and the CI workflow are
+    identical.
 
 
 ## Dependencies
