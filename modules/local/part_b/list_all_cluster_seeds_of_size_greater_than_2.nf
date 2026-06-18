@@ -12,7 +12,7 @@ process list_all_cluster_seeds_of_size_greater_than_2 {
     val basename
 
     output:
-    path "${basename}_per_sample_OTUs.stats"
+    path "${basename}_per_sample_OTUs.stats", emit: stats
 
     shell:
     '''

@@ -35,7 +35,7 @@ process build_occurrence_table {
                      // column in the occurrence table.
 
     output:
-    path "${basename}.OTU.filtered.cleaved.table"
+    path "${basename}.OTU.filtered.cleaved.table", emit: table
 
     shell:
     '''

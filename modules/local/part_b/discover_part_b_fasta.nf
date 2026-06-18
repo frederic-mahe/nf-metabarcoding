@@ -10,8 +10,8 @@ process discover_part_b_fasta {
     // (e.g. shadow_fastas.tsv is empty when no _notmerged.fas exists).
 
     output:
-    path "fastas.tsv"
-    path "shadow_fastas.tsv"
+    path "fastas.tsv",        emit: regular
+    path "shadow_fastas.tsv", emit: shadow
 
     script:
     def folders = (params.fasta_folder instanceof List)

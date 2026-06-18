@@ -29,8 +29,8 @@ process assign_taxonomy_sintax {
     val basename
 
     output:
-    path "${basename}_taxonomy_sintax.tsv"
-    path "${basename}_taxonomy.log"
+    path "${basename}_taxonomy_sintax.tsv", emit: taxonomy
+    path "${basename}_taxonomy.log",        emit: log
 
     shell:
     '''

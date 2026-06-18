@@ -21,7 +21,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def lines = path(process.out[0].get(0)).readLines()
+            def lines = path(process.out.fasta.get(0)).readLines()
             // 2 records → 4 lines; zero-abundance row IS kept (unlike
             // extract_mumu_fasta).
             assert lines.size() == 4

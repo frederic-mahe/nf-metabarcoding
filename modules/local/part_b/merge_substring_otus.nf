@@ -24,8 +24,8 @@ process merge_substring_otus {
     val basename
 
     output:
-    path "${otu_table.baseName}.nosubstringOTUs.table"
-    path "${basename}_superstring_clustering.log"
+    path "${otu_table.baseName}.nosubstringOTUs.table", emit: table
+    path "${basename}_superstring_clustering.log",      emit: log
 
     shell:
     '''

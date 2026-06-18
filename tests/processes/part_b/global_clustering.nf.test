@@ -29,7 +29,7 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = global_dereplication.out[0]
+                input[0] = global_dereplication.out.fasta
                 input[1] = "proj_3_samples"
                 """
             }
@@ -39,11 +39,11 @@ nextflow_process {
 
             // The process emits five paths, in order:
             //   swarms, stats, struct, representatives, log
-            def swarmsPath = process.out[0].get(0)
-            def statsPath  = process.out[1].get(0)
-            def structPath = process.out[2].get(0)
-            def repPath    = process.out[3].get(0)
-            def logPath    = process.out[4].get(0)
+            def swarmsPath = process.out.swarms.get(0)
+            def statsPath  = process.out.stats.get(0)
+            def structPath = process.out.struct.get(0)
+            def repPath    = process.out.representatives.get(0)
+            def logPath    = process.out.log.get(0)
 
             assert swarmsPath.endsWith("proj_3_samples_1f.swarms")
             assert statsPath.endsWith("proj_3_samples_1f.stats")
@@ -76,7 +76,7 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = global_dereplication.out[0]
+                input[0] = global_dereplication.out.fasta
                 input[1] = "proj_3_samples"
                 """
             }
@@ -84,11 +84,11 @@ nextflow_process {
         then {
             assert process.success
 
-            def swarmsPath = process.out[0].get(0)
-            def statsPath  = process.out[1].get(0)
-            def structPath = process.out[2].get(0)
-            def repPath    = process.out[3].get(0)
-            def logPath    = process.out[4].get(0)
+            def swarmsPath = process.out.swarms.get(0)
+            def statsPath  = process.out.stats.get(0)
+            def structPath = process.out.struct.get(0)
+            def repPath    = process.out.representatives.get(0)
+            def logPath    = process.out.log.get(0)
 
             // _1f → _1 across every swarm output.
             assert swarmsPath.endsWith("proj_3_samples_1.swarms") :

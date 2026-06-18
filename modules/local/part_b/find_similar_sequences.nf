@@ -7,7 +7,7 @@ process find_similar_sequences {
     path otu_fasta
 
     output:
-    path "${otu_fasta.baseName}.match_list"
+    path "${otu_fasta.baseName}.match_list", emit: matches
 
     shell:
     '''

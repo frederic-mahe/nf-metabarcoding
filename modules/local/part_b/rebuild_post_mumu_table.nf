@@ -17,7 +17,7 @@ process rebuild_post_mumu_table {
     val basename
 
     output:
-    path "${basename}_table.tsv"
+    path "${basename}_table.tsv", emit: table
 
     shell:
     """

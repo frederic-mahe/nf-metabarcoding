@@ -17,8 +17,8 @@ process chimera_detection {
     val basename
 
     output:
-    path "${basename}_1f_representatives.uchime"
-    path "${basename}_1f_representatives.log"
+    path "${basename}_1f_representatives.uchime", emit: uchime
+    path "${basename}_1f_representatives.log",    emit: log
 
     shell:
     '''

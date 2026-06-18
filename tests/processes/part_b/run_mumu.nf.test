@@ -25,8 +25,8 @@ bb02\\t3\\t0
         }
         then {
             assert process.success
-            def new_table = process.out[0].get(0)
-            def log       = process.out[1].get(0)
+            def new_table = process.out.table.get(0)
+            def log       = process.out.log.get(0)
             assert new_table.endsWith("input_raw_mumu.table") :
                 "unexpected new table filename: ${new_table}"
             // [S45]: post_clustering_curation log uses the project-

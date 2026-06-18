@@ -22,7 +22,7 @@ nextflow_process {
             script "modules/local/part_b/global_clustering.nf"
             process {
                 """
-                input[0] = global_dereplication.out[0]
+                input[0] = global_dereplication.out.fasta
                 input[1] = "proj_3_samples"
                 """
             }
@@ -35,7 +35,7 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = global_clustering.out[3]
+                input[0] = global_clustering.out.representatives
                 input[1] = "proj_3_samples"
                 """
             }
@@ -45,8 +45,8 @@ nextflow_process {
 
             // The process emits two paths: the uchime hit table and
             // the stderr log.
-            def uchimePath = process.out[0].get(0)
-            def logPath    = process.out[1].get(0)
+            def uchimePath = process.out.uchime.get(0)
+            def logPath    = process.out.log.get(0)
 
             assert uchimePath.endsWith("proj_3_samples_1f_representatives.uchime") :
                 "unexpected uchime filename: ${uchimePath}"
@@ -82,15 +82,15 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = global_clustering.out[3]
+                input[0] = global_clustering.out.representatives
                 input[1] = "proj_3_samples"
                 """
             }
         }
         then {
             assert process.success
-            def uchimePath = process.out[0].get(0)
-            def logPath    = process.out[1].get(0)
+            def uchimePath = process.out.uchime.get(0)
+            def logPath    = process.out.log.get(0)
 
             assert path(uchimePath).readLines().isEmpty() :
                 "expected an empty .uchime table when minsize filters every record"

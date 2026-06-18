@@ -35,7 +35,7 @@ nextflow_process {
             script "modules/local/part_b/global_clustering.nf"
             process {
                 """
-                input[0] = global_dereplication.out[0]
+                input[0] = global_dereplication.out.fasta
                 input[1] = "proj_3_samples"
                 """
             }
@@ -48,11 +48,11 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = global_clustering.out[1]   // .stats
-                input[1] = global_clustering.out[2]   // .struct
-                input[2] = global_clustering.out[0]   // .swarms
-                input[3] = global_dereplication.out[0] // global .fas
-                input[4] = list_all_cluster_seeds_of_size_greater_than_2.out[0]
+                input[0] = global_clustering.out.stats   // .stats
+                input[1] = global_clustering.out.struct   // .struct
+                input[2] = global_clustering.out.swarms   // .swarms
+                input[3] = global_dereplication.out.fasta // global .fas
+                input[4] = list_all_cluster_seeds_of_size_greater_than_2.out.stats
                 input[5] = "proj_3_samples"
                 """
             }
@@ -62,10 +62,10 @@ nextflow_process {
 
             // The process emits four paths: .stats2, .swarms2,
             // _representatives.fas2, and the [S45] cleaving log.
-            def stats2 = process.out[0].get(0)
-            def swarms2 = process.out[1].get(0)
-            def fas2 = process.out[2].get(0)
-            def log = process.out[3].get(0)
+            def stats2 = process.out.stats.get(0)
+            def swarms2 = process.out.swarms.get(0)
+            def fas2 = process.out.representatives.get(0)
+            def log = process.out.log.get(0)
 
             assert stats2.endsWith("proj_3_samples_1f.stats2") :
                 "unexpected .stats2 filename: ${stats2}"
@@ -107,18 +107,18 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = global_clustering.out[1]   // .stats
-                input[1] = global_clustering.out[2]   // .struct
-                input[2] = global_clustering.out[0]   // .swarms
-                input[3] = global_dereplication.out[0] // global .fas
-                input[4] = list_all_cluster_seeds_of_size_greater_than_2.out[0]
+                input[0] = global_clustering.out.stats   // .stats
+                input[1] = global_clustering.out.struct   // .struct
+                input[2] = global_clustering.out.swarms   // .swarms
+                input[3] = global_dereplication.out.fasta // global .fas
+                input[4] = list_all_cluster_seeds_of_size_greater_than_2.out.stats
                 input[5] = "proj_3_samples"
                 """
             }
         }
         then {
             assert process.success
-            def fas2 = process.out[2].get(0)
+            def fas2 = process.out.representatives.get(0)
             assert fas2.endsWith("proj_3_samples_1_representatives.fas2") :
                 "expected _1_representatives.fas2 with --fastidious=false, got: ${fas2}"
         }

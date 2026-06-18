@@ -28,8 +28,8 @@ process chimera_detection_post_cleave {
     val basename
 
     output:
-    path "${basename}_1f_representatives.uchime2"
-    path "${basename}_chimera_detection.log"
+    path "${basename}_1f_representatives.uchime2", emit: uchime
+    path "${basename}_chimera_detection.log",      emit: log
 
     shell:
     '''

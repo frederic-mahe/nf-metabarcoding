@@ -15,7 +15,7 @@ process build_expected_error_file {
     val id_length
 
     output:
-    path "${basename}.qual"
+    path "${basename}.qual", emit: qual
 
     shell:
     '''

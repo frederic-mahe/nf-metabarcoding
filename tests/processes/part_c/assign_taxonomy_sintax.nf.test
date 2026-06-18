@@ -37,10 +37,10 @@ nextflow_process {
         }
         then {
             assert process.success
-            def assignments = process.out[0].get(0)
+            def assignments = process.out.taxonomy.get(0)
             assert assignments.endsWith("proj_1_samples_notmerged_taxonomy_sintax.tsv") :
                 "expected <basename>_taxonomy_sintax.tsv, got: ${assignments}"
-            def log = process.out[1].get(0)
+            def log = process.out.log.get(0)
             assert log.endsWith("proj_1_samples_notmerged_taxonomy.log") :
                 "expected <basename>_taxonomy.log, got: ${log}"
 
@@ -98,7 +98,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def log = path(process.out[1].get(0)).text
+            def log = path(process.out.log.get(0)).text
             assert log.contains("--sintax_cutoff 0.93") :
                 "expected vsearch log to echo --sintax_cutoff 0.93 from params, got:\n${log}"
         }
@@ -132,7 +132,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def assignments = process.out[0].get(0)
+            def assignments = process.out.taxonomy.get(0)
             def rows = path(assignments).readLines()
             assert rows.size() == 1 :
                 "expected one passthrough row even when unclassified, got: ${rows}"

@@ -25,7 +25,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def out = process.out[0].get(0)
+            def out = process.out.fasta.get(0)
             assert out.endsWith("_representatives.fas")
             def lines = path(out).readLines()
             // 2 records → 4 lines (header + sequence per record).

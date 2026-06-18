@@ -16,8 +16,8 @@ process search_for_terminal_gaps {
     path otu_table
 
     output:
-    path "${otu_table.baseName}.uc"
-    path "search.log"
+    path "${otu_table.baseName}.uc", emit: uc
+    path "search.log",               emit: log
 
     shell:
     '''

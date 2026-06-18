@@ -14,7 +14,7 @@ process extract_mumu_fasta {
     path table
 
     output:
-    path "${table.baseName}.fas"
+    path "${table.baseName}.fas", emit: fasta
 
     shell:
     '''

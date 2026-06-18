@@ -6,7 +6,7 @@ process trim_metadata_for_mumu {
     path table
 
     output:
-    path "${table.baseName}_reduced.table"
+    path "${table.baseName}_reduced.table", emit: table
 
     shell:
     '''

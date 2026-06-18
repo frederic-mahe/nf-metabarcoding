@@ -18,8 +18,8 @@ process run_mumu {
     val basename
 
     output:
-    path "${reduced_table.baseName.replaceFirst(/_reduced$/, '_raw_mumu')}.table"
-    path "${basename}_post_clustering_curation.log"
+    path "${reduced_table.baseName.replaceFirst(/_reduced$/, '_raw_mumu')}.table", emit: table
+    path "${basename}_post_clustering_curation.log",                               emit: log
 
     shell:
     def new_table = "${reduced_table.baseName.replaceFirst(/_reduced$/, '_raw_mumu')}.table"

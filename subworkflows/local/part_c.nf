@@ -39,13 +39,13 @@ workflow part_C {
     if ( params.taxonomy_method == 'sintax' ) {
         // [S50]: shadow path.
         assign_taxonomy_sintax(
-            extract_fasta_sequences_from_occurrence_table.out[0],
+            extract_fasta_sequences_from_occurrence_table.out.fasta,
             reference,
             basename,
         )
         update_occurrence_table(
             occurrence_table,
-            assign_taxonomy_sintax.out[0],
+            assign_taxonomy_sintax.out.taxonomy,
             basename,
         )
     } else {
@@ -68,12 +68,13 @@ workflow part_C {
         // `sort_taxonomy` process running `LC_ALL=C sort -k2,2nr
         // -k1,1d` on an unsorted collectFile output. See Plan B
         // (2026-05-19) for the fallback writeup.
-        def reps_ch = extract_fasta_sequences_from_occurrence_table.out[0]
+        def reps_ch = extract_fasta_sequences_from_occurrence_table.out.fasta
         def chunks = (params.stampa_chunk_size > 0)
             ? reps_ch.splitFasta(by: params.stampa_chunk_size, file: true)
             : reps_ch
 
-        def merged = assign_taxonomy_stampa(chunks, reference)
+        assign_taxonomy_stampa(chunks, reference)
+        def merged = assign_taxonomy_stampa.out.taxonomy
             .combine(basename)
             .collectFile(
                 storeDir: normalize_path(params.results_folder),
@@ -120,7 +121,7 @@ workflow part_C {
         // stampa-formatted --reference_dataset resolved above.
         if ( params.majority_assignment ) {
             compute_majority_assignment(
-                update_occurrence_table.out[0],
+                update_occurrence_table.out.table,
                 reference,
                 basename,
             )
@@ -130,7 +131,7 @@ workflow part_C {
     emit:
     // [S51] annotated occurrence table — sibling of Part B's
     // <basename>_table.tsv, named <basename>_table_assigned.tsv.
-    table = update_occurrence_table.out[0]
+    table = update_occurrence_table.out.table
 }
 
 
@@ -173,17 +174,17 @@ workflow part_C_shadow {
     extract_fasta_sequences_from_occurrence_table(populated)
 
     assign_taxonomy_sintax(
-        extract_fasta_sequences_from_occurrence_table.out[0],
+        extract_fasta_sequences_from_occurrence_table.out.fasta,
         reference,
         basename,
     )
 
     update_occurrence_table(
         populated,
-        assign_taxonomy_sintax.out[0],
+        assign_taxonomy_sintax.out.taxonomy,
         basename,
     )
 
     emit:
-    table = update_occurrence_table.out[0]
+    table = update_occurrence_table.out.table
 }

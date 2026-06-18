@@ -28,7 +28,7 @@ TTTTTTTTGG
         }
         then {
             assert process.success
-            def outPath = process.out[0].get(0)
+            def outPath = process.out.results.get(0)
             assert outPath.endsWith("proj_3_samples_1f_representatives.results2") :
                 "unexpected output filename: ${outPath}"
             def rows = path(outPath).readLines().collect {
@@ -62,7 +62,7 @@ TTTTTTTTGG
         }
         then {
             assert process.success
-            def outPath = process.out[0].get(0)
+            def outPath = process.out.results.get(0)
             assert outPath.endsWith("proj_3_samples_1f_representatives.results2")
             assert file(outPath).text == "" :
                 "expected an empty results2 file"

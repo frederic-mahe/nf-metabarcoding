@@ -33,7 +33,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def out = process.out[0].get(0)
+            def out = process.out.table.get(0)
             assert out.endsWith("proj_3_samples_table_assigned.tsv") :
                 "expected <basename>_table_assigned.tsv, got: ${out}"
             def lines = path(out).readLines()

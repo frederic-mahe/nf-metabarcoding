@@ -21,7 +21,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def lines = path(process.out[0].get(0)).readLines()
+            def lines = path(process.out.table.get(0)).readLines()
             // 3 lines: header + 2 data rows
             assert lines.size() == 3
             // header: amplicon\ts1\ts2

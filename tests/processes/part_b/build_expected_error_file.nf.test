@@ -22,7 +22,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def outPath = process.out[0].get(0)
+            def outPath = process.out.qual.get(0)
             assert outPath.endsWith("proj_3_samples.qual") :
                 "unexpected output filename: ${outPath}"
             def lines = path(outPath).readLines()
@@ -69,7 +69,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def lines = path(process.out[0].get(0)).readLines()
+            def lines = path(process.out.qual.get(0)).readLines()
             // md5_a shared (lower ee in S2), md5_b (S1), md5_c (S2).
             assert lines.size() == 3 :
                 "expected 3 rows after uniq, got ${lines.size()}: ${lines}"
