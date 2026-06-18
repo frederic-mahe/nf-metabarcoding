@@ -239,7 +239,7 @@ consumer asks for split assigned output.
 **Blocks:** a new input-contract `[Sxx]` (next free is `[S70]`)
 **Revises on resolution:** `[S10]`, `[S11]`, `[S12]`, `[S27]` and the
 discovery processes `discover_inputs` / `discover_part_b_fasta`
-**Status:** `proposed`
+**Status:** `proposed` — **option 3 selected (2026-06-18); spec + code pending**
 
 Discovery is performed *inside* processes that declare **no path
 inputs** and glob `params.fastq_folder` / `params.fasta_folder` off
@@ -292,7 +292,7 @@ Until D06 lands the discovery processes stay as-is; the current
 
 **Revises on resolution:** `[S62]` (and the shadow probe at
 `main.nf:52-55`)
-**Status:** `proposed`
+**Status:** `proposed` — **option 2 selected (2026-06-18); spec + code pending**
 
 `[S62]` specifies that standalone Part C decides whether to run the
 shadow path by testing `shadow_table_path.exists()` **at workflow-build
@@ -378,7 +378,13 @@ allocation, i.e. `[S71]`)
 **Revises on resolution:** `[S19]` (Part A publishes into
 `params.fastq_folder`); touches `[S45]`, `[S46]`, `[S58]`, `[S59]`, and
 `[S68]`'s "the Part A-only path has no results folder yet" note
-**Status:** `proposed`
+**Status:** `proposed` — **option 2 selected (2026-06-18); spec + code pending**
+
+> **Note (2026-06-18):** the `[S68]` version-capture step publishes
+> `pipeline_info/software_versions.yml` into `--results_folder`, which
+> the `[S59]` closed whitelist must now permit. Allowing `pipeline_info/`
+> in `[S59]` is a down-payment on this decision (the `pipeline_info`
+> directory moves under `--outdir` when D09 lands).
 
 Part A publishes its per-sample artefacts **back into**
 `--fastq_folder` (`modules/local/part_a/trim_primers.nf:9` and
