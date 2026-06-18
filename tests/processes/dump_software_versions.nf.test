@@ -1,0 +1,44 @@
+nextflow_process {
+
+    name "dump_software_versions"
+    script "modules/local/dump_software_versions.nf"
+    process "dump_software_versions"
+
+    test("records a version (or n/a) for every external tool") {
+        // COVERAGE: [S68]
+        tag "ci"
+        when {
+            process {
+                """
+                """
+            }
+        }
+        then {
+            assert process.success
+            def outPath = process.out.get(0).get(0)
+            assert outPath.endsWith("software_versions.yml") :
+                "unexpected output filename: ${outPath}"
+
+            def lines = path(outPath).readLines().findAll { it.trim() }
+            def versions = [:]
+            lines.each { line ->
+                def parts = line.split(":", 2)
+                versions[parts[0].trim()] = parts[1].trim()
+            }
+
+            // [S68]: every external tool + the interpreter is recorded,
+            // each with a non-empty value (a real version or `n/a`).
+            ['vsearch', 'swarm', 'cutadapt', 'mumu', 'python'].each { tool ->
+                assert versions.containsKey(tool) :
+                    "missing ${tool} in software_versions.yml: ${lines}"
+                assert versions[tool] :
+                    "empty version string for ${tool}: ${lines}"
+            }
+
+            // bin/collect_versions.py emits a deterministic, sorted map.
+            def keys = lines.collect { it.split(":", 2)[0].trim() }
+            assert keys == keys.sort(false) :
+                "software_versions.yml keys are not sorted: ${keys}"
+        }
+    }
+}

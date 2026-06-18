@@ -5,6 +5,7 @@ include { part_A } from './subworkflows/local/part_a.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
 include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_fasta.nf'
 include { part_C; part_C_shadow } from './subworkflows/local/part_c.nf'
+include { dump_software_versions } from './modules/local/dump_software_versions.nf'
 
 
 workflow part_c {
@@ -28,6 +29,9 @@ workflow part_c {
 
     def results_dir = new File(normalize_path(params.results_folder).toString())
     results_dir.mkdirs()
+
+    // [S68]: record tool versions alongside the Part C outputs.
+    dump_software_versions()
 
     def table_path = file(normalize_path(params.occurrence_table))
     def derived_basename = table_path.baseName.replaceFirst(/_table$/, '')
@@ -79,6 +83,9 @@ workflow part_b {
     // before anything publishes into it.
     def results_dir = new File(normalize_path(params.results_folder).toString())
     results_dir.mkdirs()
+
+    // [S68]: record tool versions alongside the Part B outputs.
+    dump_software_versions()
 
     discover_part_b_fasta()
 
@@ -206,6 +213,9 @@ workflow {
             "--results_folder must be set when --project_name is set"
         def results_dir = new File(normalize_path(params.results_folder).toString())
         results_dir.mkdirs()
+
+        // [S68]: record tool versions alongside the Part B / Part C outputs.
+        dump_software_versions()
 
         def regular_fasta = part_A.out.fasta.filter { id, _f -> !id.endsWith("_notmerged") }
         def regular_qual  = part_A.out.qual .filter { id, _f -> !id.endsWith("_notmerged") }
