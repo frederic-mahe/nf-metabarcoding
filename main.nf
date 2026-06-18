@@ -1,9 +1,10 @@
 #!/usr/bin/env nextflow
 
-include { normalize_path; usage; validate_params } from './modules/local/functions.nf'
+include { normalize_path; usage; validate_params; samplesheet_profile } from './modules/local/functions.nf'
 include { part_A } from './subworkflows/local/part_a.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
 include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_fasta.nf'
+include { validate_samplesheet } from './modules/local/validate_samplesheet.nf'
 include { part_C; part_C_shadow } from './subworkflows/local/part_c.nf'
 include { dump_software_versions } from './modules/local/dump_software_versions.nf'
 
@@ -87,31 +88,65 @@ workflow part_b {
     // [S68]: record tool versions alongside the Part B outputs.
     dump_software_versions()
 
-    discover_part_b_fasta()
+    // Build the six per-sample lists (regular + shadow × fasta/qual/
+    // stats) from either the validated --input samplesheet (fasta
+    // profile, [S70]) or the folder scan ([S27]/[S56]). The folder scan
+    // derives qual/stats as siblings of each .fas (unchanged); the
+    // samplesheet carries them explicitly (defaulting to the same
+    // siblings in bin/parse_samplesheet.py). Both paths split into the
+    // regular and shadow ([S56]) streams by the _notmerged suffix.
+    def fasta_list
+    def qual_list
+    def stats_list
+    def s_fasta_list
+    def s_qual_list
+    def s_stats_list
+    if ( params.input ) {
+        validate_samplesheet(file(normalize_path(params.input)))
+        def split_ch = validate_samplesheet.out
+            .splitCsv(header: true, sep: '\t')
+            .map { row -> tuple(
+                row.sample,
+                file(row.fasta, checkIfExists: true),
+                file(row.qual,  checkIfExists: true),
+                file(row.stats, checkIfExists: true)
+            ) }
+            .branch { id, _f, _q, _s ->
+                shadow:  id.endsWith('_notmerged')
+                regular: !id.endsWith('_notmerged')
+            }
+        fasta_list   = split_ch.regular.map { _id, f, _q, _s -> f }.collect()
+        qual_list    = split_ch.regular.map { _id, _f, q, _s -> q }.collect()
+        stats_list   = split_ch.regular.map { _id, _f, _q, s -> s }.collect()
+        s_fasta_list = split_ch.shadow.map { _id, f, _q, _s -> f }.collect()
+        s_qual_list  = split_ch.shadow.map { _id, _f, q, _s -> q }.collect()
+        s_stats_list = split_ch.shadow.map { _id, _f, _q, s -> s }.collect()
+    } else {
+        discover_part_b_fasta()
 
-    def regular_samples_ch = discover_part_b_fasta.out.regular
-        .splitCsv(sep: '\t')
-        .map { row -> tuple(row[0], file(row[1])) }
-    def shadow_samples_ch = discover_part_b_fasta.out.shadow
-        .splitCsv(sep: '\t')
-        .map { row -> tuple(row[0], file(row[1])) }
+        def regular_samples_ch = discover_part_b_fasta.out.regular
+            .splitCsv(sep: '\t')
+            .map { row -> tuple(row[0], file(row[1])) }
+        def shadow_samples_ch = discover_part_b_fasta.out.shadow
+            .splitCsv(sep: '\t')
+            .map { row -> tuple(row[0], file(row[1])) }
 
-    def fasta_list = regular_samples_ch.map { _id, f -> f }.collect()
-    def qual_list  = regular_samples_ch
-        .map { id, f -> file("${f.parent}/${id}.qual") }
-        .collect()
-    def stats_list = regular_samples_ch
-        .map { id, f -> file("${f.parent}/${id}.stats") }
-        .collect()
+        fasta_list = regular_samples_ch.map { _id, f -> f }.collect()
+        qual_list  = regular_samples_ch
+            .map { id, f -> file("${f.parent}/${id}.qual") }
+            .collect()
+        stats_list = regular_samples_ch
+            .map { id, f -> file("${f.parent}/${id}.stats") }
+            .collect()
+        s_fasta_list = shadow_samples_ch.map { _id, f -> f }.collect()
+        s_qual_list  = shadow_samples_ch
+            .map { id, f -> file("${f.parent}/${id}.qual") }
+            .collect()
+        s_stats_list = shadow_samples_ch
+            .map { id, f -> file("${f.parent}/${id}.stats") }
+            .collect()
+    }
     part_B(fasta_list, qual_list, stats_list)
-
-    def s_fasta_list = shadow_samples_ch.map { _id, f -> f }.collect()
-    def s_qual_list  = shadow_samples_ch
-        .map { id, f -> file("${f.parent}/${id}.qual") }
-        .collect()
-    def s_stats_list = shadow_samples_ch
-        .map { id, f -> file("${f.parent}/${id}.stats") }
-        .collect()
     part_B_shadow(s_fasta_list, s_qual_list, s_stats_list)
 
     // [S47]/[S64]: invoke Part C when the user supplied the reference
@@ -167,20 +202,24 @@ workflow {
         return
     }
 
-    // [S27]: --fasta_folder switches the pipeline into Part B
-    // standalone mode. Part A's --fastq_folder requirement is lifted
-    // in that mode (Part A does not run). When --reference_dataset is
-    // also set, `workflow part_b` chains Part C onto Part B's regular
-    // output.
-    if ( params.fasta_folder ) {
+    // [S27]/[S70]: --fasta_folder, or an --input samplesheet in the
+    // fasta profile, switches the pipeline into Part B standalone mode.
+    // Part A's --fastq_folder requirement is lifted in that mode (Part A
+    // does not run). When --reference_dataset is also set, `workflow
+    // part_b` chains Part C onto Part B's regular output.
+    def input_profile = samplesheet_profile()
+    if ( params.fasta_folder || input_profile == 'fasta' ) {
         part_b()
         return
     }
 
-    // [S18]: forward_primer, reverse_primer and fastq_folder are required
-    // and have no default (supply via CLI or project config); the workflow
-    // asserts them at startup.
-    assert params.fastq_folder : "--fastq_folder must be set (no default)"
+    // [S18]/[S70]: Part A end-to-end runs from --fastq_folder or from an
+    // --input samplesheet (fastq profile). forward_primer / reverse_primer
+    // are required (no default); fastq_folder is required only when
+    // --input is not given.
+    if ( !params.input ) {
+        assert params.fastq_folder : "--fastq_folder must be set (no default)"
+    }
 
     // [S18]/[S20]: primers and --no_trimming are mutually exclusive — when
     // params.no_trimming is true, forward_primer and reverse_primer must be

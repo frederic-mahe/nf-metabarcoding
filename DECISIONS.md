@@ -237,9 +237,36 @@ consumer asks for split assigned output.
 ## D06 — Input model: validated samplesheet vs in-process folder-glob
 
 **Blocks:** a new input-contract `[Sxx]` (next free is `[S70]`)
-**Revises on resolution:** `[S10]`, `[S11]`, `[S12]`, `[S27]` and the
-discovery processes `discover_inputs` / `discover_part_b_fasta`
-**Status:** `proposed` — **option 3 selected (2026-06-18); spec + code pending**
+**Revises:** `[S10]`, `[S11]`, `[S12]`, `[S27]`; adds `[S70]`
+**Status:** `resolved` — option 3 (2026-06-18)
+
+**Resolution (2026-06-18):** option 3, implemented in two slices.
+Slice 1: `bin/parse_samplesheet.py` (stdlib, pytest-tested) does
+structural validation of the `--input` samplesheet in two profiles
+(fastq → Part A, fasta → Part B), inferred from columns; single
+`--input`, profile inferred from columns; launchDir-relative paths;
+`run` column carried as provenance. Slice 2: wiring —
+`validate_samplesheet` process (staged input); `part_A` and `part_b`
+source their per-sample channels from `--input` *or* the folder scan
+(`discover_*` paths left byte-identical as the fallback);
+`samplesheet_profile()` drives the dispatch; mutual exclusion with
+`--fastq_folder` / `--fasta_folder` asserted in `validate_params()`.
+Full ci suite (47 tests) green.
+
+Coupling found with **D09**: Part A publishes its per-sample artefacts
+into `--fastq_folder`, which is null under `--input`. Three Part A
+data-file modules (`extract_expected_error_values`, `dereplicate_fasta`,
+`list_local_clusters`) published *without* an `enabled:` guard and so
+hard-crashed ("publishDir target cannot be null") on a null
+`fastq_folder` — a latent inconsistency, since `merge_fastq_pairs` /
+`trim_primers` already had the guard. Added the guard to all three:
+`--fastq_folder` runs publish as before; `--input` runs skip Part A
+per-sample publishing until the unified `--outdir` lands (D09). The
+end-to-end `--results_folder` outputs (Part B table, Part C,
+`software_versions.yml`) are unaffected. This makes D09 the natural
+next step.
+
+The original analysis follows, for the record.
 
 Discovery is performed *inside* processes that declare **no path
 inputs** and glob `params.fastq_folder` / `params.fasta_folder` off

@@ -7,7 +7,8 @@ include { filter_and_convert_to_fasta }     from '../../modules/local/part_a/fil
 include { extract_expected_error_values }   from '../../modules/local/part_a/extract_expected_error_values.nf'
 include { dereplicate_fasta }               from '../../modules/local/part_a/dereplicate_fasta.nf'
 include { list_local_clusters }             from '../../modules/local/part_a/list_local_clusters.nf'
-include { hash_relabel_flag; hash_id_length } from '../../modules/local/functions.nf'
+include { validate_samplesheet }            from '../../modules/local/validate_samplesheet.nf'
+include { normalize_path; hash_relabel_flag; hash_id_length } from '../../modules/local/functions.nf'
 
 
 workflow part_A {
@@ -21,19 +22,31 @@ workflow part_A {
     // shadow streams when feeding part_B / part_B_shadow.
 
     main:
-    // [S10]/[S11]/[S12]/[S21]: pattern-driven discovery. Pairs go
-    // through merge_fastq_pairs; single-end files skip the merging
-    // step.
-    discover_inputs()
+    // Build the (sample, r1, r2) stream from either the validated
+    // --input samplesheet (fastq profile, [S70]) or the pattern-driven
+    // folder scan ([S10]/[S11]/[S12]/[S21]). Either way, pairs go
+    // through merge_fastq_pairs and single-end files (null r2) skip the
+    // merging step.
+    def samples
+    if ( params.input ) {
+        validate_samplesheet(file(normalize_path(params.input)))
+        samples = validate_samplesheet.out
+            .splitCsv(header: true, sep: '\t')
+            .map { row ->
+                def r2 = row.fastq_2 ? file(row.fastq_2, checkIfExists: true) : null
+                tuple(row.sample, file(row.fastq_1, checkIfExists: true), r2)
+            }
+    } else {
+        discover_inputs()
+        samples = discover_inputs.out
+            .splitCsv(sep: '\t')
+            .map { row ->
+                def r2 = (row.size() > 2 && row[2]) ? file(row[2]) : null
+                tuple(row[0], file(row[1]), r2)
+            }
+    }
 
-    def branched = discover_inputs.out
-        .splitCsv(sep: '\t')
-        .map { row ->
-            def sample = row[0]
-            def r1 = file(row[1])
-            def r2 = (row.size() > 2 && row[2]) ? file(row[2]) : null
-            tuple(sample, r1, r2)
-        }
+    def branched = samples
         .branch { _sample, _r1, r2 ->
             paired:   r2 != null
             unpaired: r2 == null

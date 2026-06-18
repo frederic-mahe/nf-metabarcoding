@@ -1240,10 +1240,16 @@ from placeholder values to real taxonomic assignments.
     `sample` (error lists both rows); a reserved `notmerged` sample
     (fastq profile); an empty required cell; a single-end row (empty
     `fastq_2`); and sibling `qual` / `stats` defaulting (fasta
-    profile). [Workflow wiring — `--input` dispatch, mutual exclusion,
-    and an end-to-end `--input` run matching the equivalent
-    `--fastq_folder` run — is the remaining D06 work, tracked in
-    DECISIONS.md.]
+    profile). An end-to-end `--input` (fastq profile) run with
+    `--project_name` / `--results_folder` set drives Part A → Part B
+    and publishes the Part B occurrence table and step logs
+    ([S46] / [S45]) to `--results_folder`, exactly like the equivalent
+    `--fastq_folder` run; setting `--input` together with
+    `--fastq_folder` (or `--fasta_folder`) aborts at startup. Note:
+    Part A's per-sample artefacts ([S19]) publish into `--fastq_folder`,
+    so an `--input` run (which has no `--fastq_folder`) does not publish
+    them until the unified `--outdir` lands (D09) — the end-to-end
+    `--results_folder` outputs are unaffected.
 
 
 ## Dependencies

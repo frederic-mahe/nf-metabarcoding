@@ -599,6 +599,77 @@ nextflow_pipeline {
         }
     }
 
+    test("--input fastq samplesheet drives Part A → Part B end-to-end") {
+        // COVERAGE: [S02], [S70]
+        // [S70]: --input (fastq profile) is the primary input. With
+        // --project_name / --results_folder set it drives Part A → Part
+        // B exactly like the equivalent --fastq_folder run, publishing
+        // the Part B occurrence table + step logs to --results_folder.
+        // (Part A's per-sample artefacts go to --fastq_folder, absent
+        // here, so they are not published until --outdir / D09 — the
+        // results_folder outputs below are unaffected.) Part B can only
+        // build a table from Part A's fasta, so these artefacts existing
+        // proves --input drove the whole pipeline.
+        tag "ci"
+        setup {
+            def sheet = file("${outputDir}/input_fastq.csv")
+            sheet.text =
+                "sample,fastq_1,fastq_2\n" +
+                "sampleA," +
+                "${projectDir}/tests/data/e2e_part_b/ok/sampleA_1.fastq.gz," +
+                "${projectDir}/tests/data/e2e_part_b/ok/sampleA_2.fastq.gz\n"
+        }
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                input          = "${outputDir}/input_fastq.csv"
+                project_name   = "e2ei"
+                results_folder = "${outputDir}/e2ei_results"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def base = "${outputDir}/e2ei_results/e2ei_1_samples"
+            ["${base}_table.tsv",
+             "${base}_table.fas",
+             "${base}_dereplication.log",
+             "${base}_clustering.log",
+             "${base}_chimera_detection.log",
+             "${base}_cleaving.log",
+             "${base}_superstring_clustering.log",
+             "${base}_post_clustering_curation.log"].each { artefact ->
+                assert file(artefact).exists() :
+                    "missing Part B artefact from --input run: ${artefact}"
+            }
+        }
+    }
+
+    test("--input together with --fastq_folder aborts at startup") {
+        // COVERAGE: [S70]
+        tag "ci"
+        setup {
+            def sheet = file("${outputDir}/mx.csv")
+            sheet.text = "sample,fastq_1,fastq_2\nS,${projectDir}/x.fq,\n"
+        }
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                input          = "${outputDir}/mx.csv"
+                fastq_folder   = "${projectDir}/tests/data"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.errorReport).toString()
+                .contains("mutually exclusive") :
+                "expected mutual-exclusion error for --input + --fastq_folder"
+        }
+    }
+
     test("Part A → Part B → Part C end-to-end runs Part C when --reference_dataset is set") {
         // COVERAGE: [S01], [S51]
         // End-to-end three-part workflow: --reference_dataset triggers

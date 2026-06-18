@@ -4,7 +4,8 @@ include { normalize_path } from '../functions.nf'
 process extract_expected_error_values {
     // extract ee for future quality filtering (keep the lowest
     // observed expected error value for each unique sequence)
-    publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode
+    publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode,
+        enabled: params.fastq_folder != null
 
     input:
     tuple val(sampleId), path(filtered_fasta)

@@ -112,6 +112,35 @@ def hash_id_length() {
 }
 
 
+def samplesheet_profile() {
+    // [S70]: infer the --input samplesheet profile ('fastq' → Part A,
+    // 'fasta' → Part B) from its header columns so the entry-point
+    // dispatch can route. Reads only the header line of the
+    // user-supplied --input file (a declared input, not a folder scan
+    // or an optional-sibling probe), so the parse-time read is
+    // deliberate and minimal. Returns null when --input is unset.
+    if ( !params.input ) {
+        return null
+    }
+    def header
+    header = file(normalize_path(params.input)).withReader { reader ->
+        reader.readLine()
+    }
+    def cols
+    cols = header ? header.split(',').collect { it.trim() } : []
+    if ( 'fastq_1' in cols ) {
+        return 'fastq'
+    }
+    if ( 'fasta' in cols ) {
+        return 'fasta'
+    }
+    throw new IllegalArgumentException(
+        "--input samplesheet header must contain a 'fastq_1' (fastq " +
+        "profile) or 'fasta' (fasta profile) column; got ${cols}"
+    )
+}
+
+
 def usage() {
     // [S57]: usage block printed on --help. Group flags by the part
     // that consumes them; the three entry-point flags up top double
@@ -125,6 +154,12 @@ Usage:
   nextflow run main.nf --occurrence_table PATH  [Part C standalone]
 
 Entry-point selection (set exactly one):
+  --input PATH                validated samplesheet CSV (primary input);
+                              fastq profile (sample,fastq_1,fastq_2,run)
+                              runs Part A, fasta profile
+                              (sample,fasta,qual,stats) runs Part B.
+                              Mutually exclusive with the folder-scan
+                              inputs below
   --fastq_folder PATH         input fastq directory (one or more,
                               comma-separated); runs Part A and, when
                               --project_name is also set, Part B
@@ -219,6 +254,11 @@ def validate_params() {
     // obscure tool error mid-pipeline. Mode-specific requirements
     // (fastq_folder / primers / reference datasets) stay inline in the
     // entry workflow because they depend on the selected run mode.
+
+    // [S70]: --input (samplesheet) is mutually exclusive with the
+    // folder-scan inputs; setting both is ambiguous, so abort up-front.
+    assert !(params.input && (params.fastq_folder || params.fasta_folder)) :
+        "--input is mutually exclusive with --fastq_folder / --fasta_folder"
 
     // [S58]: validate --publish_mode before any process is wired so a
     // typo aborts the run immediately with a clear message instead of
