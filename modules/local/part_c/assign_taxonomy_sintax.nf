@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { publish_dir } from '../functions.nf'
 
 
 process assign_taxonomy_sintax {
@@ -20,8 +20,7 @@ process assign_taxonomy_sintax {
     // params.taxonomy_method == 'sintax' ([S61]); the published
     // filename embeds `basename`, which carries the `_notmerged` token
     // on the shadow path.
-    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
-        enabled: params.results_folder != null
+    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode
 
     input:
     path representatives

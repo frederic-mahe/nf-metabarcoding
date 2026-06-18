@@ -297,8 +297,7 @@ the latter case.
     parameter via either `-params-file` or `--key value` lets the
     run proceed
 - `[S19]` every Part A per-sample artefact is published into
-  `params.fastq_folder` (the same folder(s) the input fastq files
-  came from):
+  `<outdir>/per_sample/` ([S71]; `--fastq_folder` is input-only):
     - data files: `<sampleId>.fas`, `<sampleId>.qual`,
       `<sampleId>.stats`
     - per-step log files:
@@ -407,16 +406,18 @@ the latter case.
     non-zero and stderr names the missing parameter; supplying it
     via `-params-file` or `--key value` lets the run proceed and
     every Part B artefact filename begins with the supplied value.
-- `[S26]` Part B requires `--results_folder` (no default). The
-  value is an absolute or relative path to the folder where Part B
-  publishes every artefact. Nextflow's `publishDir` materialises the
-  folder (and any missing parent directories) on first publish; the
-  workflow performs no filesystem I/O at parse time (D08). An existing
-  folder is reused as-is. Like `[S25]`, this parameter is **only**
-  required for Part B.
-  - **Pass when:** running Part B with `--results_folder` set to a
-    non-existent absolute or relative path succeeds, creates the
-    folder, and every Part B artefact lands inside it.
+- `[S26]` **Superseded by `[S71]` (D09).** Part B's output location is
+  now `--outdir` (default `results`), so no output-folder parameter is
+  required — Part B no longer aborts when `--results_folder` is unset.
+  `--results_folder` survives as a deprecated alias for `--outdir`
+  ([S71]). Nextflow's `publishDir` materialises `<outdir>/<subdir>`
+  (and any missing parents) on first publish; the workflow performs no
+  filesystem I/O at parse time (D08).
+  - **Pass when:** running Part B with neither `--outdir` nor
+    `--results_folder` succeeds and publishes under `results/`
+    (the default); `--outdir <d>` (non-existent, absolute or relative)
+    succeeds, creates `<d>`, and every Part B artefact lands under
+    `<d>/occurrence_table/` ([S71]).
 - `[S27]` Part B builds its fasta channel by collecting every
   `.fas` file that satisfies one of:
     - produced by Part A in the same run (when Parts A and B run
@@ -661,8 +662,8 @@ the latter case.
     - `<basename>_post_clustering_curation.log` — `run_mumu`'s
       `--log` output (`[S43]`)
   - **Pass when:** running Part B on the documented fixture
-    publishes the six step logs above into `params.results_folder`;
-    each file is non-empty.
+    publishes the six step logs above into `<outdir>/occurrence_table/`
+    ([S71]); each file is non-empty.
 - `[S46]` Part B publishes its final occurrence table as
   `<project>_<N>_samples_table.tsv` (after `rebuild_post_mumu_table`
   and the size=0→1 awk hotfix). Among the OTU tables produced
@@ -675,11 +676,11 @@ the latter case.
   to be published.
   - **Pass when:** running Part B on the documented fixture
     publishes `<project>_<N>_samples_table.tsv` to
-    `params.results_folder`; the file is non-empty and starts with
-    the OTU-table header row; none of the intermediate
+    `<outdir>/occurrence_table/` ([S71]); the file is non-empty and
+    starts with the OTU-table header row; none of the intermediate
     `.OTU.filtered.cleaved.table`, `.nosubstringOTUs.table`,
     `_raw_mumu.table`, or `.mumu.table` files are present in the
-    results folder.
+    output.
 
 
 ## Part C — taxonomic assignment
@@ -922,8 +923,8 @@ from placeholder values to real taxonomic assignments.
     symbolic link (per `Files.isSymbolicLink`); an invalid value
     such as `--publish_mode bogus` aborts the workflow with an
     error mentioning `publish_mode`.
-- `[S59]` Part B's `--results_folder` holds a closed whitelist of
-  artefacts per regular / shadow run:
+- `[S59]` `<outdir>/occurrence_table/` ([S71]) holds a closed
+  whitelist of artefacts per regular / shadow run:
     1. exactly one occurrence table: `<basename>_table.tsv` (from
        [S46]);
     2. exactly one FASTA: the post-mumu
@@ -935,30 +936,30 @@ from placeholder values to real taxonomic assignments.
        `_chimera_detection.log`, `_cleaving.log`,
        `_superstring_clustering.log`,
        `_post_clustering_curation.log`.
-    4. the `pipeline_info/` directory holding the run's
-       `software_versions.yml` ([S68]). This is the one whitelist
-       entry shared by the regular and shadow runs (it carries no
-       `_notmerged` token); it moves under `--outdir/pipeline_info`
-       when D09 lands.
-  All other Part B intermediates (`.qual`, `.distr`,
-  `_per_sample_OTUs.stats`, the global dereplicated `.fas`, the
-  swarm artefacts `.swarms` / `.stats` / `.struct` /
+  When Part C runs, its `<basename>_table_assigned.tsv` ([S51]) and
+  `<basename>_table_assigned_majority.tsv` ([S66]) are published into
+  the same directory (they are not Part B intermediates and are not
+  covered by this whitelist). The run's `software_versions.yml`
+  ([S68]) lives in the sibling `<outdir>/pipeline_info/`, **not** in
+  `occurrence_table/`. All other Part B intermediates (`.qual`,
+  `.distr`, `_per_sample_OTUs.stats`, the global dereplicated `.fas`,
+  the swarm artefacts `.swarms` / `.stats` / `.struct` /
   `_representatives.fas` and their cleaver siblings,
   `.uchime` / `.uchime2`, `_representatives.results` /
   `.results2`, the pre-mumu `.nosubstringOTUs.fas`) stay in the
   Nextflow work directory and **must not** appear under
-  `--results_folder`. The shadow Part B path follows the same
-  contract with the `_notmerged` token in the basename.
-  - **Pass when:** an end-to-end run produces a results folder
-    whose file set matches `{<basename>_table.tsv,
-    <basename>_table.fas, <basename>_dereplication.log,
-    <basename>_clustering.log, <basename>_chimera_detection.log,
-    <basename>_cleaving.log,
+  `<outdir>/occurrence_table/`. The shadow Part B path follows the
+  same contract with the `_notmerged` token in the basename.
+  - **Pass when:** an end-to-end Part B-only run (no Part C) produces
+    an `<outdir>/occurrence_table/` whose file set matches
+    `{<basename>_table.tsv, <basename>_table.fas,
+    <basename>_dereplication.log, <basename>_clustering.log,
+    <basename>_chimera_detection.log, <basename>_cleaving.log,
     <basename>_superstring_clustering.log,
-    <basename>_post_clustering_curation.log}` (plus the same set
-    with `_notmerged` if the shadow path fired, plus the shared
-    `pipeline_info/` directory, [S68]); none of the blacklisted
-    intermediate filenames appear.
+    <basename>_post_clustering_curation.log}` (plus the same set with
+    `_notmerged` if the shadow path fired); none of the blacklisted
+    intermediate filenames appear; `software_versions.yml` is in
+    `<outdir>/pipeline_info/`, not `occurrence_table/`.
 - `[S60]` Path-typed parameters are normalised at workflow startup so
   shell-style `~` prefixes that the shell did not expand (quoted on
   the CLI, or read from a `-params-file`) still resolve to the
@@ -1160,23 +1161,21 @@ from placeholder values to real taxonomic assignments.
 - `[S68]` every run records the versions of the external tools it
   relies on (`vsearch`, `swarm`, `cutadapt`, `mumu`) plus the Python
   interpreter into `software_versions.yml`, published under
-  `<results_folder>/pipeline_info/`. The process
+  `<outdir>/pipeline_info/` ([S71]). The process
   `dump_software_versions` queries each tool's `--version` on the
   active environment (PATH / conda / module / container) and pipes the
   raw output through `bin/collect_versions.py`, which extracts the
   first `MAJOR.MINOR[.PATCH]` token per tool. A tool missing from the
   environment is recorded as `n/a` (not dropped) so the gap is visible
-  in the report rather than silently absent. The file is published
-  wherever a `--results_folder` is established (Part B standalone,
-  Part C standalone, and the end-to-end path with `--project_name`);
-  the dev-only Part A-only path has no results folder yet and gains the
-  versions file once the unified `--outdir` lands (tracked separately).
-  - **Pass when:** a run with a `--results_folder` publishes
-    `pipeline_info/software_versions.yml` naming `vsearch`, `swarm`,
-    `cutadapt`, `mumu`, and `python`, each with a non-empty value (a
-    real `MAJOR.MINOR[.PATCH]` token or `n/a`); `bin/collect_versions.py`
-    unit tests pin the extraction for each tool's real `--version`
-    output and the missing-tool `n/a` case.
+  in the report rather than silently absent. Because `--outdir` always
+  resolves (default `results`), the versions file is published on every
+  entry point — including a Part A-only run.
+  - **Pass when:** a run publishes
+    `<outdir>/pipeline_info/software_versions.yml` naming `vsearch`,
+    `swarm`, `cutadapt`, `mumu`, and `python`, each with a non-empty
+    value (a real `MAJOR.MINOR[.PATCH]` token or `n/a`);
+    `bin/collect_versions.py` unit tests pin the extraction for each
+    tool's real `--version` output and the missing-tool `n/a` case.
 - `[S69]` the conda environment (`environment.yml`) and the CI tool
   setup (`.github/workflows/test.yml`) pin every shared external tool
   to an **exact** version (`name=X.Y.Z`, never a floating `>=` / `<=`),
@@ -1245,11 +1244,10 @@ from placeholder values to real taxonomic assignments.
     and publishes the Part B occurrence table and step logs
     ([S46] / [S45]) to `--results_folder`, exactly like the equivalent
     `--fastq_folder` run; setting `--input` together with
-    `--fastq_folder` (or `--fasta_folder`) aborts at startup. Note:
-    Part A's per-sample artefacts ([S19]) publish into `--fastq_folder`,
-    so an `--input` run (which has no `--fastq_folder`) does not publish
-    them until the unified `--outdir` lands (D09) — the end-to-end
-    `--results_folder` outputs are unaffected.
+    `--fastq_folder` (or `--fasta_folder`) aborts at startup. Part A's
+    per-sample artefacts ([S19]) publish under `<outdir>/per_sample/`
+    ([S71]) regardless of whether the samples came from `--input` or a
+    folder scan.
 
 
 ## Output (`--outdir`)
@@ -1296,9 +1294,15 @@ from placeholder values to real taxonomic assignments.
     `<d>/pipeline_info/`; nothing is written to the input folder;
     `<d>/occurrence_table/` matches the `[S59]` whitelist;
     `--results_folder <d>` (no `--outdir`) routes to the same layout
-    with a deprecation warning. [The publishDir rewiring and the
-    matching revisions to `[S19]` / `[S26]` / `[S46]` / `[S59]` /
-    `[S68]` land with the D09 wiring slice.]
+    with a deprecation warning.
+
+  Reconciliation: any earlier bullet or pass-when that names a publish
+  location as `params.fastq_folder` / `--results_folder` now resolves
+  to this `[S71]` layout — Part A artefacts under
+  `<outdir>/per_sample/`, Part B / Part C tables and step logs under
+  `<outdir>/occurrence_table/`, `software_versions.yml` under
+  `<outdir>/pipeline_info/` — with `--results_folder` the deprecated
+  alias for `--outdir`.
 
 
 ## Dependencies

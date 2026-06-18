@@ -66,19 +66,47 @@ Required to run the test suite and the linters:
 bash tests/data/generate.sh
 
 # run on the bundled fixtures (paired_merge_ok matches canonical row 7
-# — no --fastq_pattern needed)
+# — no --fastq_pattern needed). --outdir is where every result lands.
 nextflow run main.nf \
     --fastq_folder  tests/data \
+    --outdir        results \
     --threads       1
 
 # run on your own data — auto-detect via the canonical pattern table
 nextflow run main.nf \
-    --fastq_folder  /path/to/fastq_dir
+    --fastq_folder  /path/to/fastq_dir \
+    --outdir        /path/to/results
 
 # multiple folders (comma-separated)
 nextflow run main.nf \
-    --fastq_folder  /data/run17,/data/run18
+    --fastq_folder  /data/run17,/data/run18 \
+    --outdir        /path/to/results
 ```
+
+### Output layout (`--outdir`)
+
+All published artefacts land under `--outdir` (default `results`), in a
+fixed layout:
+
+```
+<outdir>/
+├── per_sample/         per-sample .fas / .qual / .stats + Part A logs
+├── occurrence_table/   the occurrence table(s), step logs, and the
+│                       taxonomy-annotated tables (Part B + Part C)
+└── pipeline_info/      software_versions.yml (tool versions for the run)
+```
+
+Inputs are never written to — `--fastq_folder` / `--fasta_folder` are
+read-only.
+
+> **Migration note (0.1.0, breaking).** Earlier versions published Part
+> A artefacts back into `--fastq_folder` and Part B/C artefacts into
+> `--results_folder`. As of 0.1.0 everything goes under `--outdir` in
+> the layout above. `--results_folder` still works as a **deprecated
+> alias** for `--outdir` (with a warning), but the files now live in the
+> `occurrence_table/` sub-directory rather than at the top level — update
+> any scripts that read `<results_folder>/*.tsv` to
+> `<outdir>/occurrence_table/*.tsv`.
 
 ### Input discovery
 

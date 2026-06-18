@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { publish_dir } from '../functions.nf'
 
 
 process trim_primers {
@@ -6,8 +6,7 @@ process trim_primers {
     // are in the same orientation. Matching leftmost is the default.
     // Length and N-count filtering are delegated to
     // filter_and_convert_to_fasta (vsearch --fastq_minlen / --fastq_maxns).
-    publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode, pattern: "*.log",
-        enabled: params.fastq_folder != null
+    publishDir path: { publish_dir('per_sample') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     tuple val(sampleId), path(merged_fastq)

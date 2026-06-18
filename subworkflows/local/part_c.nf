@@ -10,7 +10,7 @@ include { assign_taxonomy_stampa }                         from '../../modules/l
 include { assign_taxonomy_sintax }                         from '../../modules/local/part_c/assign_taxonomy_sintax.nf'
 include { update_occurrence_table }                        from '../../modules/local/part_c/update_occurrence_table.nf'
 include { compute_majority_assignment }                    from '../../modules/local/part_c/compute_majority_assignment.nf'
-include { normalize_path }                                 from '../../modules/local/functions.nf'
+include { normalize_path; publish_dir }                    from '../../modules/local/functions.nf'
 
 
 workflow part_C {
@@ -77,7 +77,7 @@ workflow part_C {
         def merged = assign_taxonomy_stampa.out.taxonomy
             .combine(basename)
             .collectFile(
-                storeDir: normalize_path(params.results_folder),
+                storeDir: publish_dir('occurrence_table'),
                 sort: { line ->
                     // -k2,2nr -k1,1d == abundance desc, amplicon asc.
                     // collectFile's sort closure takes one argument

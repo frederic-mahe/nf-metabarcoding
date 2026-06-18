@@ -1,4 +1,4 @@
-include { normalize_path } from './functions.nf'
+include { publish_dir } from './functions.nf'
 
 
 process dump_software_versions {
@@ -8,12 +8,9 @@ process dump_software_versions {
     // which extracts the version token; a tool missing from the active
     // environment (PATH / conda / module / container) is recorded as
     // `n/a` rather than dropped, so the gap is visible in the report.
-    // Published under <results_folder>/pipeline_info/ wherever a
-    // results folder is established (Part B / Part C / end-to-end with
-    // --project_name).
-    publishDir path: { "${normalize_path(params.results_folder)}/pipeline_info" },
-        mode: params.publish_mode,
-        enabled: params.results_folder != null
+    // [S71]: published to <outdir>/pipeline_info/ (a sibling of
+    // occurrence_table/, not inside it).
+    publishDir path: { publish_dir('pipeline_info') }, mode: params.publish_mode
 
     output:
     path "software_versions.yml"

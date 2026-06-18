@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { publish_dir } from '../functions.nf'
 
 
 process update_occurrence_table {
@@ -6,8 +6,7 @@ process update_occurrence_table {
     // <basename>_table.tsv. The output is published as a sibling
     // file `<basename>_table_assigned.tsv` so Part B's unannotated
     // table is preserved alongside the annotated one (D04 sub-q2).
-    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
-        enabled: params.results_folder != null
+    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode
 
     input:
     path occurrence_table

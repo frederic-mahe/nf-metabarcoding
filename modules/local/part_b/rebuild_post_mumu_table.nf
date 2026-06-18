@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { publish_dir } from '../functions.nf'
 
 
 process rebuild_post_mumu_table {
@@ -8,8 +8,7 @@ process rebuild_post_mumu_table {
     //
     // [S46]: emits the final occurrence table as
     // <basename>_table.tsv.
-    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
-        enabled: params.results_folder != null
+    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode
 
     input:
     path mumu_table

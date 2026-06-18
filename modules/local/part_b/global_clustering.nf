@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { publish_dir } from '../functions.nf'
 
 
 process global_clustering {
@@ -12,8 +12,7 @@ process global_clustering {
     // [S59]: only the log reaches the results folder; the
     // .swarms / .stats / .struct / _representatives.fas are
     // internal intermediates.
-    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode, pattern: "*.log",
-        enabled: params.results_folder != null
+    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     path global_fasta

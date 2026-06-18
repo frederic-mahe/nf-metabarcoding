@@ -25,13 +25,12 @@ workflow part_c {
     assert params.occurrence_table :
         "--occurrence_table must be set when running Part C standalone " +
         "(fasta input is blocked on DECISIONS.md D04)"
-    assert params.results_folder :
-        "--results_folder must be set when running Part C"
 
-    // [S26]/D08: no startup mkdirs — publishDir materialises
-    // results_folder (and any missing parents) on first publish, so the
-    // workflow does no filesystem I/O at parse time.
-    // [S68]: record tool versions alongside the Part C outputs.
+    // [S71]/D08: no startup mkdirs — publishDir materialises
+    // <outdir>/<subdir> on first publish (no parse-time filesystem I/O).
+    // --outdir always resolves (default 'results'), so no output-folder
+    // param is required ([S26] superseded).
+    // [S68]: record tool versions under <outdir>/pipeline_info/.
     dump_software_versions()
 
     def table_path = file(normalize_path(params.occurrence_table))
@@ -79,13 +78,12 @@ workflow part_b {
     // allows two distinct sub-workflows in the same scope.
     assert params.project_name :
         "--project_name must be set when --fasta_folder is set"
-    assert params.results_folder :
-        "--results_folder must be set when --fasta_folder is set"
 
-    // [S26]/D08: no startup mkdirs — publishDir materialises
-    // results_folder (and any missing parents) on first publish, so the
-    // workflow does no filesystem I/O at parse time.
-    // [S68]: record tool versions alongside the Part B outputs.
+    // [S71]/D08: no startup mkdirs — publishDir materialises
+    // <outdir>/<subdir> on first publish (no parse-time filesystem I/O).
+    // --outdir always resolves (default 'results'), so no output-folder
+    // param is required ([S26] superseded).
+    // [S68]: record tool versions under <outdir>/pipeline_info/.
     dump_software_versions()
 
     // Build the six per-sample lists (regular + shadow × fasta/qual/
@@ -248,12 +246,11 @@ workflow {
     // table — DSL2 allows two distinct sub-workflows in the same
     // scope.
     if ( params.project_name ) {
-        assert params.results_folder :
-            "--results_folder must be set when --project_name is set"
-        // [S26]/D08: no startup mkdirs — publishDir materialises
-        // results_folder (and any missing parents) on first publish, so
-        // the workflow does no filesystem I/O at parse time.
-        // [S68]: record tool versions alongside the Part B / Part C outputs.
+        // [S71]/D08: no startup mkdirs — publishDir materialises
+        // <outdir>/<subdir> on first publish (no parse-time filesystem
+        // I/O). --outdir always resolves (default 'results'), so no
+        // output-folder param is required ([S26] superseded).
+        // [S68]: record tool versions under <outdir>/pipeline_info/.
         dump_software_versions()
 
         def regular_fasta = part_A.out.fasta.filter { id, _f -> !id.endsWith("_notmerged") }

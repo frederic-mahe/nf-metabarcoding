@@ -97,7 +97,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S68]`| every run records external-tool + Python versions into `pipeline_info/software_versions.yml` (missing tool → `n/a`) | `tests/python/test_collect_versions.py`, `tests/processes/dump_software_versions.nf.test` | done | — |
 | `[S69]`| exact, agreeing version pins in `environment.yml` and CI; no unresolvable `bioconda::mumu` | `tests/python/test_reproducible_pins.py` | done | — |
 | `[S70]`| `--input` samplesheet (fastq / fasta profiles): structural validation in `bin/parse_samplesheet.py`; folder-scan fallback, mutually exclusive | `tests/python/test_parse_samplesheet.py`, `tests/main.nf.test` | done | — |
-| `[S71]`| `--outdir` single output root (`per_sample`/`occurrence_table`/`pipeline_info`); `--results_folder` deprecated alias; `--fastq_folder` input-only | `tests/functions/effective_outdir.nf.test` | partial | D09 wiring pending |
+| `[S71]`| `--outdir` single output root (`per_sample`/`occurrence_table`/`pipeline_info`); `--results_folder` deprecated alias; `--fastq_folder` input-only | `tests/functions/effective_outdir.nf.test`, `tests/main.nf.test` | done | — |
 
 
 ## Per-process tests

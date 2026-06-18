@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { publish_dir } from '../functions.nf'
 
 
 process compute_majority_assignment {
@@ -11,8 +11,7 @@ process compute_majority_assignment {
     // (OTU\tamplicon\ttaxonomy_majority). Never runs on the shadow
     // path; gated on params.majority_assignment and (by the startup
     // assert) on --taxonomy_method=stampa.
-    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
-        enabled: params.results_folder != null
+    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode
 
     input:
     path assigned_table

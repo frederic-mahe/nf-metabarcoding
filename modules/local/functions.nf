@@ -109,15 +109,10 @@ def effective_outdir(outdir, results_folder) {
 
 
 def resolve_outdir() {
-    // [S71]: params-reading wrapper over effective_outdir(); warns once
-    // when the deprecated --results_folder alias is the source.
-    if ( !params.outdir && params.results_folder ) {
-        System.err.println(
-            "WARNING: --results_folder is deprecated; use --outdir. " +
-            "Outputs now follow the " +
-            "<outdir>/{per_sample,occurrence_table,pipeline_info}/ layout."
-        )
-    }
+    // [S71]: params-reading wrapper over effective_outdir(). Silent —
+    // the --results_folder deprecation warning is emitted once at
+    // startup by validate_params(), not here (this runs per publishDir
+    // evaluation).
     return effective_outdir(params.outdir, params.results_folder)
 }
 
@@ -295,6 +290,16 @@ def validate_params() {
     // folder-scan inputs; setting both is ambiguous, so abort up-front.
     assert !(params.input && (params.fastq_folder || params.fasta_folder)) :
         "--input is mutually exclusive with --fastq_folder / --fasta_folder"
+
+    // [S71]: --results_folder is a deprecated alias for --outdir. Warn
+    // once at startup when it is the active output root.
+    if ( !params.outdir && params.results_folder ) {
+        System.err.println(
+            "WARNING: --results_folder is deprecated; use --outdir. " +
+            "Outputs now follow the " +
+            "<outdir>/{per_sample,occurrence_table,pipeline_info}/ layout."
+        )
+    }
 
     // [S58]: validate --publish_mode before any process is wired so a
     // typo aborts the run immediately with a clear message instead of

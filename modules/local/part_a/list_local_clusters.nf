@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { publish_dir } from '../functions.nf'
 
 
 // refactoring:
@@ -9,8 +9,7 @@ include { normalize_path } from '../functions.nf'
 process list_local_clusters {
     // retain only clusters with more than 2 reads
     // (do not use the fastidious option here)
-    publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode,
-        enabled: params.fastq_folder != null
+    publishDir path: { publish_dir('per_sample') }, mode: params.publish_mode
 
     input:
     tuple val(sampleId), path(dereplicated_fasta)

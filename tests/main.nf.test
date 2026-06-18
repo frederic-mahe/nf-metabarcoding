@@ -4,10 +4,11 @@ nextflow_pipeline {
     script "main.nf"
 
     test("runs end-to-end on the paired_merge_ok fixtures") {
-        // COVERAGE: [S01], [S03], [S10], [S11], [S12], [S19]
+        // COVERAGE: [S01], [S03], [S10], [S11], [S12], [S19], [S71]
         tag "ci"
         when {
             params {
+                outdir         = "${outputDir}/a_e2eok"
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
                 fastq_folder   = "${projectDir}/tests/data"
@@ -17,8 +18,8 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            // [S19] per-step logs land in params.fastq_folder
-            def folder = "${projectDir}/tests/data"
+            // [S19] per-step logs land in <outdir>/per_sample/
+            def folder = "${outputDir}/a_e2eok/per_sample"
             def sampleId = "paired_merge_ok"
             ["merging", "trimming", "dereplicating", "clustering"].each { step ->
                 def log = file("${folder}/${sampleId}_${step}.log")
@@ -27,7 +28,7 @@ nextflow_pipeline {
             }
 
             // [S01]/[S19]: per-sample artefacts (the Part A → Part B
-            // contract) also land in params.fastq_folder.
+            // contract) also land in <outdir>/per_sample/.
             ["fas", "qual", "stats"].each { ext ->
                 def artefact = file("${folder}/${sampleId}.${ext}")
                 assert artefact.exists() :
@@ -215,6 +216,7 @@ nextflow_pipeline {
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
                 fastq_folder   = "${projectDir}/tests/data/unpaired_only"
+                outdir         = "${outputDir}/a_unpaired"
                 fastq_pattern  = "/*_{1,2}.fastq.gz"  // matches nothing in this dir
                 threads        = 1
             }
@@ -232,8 +234,8 @@ nextflow_pipeline {
                 assert out.contains(proc) :
                     "expected ${proc} to run on the unpaired sample, got: ${out}"
             }
-            // per-sample artefacts and the [S19] logs land in fastq_folder
-            def folder = "${projectDir}/tests/data/unpaired_only"
+            // per-sample artefacts and the [S19] logs land in <outdir>/per_sample/
+            def folder = "${outputDir}/a_unpaired/per_sample"
             def sampleId = "unpaired_sample"
             assert file("${folder}/${sampleId}.fas").exists()         : "missing .fas"
             assert file("${folder}/${sampleId}_trimming.log").exists() : "missing trimming log"
@@ -254,6 +256,7 @@ nextflow_pipeline {
                 fastq_folder   = "${projectDir}/tests/data"
                 fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
                 hash_function  = "md5"
+                outdir         = "${outputDir}/a_md5"
                 threads        = 1
             }
         }
@@ -263,7 +266,7 @@ nextflow_pipeline {
             // thread md5 through filter_and_convert_to_fasta and the
             // .qual dedup. The published per-sample .qual carries
             // 32-hex-char names (vs the 40 of the default sha1 runs).
-            def qual = file("${projectDir}/tests/data/paired_merge_ok.qual")
+            def qual = file("${outputDir}/a_md5/per_sample/paired_merge_ok.qual")
             assert qual.exists() : "missing published .qual"
             def lines = qual.readLines()
             assert lines.size() > 0 : "expected at least one .qual row"
@@ -282,6 +285,7 @@ nextflow_pipeline {
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
                 fastq_folder   = "${projectDir}/tests/data/miseq"
+                outdir         = "${outputDir}/a_miseq"
                 fastq_pattern  = ""  // rely purely on the canonical table
                 threads        = 1
             }
@@ -290,7 +294,7 @@ nextflow_pipeline {
             assert workflow.success
             // Sample ID derives from canonical pattern row 1
             // (`_L00[1-9]_R1_00[1-9]\.<ext>`).
-            def folder = "${projectDir}/tests/data/miseq"
+            def folder = "${outputDir}/a_miseq/per_sample"
             def sampleId = "SampleX_S1"
             ["merging", "trimming", "dereplicating", "clustering"].each { step ->
                 def log = file("${folder}/${sampleId}_${step}.log")
@@ -308,6 +312,7 @@ nextflow_pipeline {
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
                 fastq_folder   = "${projectDir}/tests/data/miseq,${projectDir}/tests/data/unpaired_only"
+                outdir         = "${outputDir}/a_comma"
                 fastq_pattern  = ""
                 threads        = 1
             }
@@ -320,9 +325,9 @@ nextflow_pipeline {
             assert out.contains("merge_fastq_pairs") :
                 "expected merge_fastq_pairs to run on the MiSeq pair, got: ${out}"
             // Per-sample log probes
-            assert file("${projectDir}/tests/data/miseq/SampleX_S1_merging.log").exists()
-            assert file("${projectDir}/tests/data/unpaired_only/unpaired_sample_dereplicating.log").exists()
-            assert !file("${projectDir}/tests/data/unpaired_only/unpaired_sample_merging.log").exists() :
+            assert file("${outputDir}/a_comma/per_sample/SampleX_S1_merging.log").exists()
+            assert file("${outputDir}/a_comma/per_sample/unpaired_sample_dereplicating.log").exists()
+            assert !file("${outputDir}/a_comma/per_sample/unpaired_sample_merging.log").exists() :
                 "single-end sample must not produce a merging log"
         }
     }
@@ -332,6 +337,7 @@ nextflow_pipeline {
         tag "ci"
         when {
             params {
+                outdir         = "${outputDir}/a_notmerged"
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
                 fastq_folder   = "${projectDir}/tests/data"
@@ -342,7 +348,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
 
-            def folder = "${projectDir}/tests/data"
+            def folder = "${outputDir}/a_notmerged/per_sample"
             def shadowId = "paired_merge_fail_notmerged"
 
             // [S04]: shadow path has no merging step (the reads in
@@ -390,12 +396,13 @@ nextflow_pipeline {
                 fastq_folder         = "${projectDir}/tests/data"
                 fastq_pattern        = "/paired_merge_fail_{1,2}.fastq.gz"
                 join_padding_length  = 16
+                outdir               = "${outputDir}/a_padding"
                 threads              = 1
             }
         }
         then {
             assert workflow.success
-            def folder = "${projectDir}/tests/data"
+            def folder = "${outputDir}/a_padding/per_sample"
             def shadowId = "paired_merge_fail_notmerged"
 
             def fas = file("${folder}/${shadowId}.fas")
@@ -476,7 +483,7 @@ nextflow_pipeline {
             assert workflow.success
 
             // [S26]: the results folder is created on the fly.
-            def resultDir = "${outputDir}/part_b_results"
+            def resultDir = "${outputDir}/part_b_results/occurrence_table"
             assert file(resultDir).exists() : "results folder should be created"
 
             // [S09]/[S27]: 3 samples (S1, S2 with content + E empty);
@@ -575,7 +582,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
 
-            def resultDir = "${outputDir}/e2e_results"
+            def resultDir = "${outputDir}/e2e_results/occurrence_table"
             assert file(resultDir).exists() : "results folder should be created"
 
             // Part A's regular sample → Part B with N=1 (the
@@ -602,14 +609,12 @@ nextflow_pipeline {
     test("--input fastq samplesheet drives Part A → Part B end-to-end") {
         // COVERAGE: [S02], [S70]
         // [S70]: --input (fastq profile) is the primary input. With
-        // --project_name / --results_folder set it drives Part A → Part
-        // B exactly like the equivalent --fastq_folder run, publishing
-        // the Part B occurrence table + step logs to --results_folder.
-        // (Part A's per-sample artefacts go to --fastq_folder, absent
-        // here, so they are not published until --outdir / D09 — the
-        // results_folder outputs below are unaffected.) Part B can only
-        // build a table from Part A's fasta, so these artefacts existing
-        // proves --input drove the whole pipeline.
+        // --project_name and an output dir set it drives Part A → Part B
+        // exactly like the equivalent --fastq_folder run, publishing the
+        // Part B occurrence table + step logs under
+        // <outdir>/occurrence_table/ ([S71]). Part B can only build a
+        // table from Part A's fasta, so these artefacts existing proves
+        // --input drove the whole pipeline.
         tag "ci"
         setup {
             def sheet = file("${outputDir}/input_fastq.csv")
@@ -631,7 +636,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def base = "${outputDir}/e2ei_results/e2ei_1_samples"
+            def base = "${outputDir}/e2ei_results/occurrence_table/e2ei_1_samples"
             ["${base}_table.tsv",
              "${base}_table.fas",
              "${base}_dereplication.log",
@@ -706,7 +711,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def base = "${outputDir}/e2ec_results/e2ec_1_samples"
+            def base = "${outputDir}/e2ec_results/occurrence_table/e2ec_1_samples"
             def partB = file("${base}_table.tsv")
             assert partB.exists() :
                 "Part B occurrence table should exist end-to-end"
@@ -747,7 +752,7 @@ nextflow_pipeline {
             // padded reads). Both feed Part B: regular path yields
             // shadow_e2e_1_samples_*, shadow path yields
             // shadow_e2e_1_samples_notmerged_*.
-            def regular_base = "${outputDir}/shadow_e2e_results/shadow_e2e_1_samples"
+            def regular_base = "${outputDir}/shadow_e2e_results/occurrence_table/shadow_e2e_1_samples"
             def shadow_base  = "${regular_base}_notmerged"
 
             // [S59]: regular path publishes its table; shadow path
@@ -774,13 +779,13 @@ nextflow_pipeline {
                     "N leaked into shadow post-mumu fasta line ${i}: ${fastaLines[i]}"
             }
 
-            // The per-sample shadow .fas stays in fastq_folder (Part A's
-            // publishDir target) — not in the Part B results folder.
+            // [S71]: per-sample shadow .fas goes to <outdir>/per_sample/,
+            // never mixed in with the Part B occurrence_table/ artefacts.
             def perSampleInResults = file(
-                "${outputDir}/shadow_e2e_results/sampleB_notmerged.fas"
+                "${outputDir}/shadow_e2e_results/occurrence_table/sampleB_notmerged.fas"
             )
             assert !perSampleInResults.exists() :
-                "per-sample shadow .fas must not be published into the Part B results folder"
+                "per-sample shadow .fas must not appear under occurrence_table/"
         }
     }
 
@@ -800,7 +805,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def resultDir = "${outputDir}/whitelist_results"
+            def resultDir = "${outputDir}/whitelist_results/occurrence_table"
             def regular = "whitelist_1_samples"
             def shadow  = "whitelist_1_samples_notmerged"
             def stepLogs = [
@@ -817,12 +822,14 @@ nextflow_pipeline {
                 expected << "${base}_table.fas"
                 stepLogs.each { suffix -> expected << "${base}${suffix}" }
             }
-            // [S59]/[S68]: the shared pipeline_info/ dir (software
-            // versions) is whitelisted alongside the per-run artefacts.
-            expected << "pipeline_info"
             def actual = file(resultDir).listFiles()*.name.toList().sort()
             assert actual == expected.sort() :
                 "Part B results folder mismatch.\nexpected: ${expected.sort()}\nactual:   ${actual}"
+
+            // [S68]/[S71]: software_versions.yml is a sibling under
+            // <outdir>/pipeline_info/, not inside occurrence_table/.
+            assert file("${outputDir}/whitelist_results/pipeline_info/software_versions.yml").exists() :
+                "software_versions.yml should be under <outdir>/pipeline_info/"
 
             // [S59] spell out the blacklist for the regular path so
             // a regression that re-adds a publishDir surfaces with a
@@ -870,22 +877,26 @@ nextflow_pipeline {
         }
     }
 
-    test("Part B aborts when --results_folder is missing") {
-        // COVERAGE: [S26]
+    test("Part B no longer requires --results_folder; the alias still publishes") {
+        // COVERAGE: [S26], [S71]
+        // [S26] superseded by [S71]: --results_folder is no longer
+        // required (--outdir defaults to 'results'). It survives as a
+        // deprecated alias for --outdir — a Part B run with only
+        // --results_folder succeeds and publishes under
+        // <results_folder>/occurrence_table/.
         tag "ci"
         when {
             params {
-                project_name = "myproj"
-                fasta_folder = "${projectDir}/tests/data/part_b"
-                threads      = 1
-                // results_folder deliberately unset
+                project_name   = "aliasproj"
+                results_folder = "${outputDir}/alias_out"
+                fasta_folder   = "${projectDir}/tests/data/part_b"
+                threads        = 1
             }
         }
         then {
-            assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
-            assert msg.contains("results_folder") :
-                "expected error to name results_folder, got: ${msg}"
+            assert workflow.success
+            assert file("${outputDir}/alias_out/occurrence_table/aliasproj_3_samples_table.tsv").exists() :
+                "deprecated --results_folder alias should publish under <dir>/occurrence_table/"
         }
     }
 
@@ -966,7 +977,7 @@ nextflow_pipeline {
             // `part_c_standalone` → published table
             // `part_c_standalone_table_assigned.tsv` (D04 sub-q2).
             def updated = file(
-                "${outputDir}/part_c_standalone/part_c_standalone_table_assigned.tsv"
+                "${outputDir}/part_c_standalone/occurrence_table/part_c_standalone_table_assigned.tsv"
             )
             assert updated.exists() :
                 "Part C should publish <basename>_table_assigned.tsv"
@@ -1019,12 +1030,12 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def assigned = file(
-                "${outputDir}/part_c_majority/part_c_majority_table_assigned.tsv"
+                "${outputDir}/part_c_majority/occurrence_table/part_c_majority_table_assigned.tsv"
             )
             assert assigned.exists() :
                 "Part C should still publish <basename>_table_assigned.tsv"
             def majority = file(
-                "${outputDir}/part_c_majority/part_c_majority_table_assigned_majority.tsv"
+                "${outputDir}/part_c_majority/occurrence_table/part_c_majority_table_assigned_majority.tsv"
             )
             assert majority.exists() :
                 "--majority_assignment should publish <basename>_table_assigned_majority.tsv"
@@ -1067,7 +1078,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def majority = file(
-                "${outputDir}/part_c_no_majority/part_c_no_majority_table_assigned_majority.tsv"
+                "${outputDir}/part_c_no_majority/occurrence_table/part_c_no_majority_table_assigned_majority.tsv"
             )
             assert !majority.exists() :
                 "majority table must not be published when --majority_assignment is unset"
@@ -1142,7 +1153,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def merged = file(
-                "${outputDir}/part_c_scatter/part_c_scatter_taxonomy_stampa.tsv"
+                "${outputDir}/part_c_scatter/occurrence_table/part_c_scatter_taxonomy_stampa.tsv"
             )
             assert merged.exists() :
                 "collectFile should publish <basename>_taxonomy_stampa.tsv"
@@ -1159,7 +1170,7 @@ nextflow_pipeline {
                 "sort order wrong: ${abundances}"
             // The final occurrence table also receives the assignments.
             def updated = file(
-                "${outputDir}/part_c_scatter/part_c_scatter_table_assigned.tsv"
+                "${outputDir}/part_c_scatter/occurrence_table/part_c_scatter_table_assigned.tsv"
             )
             assert updated.exists() :
                 "Part C should publish <basename>_table_assigned.tsv"
@@ -1206,7 +1217,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def merged = file(
-                "${outputDir}/part_c_nosplit/part_c_nosplit_taxonomy_stampa.tsv"
+                "${outputDir}/part_c_nosplit/occurrence_table/part_c_nosplit_taxonomy_stampa.tsv"
             )
             assert merged.exists() :
                 "collectFile should publish <basename>_taxonomy_stampa.tsv even without split"
@@ -1269,7 +1280,7 @@ nextflow_pipeline {
             assert workflow.success :
                 "tilde expansion should let Part C find the reference"
             def updated = file(
-                "${outputDir}/tilde_results/tilde_table_assigned.tsv"
+                "${outputDir}/tilde_results/occurrence_table/tilde_table_assigned.tsv"
             )
             assert updated.exists() :
                 "Part C should publish <basename>_table_assigned.tsv"
@@ -1291,6 +1302,7 @@ nextflow_pipeline {
                 fastq_folder   = "${projectDir}/tests/data"
                 fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
                 publish_mode   = "symlink"
+                outdir         = "${outputDir}/a_symlink"
                 threads        = 1
             }
         }
@@ -1299,7 +1311,7 @@ nextflow_pipeline {
             // [S58]: with publish_mode=symlink, the published per-step
             // log should be a symbolic link (default 'link' would
             // yield a regular file with nlink > 1).
-            def log = file("${projectDir}/tests/data/paired_merge_ok_merging.log")
+            def log = file("${outputDir}/a_symlink/per_sample/paired_merge_ok_merging.log")
             assert log.exists() : "missing published log: ${log}"
             assert java.nio.file.Files.isSymbolicLink(log.toPath()) :
                 "publish_mode=symlink should produce a symlink, got: ${log}"
@@ -1354,7 +1366,7 @@ nextflow_pipeline {
 
             // Part B publishes <basename>_table.tsv. Three samples
             // (S1, S2, E) — N=3.
-            def table = file("${outputDir}/empty_b_results/empty_3_samples_table.tsv")
+            def table = file("${outputDir}/empty_b_results/occurrence_table/empty_3_samples_table.tsv")
             assert table.exists() :
                 "Part B should publish the occurrence table"
 
@@ -1405,6 +1417,7 @@ nextflow_pipeline {
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
                 fastq_folder   = "${outputDir}/empty_a_input"
+                outdir         = "${outputDir}/a_empty"
                 fastq_pattern  = ""
                 threads        = 1
             }
@@ -1412,7 +1425,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
             ["fas", "qual", "stats"].each { ext ->
-                def f = file("${outputDir}/empty_a_input/empty.${ext}")
+                def f = file("${outputDir}/a_empty/per_sample/empty.${ext}")
                 assert f.exists() :
                     "Part A must emit empty.${ext} for an empty fastq pair: ${f}"
                 assert f.size() == 0 :
@@ -1497,7 +1510,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def assigned = file(
-                "${outputDir}/part_c_regular_sintax/part_c_regular_sintax_table_assigned.tsv"
+                "${outputDir}/part_c_regular_sintax/occurrence_table/part_c_regular_sintax_table_assigned.tsv"
             )
             assert assigned.exists() :
                 "regular sintax path should publish <basename>_table_assigned.tsv"
@@ -1506,7 +1519,7 @@ nextflow_pipeline {
                 "expected header + 1 row, got: ${lines}"
             // No _notmerged sibling was created → no shadow output.
             def shadow = file(
-                "${outputDir}/part_c_regular_sintax/part_c_regular_sintax_notmerged_table_assigned.tsv"
+                "${outputDir}/part_c_regular_sintax/occurrence_table/part_c_regular_sintax_notmerged_table_assigned.tsv"
             )
             assert !shadow.exists() :
                 "no _notmerged sibling on disk → shadow Part C must not run"
@@ -1565,13 +1578,13 @@ nextflow_pipeline {
             assert workflow.success
             // regular path → stampa
             def regular = file(
-                "${outputDir}/part_c_shadow/part_c_shadow_table_assigned.tsv"
+                "${outputDir}/part_c_shadow/occurrence_table/part_c_shadow_table_assigned.tsv"
             )
             assert regular.exists() :
                 "regular Part C should publish <basename>_table_assigned.tsv"
             // shadow path → sintax on the _notmerged sibling
             def shadow = file(
-                "${outputDir}/part_c_shadow/part_c_shadow_notmerged_table_assigned.tsv"
+                "${outputDir}/part_c_shadow/occurrence_table/part_c_shadow_notmerged_table_assigned.tsv"
             )
             assert shadow.exists() :
                 "shadow Part C should publish <basename>_notmerged_table_assigned.tsv"
@@ -1618,12 +1631,12 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def regular = file(
-                "${outputDir}/part_c_no_shadow/part_c_no_shadow_table_assigned.tsv"
+                "${outputDir}/part_c_no_shadow/occurrence_table/part_c_no_shadow_table_assigned.tsv"
             )
             assert regular.exists() :
                 "regular Part C should publish <basename>_table_assigned.tsv"
             def shadow = file(
-                "${outputDir}/part_c_no_shadow/part_c_no_shadow_notmerged_table_assigned.tsv"
+                "${outputDir}/part_c_no_shadow/occurrence_table/part_c_no_shadow_notmerged_table_assigned.tsv"
             )
             assert !shadow.exists() :
                 "no sibling → no shadow Part C → no _notmerged_table_assigned.tsv"
@@ -1682,7 +1695,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def shadow_assigned = file(
-                "${outputDir}/part_c_two_refs/part_c_two_refs_notmerged_table_assigned.tsv"
+                "${outputDir}/part_c_two_refs/occurrence_table/part_c_two_refs_notmerged_table_assigned.tsv"
             )
             assert shadow_assigned.exists() :
                 "shadow Part C should publish <basename>_notmerged_table_assigned.tsv"
@@ -1741,12 +1754,12 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def regular = file(
-                "${outputDir}/part_c_shadow_skip/part_c_shadow_skip_table_assigned.tsv"
+                "${outputDir}/part_c_shadow_skip/occurrence_table/part_c_shadow_skip_table_assigned.tsv"
             )
             assert regular.exists() :
                 "regular Part C should publish <basename>_table_assigned.tsv"
             def shadow = file(
-                "${outputDir}/part_c_shadow_skip/part_c_shadow_skip_notmerged_table_assigned.tsv"
+                "${outputDir}/part_c_shadow_skip/occurrence_table/part_c_shadow_skip_notmerged_table_assigned.tsv"
             )
             assert !shadow.exists() :
                 "no --reference_dataset_sintax → shadow Part C must not publish"
@@ -1801,7 +1814,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def base = "${outputDir}/part_b_nofast/nofast_3_samples"
+            def base = "${outputDir}/part_b_nofast/occurrence_table/nofast_3_samples"
             assert file("${base}_table.tsv").exists() :
                 "Part B should publish the table under --fastidious=false"
             assert file("${base}_table.fas").exists() :
@@ -1890,13 +1903,14 @@ nextflow_pipeline {
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
                 fastq_folder   = "${projectDir}/tests/data/compression_variants"
+                outdir         = "${outputDir}/a_compress"
                 fastq_pattern  = ""
                 threads        = 1
             }
         }
         then {
             assert workflow.success
-            def folder = "${projectDir}/tests/data/compression_variants"
+            def folder = "${outputDir}/a_compress/per_sample"
 
             // every sample published the three per-sample artefacts.
             ["cmp_plain", "cmp_gz", "cmp_bz2"].each { sampleId ->

@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { publish_dir } from '../functions.nf'
 
 
 process merge_substring_otus {
@@ -13,9 +13,8 @@ process merge_substring_otus {
     // step's stderr to produce the combined
     // <basename>_superstring_clustering.log. The merged OTU table
     // itself is **not** published ([S46]).
-    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
-        pattern: "*_superstring_clustering.log",
-        enabled: params.results_folder != null
+    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode,
+        pattern: "*_superstring_clustering.log"
 
     input:
     path otu_table

@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { publish_dir } from '../functions.nf'
 
 
 process extract_mumu_fasta {
@@ -7,8 +7,7 @@ process extract_mumu_fasta {
     // size=0 → 1 awk hotfix in `rebuild_post_mumu_table` ([S44]) no
     // row carries `$2 == 0` anymore, so the filter is a no-op
     // safety net retained for byte parity with the legacy bash.
-    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode,
-        enabled: params.results_folder != null
+    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode
 
     input:
     path table

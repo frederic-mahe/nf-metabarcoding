@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { publish_dir } from '../functions.nf'
 
 
 process run_mumu {
@@ -9,8 +9,7 @@ process run_mumu {
     // [S45]: the mumu --log output is the canonical post-clustering
     // curation log. The intermediate _raw_mumu.table is **not**
     // published ([S46]); the publishDir pattern keeps the log only.
-    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode, pattern: "*.log",
-        enabled: params.results_folder != null
+    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     path reduced_table

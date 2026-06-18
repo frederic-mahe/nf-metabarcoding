@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { publish_dir } from '../functions.nf'
 
 
 process chimera_detection_post_cleave {
@@ -18,8 +18,7 @@ process chimera_detection_post_cleave {
     // [S59]: only the log reaches the results folder; the .uchime2
     // hit table is an internal intermediate consumed by
     // build_occurrence_table.
-    publishDir path: { normalize_path(params.results_folder) }, mode: params.publish_mode, pattern: "*.log",
-        enabled: params.results_folder != null
+    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     path representatives           // pre-cleave: <basename>_1f_representatives.fas
