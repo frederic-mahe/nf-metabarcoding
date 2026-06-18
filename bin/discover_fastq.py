@@ -156,6 +156,15 @@ def _user_pattern_to_entry(glob: str) -> PatternEntry:
         )
 
     r1_token, r2_token = brace.group(1), brace.group(2)
+    # The two sides are the R1/R2 discriminator and must differ ([S67]).
+    # Equal sides would make the derived R2 name identical to the R1
+    # name, pairing a file with itself.
+    if r1_token == r2_token:
+        raise ValueError(
+            f"--fastq_pattern brace token sides must differ (the R1/R2 "
+            f"discriminator); got identical sides {{{r1_token},{r2_token}}} "
+            f"in {glob!r}"
+        )
     prefix, suffix = glob[: brace.start()], glob[brace.end():]
 
     sample_taken = False

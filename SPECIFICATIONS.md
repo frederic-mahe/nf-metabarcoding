@@ -214,6 +214,15 @@ the latter case.
   - **Pass when:** for each row of the canonical table, an R1 fixture
     is paired with its R2; an R1 fixture matching `--fastq_pattern`
     but not any canonical pattern is also paired correctly.
+- `[S67]` rejects a `--fastq_pattern` whose `{<r1>,<r2>}` brace token
+  has identical sides (e.g. `{1,1}`, `{R1,R1}`). The two sides are the
+  R1/R2 discriminator and must differ; were they equal, the derived
+  R2 basename would equal the R1 basename and the R1 file would be
+  paired with itself. The check fires at pattern-parse time, before
+  any file is globbed, with a message naming the offending token.
+  - **Pass when:** a pattern with equal sides (`*_{1,1}.fastq.gz`)
+    raises an error at parse time; a pattern with differing sides
+    (`{1,2}`, `{R1,R2}`) is accepted.
 - `[S12]` derives the sample ID for a paired-end pair from the R1
   basename by stripping the **first matching pattern** suffix (the
   same pattern table that drives `[S11]`). Single-end files derive
@@ -1172,3 +1181,8 @@ the suffix. Examples:
 
 A custom pattern is checked **before** the canonical table; if it
 matches an R1 file, the canonical table is bypassed for that file.
+
+The two sides of the brace token must differ (`{1,2}`, `{R1,R2}` —
+not `{1,1}`): they are the R1/R2 discriminator, so equal sides would
+make the derived R2 name identical to the R1 name and pair a file
+with itself. A pattern with equal sides is rejected (`[S67]`).

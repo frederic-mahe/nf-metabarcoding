@@ -22,6 +22,7 @@ import pytest
 from discover_fastq import (
     DuplicateSampleIDError,
     Sample,
+    _user_pattern_to_entry,
     check_unique_sample_ids,
     derive_r2_name,
     derive_sample_id,
@@ -323,6 +324,44 @@ def test_user_pattern_takes_precedence_over_canonical_table(
 
     # Override strips at the literal `R1`, so sample = "A_".
     assert result == [Sample(sample_id="A_", r1=r1, r2=r2)]
+
+
+# ---------- brace-token discriminator must differ ([S67]) ------------------
+# COVERAGE: [S67]
+
+
+@pytest.mark.parametrize(
+    "glob",
+    [
+        "*_{1,1}.fastq.gz",
+        "*{R1,R1}.fastq.gz",
+        "paired_merge_ok_{1,1}.fastq.gz",  # no-`*` literal-prefix variant
+    ],
+)
+def test_user_pattern_rejects_equal_brace_token_sides(glob: str) -> None:
+    # The two sides of `{<r1>,<r2>}` are the R1/R2 discriminator. Equal
+    # sides would derive an R2 name identical to the R1 name and pair a
+    # file with itself, so the pattern must be rejected at parse time.
+    with pytest.raises(ValueError) as excinfo:
+        _user_pattern_to_entry(glob)
+    msg = str(excinfo.value)
+    # the offending token is named so the user can fix it
+    assert "1" in msg or "R1" in msg
+
+
+def test_user_pattern_accepts_differing_brace_token_sides() -> None:
+    # The legitimate discriminators stay accepted.
+    for glob in ("*_{1,2}.fastq.gz", "*{R1,R2}.fastq.gz", "*-mate{A,B}.fq"):
+        # no exception
+        _user_pattern_to_entry(glob)
+
+
+def test_discover_aborts_on_self_pairing_pattern(tmp_path: Path) -> None:
+    # End-to-end through discover(): a `{1,1}` token must not silently
+    # pair `*_1.fastq.gz` with itself.
+    _make_fastq(tmp_path, "study42_1.fastq.gz")
+    with pytest.raises(ValueError):
+        discover([tmp_path], extra_pattern="*_{1,1}.fastq.gz")
 
 
 # ---------- sample-ID uniqueness ([S13]/[S14], D03) ------------------------
