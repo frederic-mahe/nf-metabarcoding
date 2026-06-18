@@ -746,6 +746,9 @@ nextflow_pipeline {
                 expected << "${base}_table.fas"
                 stepLogs.each { suffix -> expected << "${base}${suffix}" }
             }
+            // [S59]/[S68]: the shared pipeline_info/ dir (software
+            // versions) is whitelisted alongside the per-run artefacts.
+            expected << "pipeline_info"
             def actual = file(resultDir).listFiles()*.name.toList().sort()
             assert actual == expected.sort() :
                 "Part B results folder mismatch.\nexpected: ${expected.sort()}\nactual:   ${actual}"

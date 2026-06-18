@@ -935,6 +935,11 @@ from placeholder values to real taxonomic assignments.
        `_chimera_detection.log`, `_cleaving.log`,
        `_superstring_clustering.log`,
        `_post_clustering_curation.log`.
+    4. the `pipeline_info/` directory holding the run's
+       `software_versions.yml` ([S68]). This is the one whitelist
+       entry shared by the regular and shadow runs (it carries no
+       `_notmerged` token); it moves under `--outdir/pipeline_info`
+       when D09 lands.
   All other Part B intermediates (`.qual`, `.distr`,
   `_per_sample_OTUs.stats`, the global dereplicated `.fas`, the
   swarm artefacts `.swarms` / `.stats` / `.struct` /
@@ -951,8 +956,9 @@ from placeholder values to real taxonomic assignments.
     <basename>_cleaving.log,
     <basename>_superstring_clustering.log,
     <basename>_post_clustering_curation.log}` (plus the same set
-    with `_notmerged` if the shadow path fired); none of the
-    blacklisted intermediate filenames appear.
+    with `_notmerged` if the shadow path fired, plus the shared
+    `pipeline_info/` directory, [S68]); none of the blacklisted
+    intermediate filenames appear.
 - `[S60]` Path-typed parameters are normalised at workflow startup so
   shell-style `~` prefixes that the shell did not expand (quoted on
   the CLI, or read from a `-params-file`) still resolve to the
