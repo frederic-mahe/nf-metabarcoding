@@ -1252,6 +1252,55 @@ from placeholder values to real taxonomic assignments.
     `--results_folder` outputs are unaffected.
 
 
+## Output (`--outdir`)
+
+- `[S71]` `--outdir <dir>` is the single root for every published
+  artefact, in a fixed layout:
+    - `<outdir>/per_sample/` — Part A's per-sample artefacts ([S19]):
+      `<sample>.{fas,qual,stats}` and the per-step logs
+      (`_merging` / `_trimming` / `_dereplicating` / `_clustering`).
+    - `<outdir>/occurrence_table/` — Part B ([S46] / [S59]:
+      `<basename>_table.tsv`, `<basename>_table.fas`, the six step
+      logs) and Part C ([S51] / [S66]:
+      `<basename>_table_assigned.tsv`,
+      `<basename>_table_assigned_majority.tsv`), regular and
+      `_notmerged` shadow siblings together.
+    - `<outdir>/pipeline_info/` — `software_versions.yml` ([S68]); a
+      sibling of `occurrence_table/`, **not** inside it.
+  Inputs are never written to. `publishDir` materialises the tree on
+  first publish (D08). A single helper resolves each process's target
+  (`publish_dir('<subdir>')` → `<outdir>/<subdir>`), so routing lives
+  in one place rather than scattered across the modules.
+
+  `--outdir` defaults to `results`. `--results_folder` is a
+  **deprecated alias**: when `--outdir` is unset and `--results_folder`
+  is set, the latter becomes the output root (with a deprecation
+  warning); when both are set, `--outdir` wins
+  (`effective_outdir(outdir, results_folder)`). `--fastq_folder`
+  reverts to an **input-only** parameter — Part A no longer publishes
+  into it. This is a breaking change to output locations (manifest
+  version bumped; see the README migration note). Part B no longer
+  aborts when `--results_folder` is unset ([S26] superseded) because
+  `--outdir` always resolves to a value.
+
+  `[S59]`'s closed whitelist re-anchors to
+  `<outdir>/occurrence_table/` (the original eight entries — the
+  `pipeline_info/` directory moves out to its own sibling under
+  `<outdir>`).
+  - **Pass when:** `effective_outdir` unit tests pin the precedence
+    (`--outdir` > deprecated `--results_folder` > `results`) and `~`
+    expansion. An end-to-end run (`--fastq_folder` or `--input`) with
+    `--outdir <d>` publishes Part A artefacts under `<d>/per_sample/`,
+    the Part B table + six step logs and the Part C assigned table
+    under `<d>/occurrence_table/`, and `software_versions.yml` under
+    `<d>/pipeline_info/`; nothing is written to the input folder;
+    `<d>/occurrence_table/` matches the `[S59]` whitelist;
+    `--results_folder <d>` (no `--outdir`) routes to the same layout
+    with a deprecation warning. [The publishDir rewiring and the
+    matching revisions to `[S19]` / `[S26]` / `[S46]` / `[S59]` /
+    `[S68]` land with the D09 wiring slice.]
+
+
 ## Dependencies
 
 In addition to the upstream-tested tools used by Part A

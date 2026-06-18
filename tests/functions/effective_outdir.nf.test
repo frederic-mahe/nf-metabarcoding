@@ -1,0 +1,92 @@
+nextflow_function {
+
+    name "effective_outdir"
+    script "modules/local/functions.nf"
+    function "effective_outdir"
+
+    test("--outdir wins over the deprecated --results_folder") {
+        // COVERAGE: [S71]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = 'out'
+                input[1] = 'res'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == 'out'
+        }
+    }
+
+    test("--outdir alone is used") {
+        // COVERAGE: [S71]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = 'out'
+                input[1] = null
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == 'out'
+        }
+    }
+
+    test("deprecated --results_folder is the fallback when --outdir is unset") {
+        // COVERAGE: [S71]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = null
+                input[1] = 'res'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == 'res'
+        }
+    }
+
+    test("defaults to 'results' when neither is set") {
+        // COVERAGE: [S71]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = null
+                input[1] = null
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == 'results'
+        }
+    }
+
+    test("a leading ~ in --outdir is expanded ([S60])") {
+        // COVERAGE: [S71]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = '~/runs/out'
+                input[1] = null
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result ==
+                System.getProperty('user.home') + '/runs/out'
+        }
+    }
+}

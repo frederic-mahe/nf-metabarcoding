@@ -93,6 +93,42 @@ def lookup_user_home(String user) {
 }
 
 
+def effective_outdir(outdir, results_folder) {
+    // [S71]: resolve the output root. Precedence: --outdir, then the
+    // deprecated --results_folder alias, then the default 'results'.
+    // Pure (no params access) so it is unit-testable; resolve_outdir()
+    // is the params-reading wrapper. A leading `~` is expanded ([S60]).
+    if ( outdir ) {
+        return normalize_path(outdir)
+    }
+    if ( results_folder ) {
+        return normalize_path(results_folder)
+    }
+    return 'results'
+}
+
+
+def resolve_outdir() {
+    // [S71]: params-reading wrapper over effective_outdir(); warns once
+    // when the deprecated --results_folder alias is the source.
+    if ( !params.outdir && params.results_folder ) {
+        System.err.println(
+            "WARNING: --results_folder is deprecated; use --outdir. " +
+            "Outputs now follow the " +
+            "<outdir>/{per_sample,occurrence_table,pipeline_info}/ layout."
+        )
+    }
+    return effective_outdir(params.outdir, params.results_folder)
+}
+
+
+def publish_dir(part) {
+    // [S71]: publishDir target for a given output subdirectory
+    // ('per_sample' / 'occurrence_table' / 'pipeline_info').
+    return "${resolve_outdir()}/${part}"
+}
+
+
 def hash_relabel_flag() {
     // [S65]: the vsearch relabel flag matching params.hash_function,
     // threaded into filter_and_convert_to_fasta as an explicit input.
