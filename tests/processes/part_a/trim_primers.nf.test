@@ -31,8 +31,7 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = merge_fastq_pairs.out[0]
-                input[1] = merge_fastq_pairs.out[1]
+                input[0] = merge_fastq_pairs.out.merged
                 """
             }
         }
@@ -43,7 +42,7 @@ nextflow_process {
             // amplicon flanked by the canonical forward + reverse
             // primer pair → cutadapt --discard-untrimmed keeps all
             // three. Read count must be preserved.
-            def lines = path(process.out[1].get(0)).readLines()
+            def lines = path(process.out.trimmed.get(0)[1]).readLines()
             assert lines.size() == 12 :
                 "expected 3 trimmed records (12 lines), got ${lines.size()}"
 
@@ -81,14 +80,13 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = merge_fastq_pairs.out[0]
-                input[1] = merge_fastq_pairs.out[1]
+                input[0] = merge_fastq_pairs.out.merged
                 """
             }
         }
         then {
             assert process.success
-            def logPath = process.out[2].get(0)
+            def logPath = process.out.log.get(0)
             assert logPath.endsWith("sample_ok_trimming.log") : "unexpected log path: ${logPath}"
             assert path(logPath).readLines().size() > 0 : "expected non-empty trimming log"
         }

@@ -15,13 +15,10 @@ process join_notmerged {
     // downstream processes.
 
     input:
-    val sampleId
-    path notmerged_fwd
-    path notmerged_rev
+    tuple val(sampleId), path(notmerged_fwd), path(notmerged_rev)
 
     output:
-    val sampleId
-    path "joined_fastq"
+    tuple val(sampleId), path("joined_fastq"), emit: joined
 
     shell:
     '''

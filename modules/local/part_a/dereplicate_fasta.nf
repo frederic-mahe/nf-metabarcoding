@@ -6,13 +6,11 @@ process dereplicate_fasta {
     publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode
 
     input:
-    val sampleId
-    path filtered_fasta
+    tuple val(sampleId), path(filtered_fasta)
 
     output:
-    val sampleId
-    path "${sampleId}.fas"
-    path "${sampleId}_dereplicating.log"
+    tuple val(sampleId), path("${sampleId}.fas"), emit: fasta
+    path "${sampleId}_dereplicating.log",         emit: log
 
     shell:
     '''

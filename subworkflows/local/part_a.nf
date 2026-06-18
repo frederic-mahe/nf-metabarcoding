@@ -58,63 +58,49 @@ workflow part_A {
     // only, the shadow and regular paths share the same downstream
     // filters (--fastq_maxns 0) and the same swarm invocation —
     // no per-path branching is needed after this point.
-    strip_reads(
-        merge_fastq_pairs.out[0],
-        merge_fastq_pairs.out[3],
-        merge_fastq_pairs.out[4]
+    strip_reads(merge_fastq_pairs.out.notmerged)
+    join_notmerged(
+        strip_reads.out.stripped.map { id, fwd, rev ->
+            tuple("${id}_notmerged", fwd, rev)
+        }
     )
-    def shadow_id = strip_reads.out[0].map { it + "_notmerged" }
-    join_notmerged(shadow_id, strip_reads.out[1], strip_reads.out[2])
 
     // Build a unified (id, fastq) stream for the rest of Part A.
-    def regular_ch = merge_fastq_pairs.out[0]
-        .merge(merge_fastq_pairs.out[1])
-        .mix(unpaired_ch)
-    def shadow_ch = join_notmerged.out[0]
-        .merge(join_notmerged.out[1])
+    def regular_ch = merge_fastq_pairs.out.merged.mix(unpaired_ch)
+    def shadow_ch = join_notmerged.out.joined
 
-    def to_process = regular_ch.mix(shadow_ch).multiMap { id, f ->
-        id:   id
-        file: f
-    }
+    def to_process = regular_ch.mix(shadow_ch)
 
     // trim primers (skipped when --no_trimming is set)
-    def sampleId_ch
-    def fastq_ch
+    def trimmed_ch
     if ( params.no_trimming ) {
-        sampleId_ch = to_process.id
-        fastq_ch    = to_process.file
+        trimmed_ch = to_process
     } else {
-        trim_primers(to_process.id, to_process.file)
-        sampleId_ch = trim_primers.out[0]
-        fastq_ch    = trim_primers.out[1]
+        trim_primers(to_process)
+        trimmed_ch = trim_primers.out.trimmed
     }
 
     // convert to fasta with the hash digest + ee ([S65]), apply
     // min-length / max-N=0 filters. The A-padded shadow reads carry no
     // Ns, so they pass the same max-N=0 threshold as the regular path.
-    filter_and_convert_to_fasta(sampleId_ch, fastq_ch, hash_relabel_flag())
+    filter_and_convert_to_fasta(trimmed_ch, hash_relabel_flag())
 
     // set aside EE values
     extract_expected_error_values(
-        filter_and_convert_to_fasta.out[0],
-        filter_and_convert_to_fasta.out[1],
+        filter_and_convert_to_fasta.out.fasta,
         hash_id_length()
     )
 
     // dereplicate
-    dereplicate_fasta(
-        filter_and_convert_to_fasta.out[0], filter_and_convert_to_fasta.out[1]
-    )
+    dereplicate_fasta(filter_and_convert_to_fasta.out.fasta)
 
-    list_local_clusters(dereplicate_fasta.out[0], dereplicate_fasta.out[1])
+    list_local_clusters(dereplicate_fasta.out.fasta)
 
     emit:
     // (sampleId, path) tuples — shadow samples carry a _notmerged
     // suffix so the main workflow can filter them into the shadow
     // stream before calling part_B / part_B_shadow.
-    fasta = dereplicate_fasta.out[0].merge(dereplicate_fasta.out[1])
-    qual  = extract_expected_error_values.out[0]
-        .merge(extract_expected_error_values.out[1])
-    stats = list_local_clusters.out[0].merge(list_local_clusters.out[1])
+    fasta = dereplicate_fasta.out.fasta
+    qual  = extract_expected_error_values.out.qual
+    stats = list_local_clusters.out.stats
 }

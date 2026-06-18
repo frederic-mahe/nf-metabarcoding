@@ -7,13 +7,11 @@ process extract_expected_error_values {
     publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode
 
     input:
-    val sampleId
-    path filtered_fasta
+    tuple val(sampleId), path(filtered_fasta)
     val id_length
 
     output:
-    val sampleId
-    path "${sampleId}.qual"
+    tuple val(sampleId), path("${sampleId}.qual"), emit: qual
 
     shell:
     '''

@@ -6,14 +6,10 @@ process strip_reads {
     // --fastq_stripright 0 is a valid no-op pass-through.
 
     input:
-    val sampleId
-    path notmerged_fwd
-    path notmerged_rev
+    tuple val(sampleId), path(notmerged_fwd), path(notmerged_rev)
 
     output:
-    val sampleId
-    path "stripped_fwd"
-    path "stripped_rev"
+    tuple val(sampleId), path("stripped_fwd"), path("stripped_rev"), emit: stripped
 
     shell:
     '''

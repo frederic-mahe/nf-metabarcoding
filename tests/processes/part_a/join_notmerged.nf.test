@@ -33,16 +33,16 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = merge_fastq_pairs.out[0].map { it + '_notmerged' }
-                input[1] = merge_fastq_pairs.out[3]
-                input[2] = merge_fastq_pairs.out[4]
+                input[0] = merge_fastq_pairs.out.notmerged.map { row ->
+                    tuple(row[0] + "_notmerged", row[1], row[2])
+                }
                 """
             }
         }
         then {
             assert process.success
 
-            def lines = path(process.out[1].get(0)).readLines()
+            def lines = path(process.out.joined.get(0)[1]).readLines()
             assert lines.size() >= 4 : "expected at least one joined fastq record"
             assert lines.size() % 4 == 0 :
                 "fastq must have a multiple of 4 lines, got ${lines.size()}"
@@ -84,15 +84,15 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = merge_fastq_pairs.out[0].map { it + '_notmerged' }
-                input[1] = merge_fastq_pairs.out[3]
-                input[2] = merge_fastq_pairs.out[4]
+                input[0] = merge_fastq_pairs.out.notmerged.map { row ->
+                    tuple(row[0] + "_notmerged", row[1], row[2])
+                }
                 """
             }
         }
         then {
             assert process.success
-            def lines = path(process.out[1].get(0)).readLines()
+            def lines = path(process.out.joined.get(0)[1]).readLines()
             assert lines.size() % 4 == 0 :
                 "fastq must have a multiple of 4 lines, got ${lines.size()}"
 
@@ -115,15 +115,15 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = merge_fastq_pairs.out[0].map { it + '_notmerged' }
-                input[1] = merge_fastq_pairs.out[3]
-                input[2] = merge_fastq_pairs.out[4]
+                input[0] = merge_fastq_pairs.out.notmerged.map { row ->
+                    tuple(row[0] + "_notmerged", row[1], row[2])
+                }
                 """
             }
         }
         then {
             assert process.success
-            def lines = path(process.out[1].get(0)).readLines()
+            def lines = path(process.out.joined.get(0)[1]).readLines()
             if (lines.size() == 0) {
                 return
             }
@@ -149,19 +149,25 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = merge_fastq_pairs.out[0].map { it + '_notmerged' }
-                input[1] = merge_fastq_pairs.out[3]
-                input[2] = merge_fastq_pairs.out[4]
+                input[0] = merge_fastq_pairs.out.notmerged.map { row ->
+                    tuple(row[0] + "_notmerged", row[1], row[2])
+                }
                 """
             }
         }
         then {
             assert process.success
-            // Exactly two output channels: sampleId + joined fastq.
-            // A third output (the legacy _merging.log) would be a
-            // regression.
+            // The shadow join exposes a single declared output: the
+            // (sampleId, joined fastq) tuple. A `_merging.log` output
+            // would be a regression. (nf-test surfaces the one declared
+            // channel under both its positional and its `joined` name,
+            // so process.out.size() is 2; an extra emitted output would
+            // push it higher.)
             assert process.out.size() == 2 :
-                "join_notmerged must expose only sampleId + joined fastq, got ${process.out.size()} channels"
+                "join_notmerged must expose only the (sampleId, joined fastq) tuple, got ${process.out.size()} entries"
+            def joined = process.out.joined.get(0)
+            assert joined.size() == 2 && joined[1].endsWith("joined_fastq") :
+                "expected a (sampleId, joined fastq) tuple, got: ${joined}"
         }
     }
 }

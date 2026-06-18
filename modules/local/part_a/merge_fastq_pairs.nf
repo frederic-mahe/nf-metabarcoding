@@ -12,11 +12,9 @@ process merge_fastq_pairs {
     tuple val(sampleId), path(fastq_pair)
 
     output:
-    val sampleId
-    path "merged_fastq"
-    path "${sampleId}_merging.log"
-    path "notmerged_fwd"
-    path "notmerged_rev"
+    tuple val(sampleId), path("merged_fastq"),                        emit: merged
+    tuple val(sampleId), path("notmerged_fwd"), path("notmerged_rev"), emit: notmerged
+    path "${sampleId}_merging.log",                                   emit: log
 
     shell:
     '''

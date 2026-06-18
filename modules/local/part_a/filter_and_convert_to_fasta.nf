@@ -6,13 +6,11 @@ process filter_and_convert_to_fasta {
     // ([S04]) pads with A/C/G/T (see [S63]), so the same max-N=0
     // threshold serves both the regular and the shadow path.
     input:
-    val sampleId
-    path trimmed_fastq
+    tuple val(sampleId), path(trimmed_fastq)
     val relabel_flag
 
     output:
-    val sampleId
-    path "filtered_fasta"
+    tuple val(sampleId), path("filtered_fasta"), emit: fasta
 
     shell:
     '''

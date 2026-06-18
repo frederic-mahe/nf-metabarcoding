@@ -13,9 +13,11 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = "sample_fail"
-                input[1] = file("\${projectDir}/tests/data/paired_merge_fail_1.fastq.gz")
-                input[2] = file("\${projectDir}/tests/data/paired_merge_fail_2.fastq.gz")
+                input[0] = tuple(
+                    "sample_fail",
+                    file("\${projectDir}/tests/data/paired_merge_fail_1.fastq.gz"),
+                    file("\${projectDir}/tests/data/paired_merge_fail_2.fastq.gz")
+                )
                 """
             }
         }
@@ -23,8 +25,8 @@ nextflow_process {
             assert process.success
 
             // raw reads are 70 nt; expect 40 nt after stripping 30
-            def fwdLines = path(process.out[1].get(0)).readLines()
-            def revLines = path(process.out[2].get(0)).readLines()
+            def fwdLines = path(process.out.stripped.get(0)[1]).readLines()
+            def revLines = path(process.out.stripped.get(0)[2]).readLines()
             assert fwdLines.size() > 0 && fwdLines.size() % 4 == 0 :
                 "fwd fastq must be a multiple of 4 lines, got ${fwdLines.size()}"
             assert revLines.size() == fwdLines.size() :
@@ -55,15 +57,17 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = "sample_fail"
-                input[1] = file("\${projectDir}/tests/data/paired_merge_fail_1.fastq.gz")
-                input[2] = file("\${projectDir}/tests/data/paired_merge_fail_2.fastq.gz")
+                input[0] = tuple(
+                    "sample_fail",
+                    file("\${projectDir}/tests/data/paired_merge_fail_1.fastq.gz"),
+                    file("\${projectDir}/tests/data/paired_merge_fail_2.fastq.gz")
+                )
                 """
             }
         }
         then {
             assert process.success
-            [process.out[1].get(0), process.out[2].get(0)].each { p ->
+            [process.out.stripped.get(0)[1], process.out.stripped.get(0)[2]].each { p ->
                 def lines = path(p).readLines()
                 if (lines.size() == 0) {
                     return
@@ -91,16 +95,18 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = "sample_fail"
-                input[1] = file("\${projectDir}/tests/data/paired_merge_fail_1.fastq.gz")
-                input[2] = file("\${projectDir}/tests/data/paired_merge_fail_2.fastq.gz")
+                input[0] = tuple(
+                    "sample_fail",
+                    file("\${projectDir}/tests/data/paired_merge_fail_1.fastq.gz"),
+                    file("\${projectDir}/tests/data/paired_merge_fail_2.fastq.gz")
+                )
                 """
             }
         }
         then {
             assert process.success
-            def fwdLines = path(process.out[1].get(0)).readLines()
-            def revLines = path(process.out[2].get(0)).readLines()
+            def fwdLines = path(process.out.stripped.get(0)[1]).readLines()
+            def revLines = path(process.out.stripped.get(0)[2]).readLines()
             for (int i = 1; i < fwdLines.size(); i += 4) {
                 assert fwdLines[i].length() == 70 :
                     "fwd: expected original length 70, got ${fwdLines[i].length()}"

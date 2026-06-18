@@ -12,13 +12,11 @@ process list_local_clusters {
     publishDir path: { normalize_path(params.fastq_folder) }, mode: params.publish_mode
 
     input:
-    val sampleId
-    path dereplicated_fasta
+    tuple val(sampleId), path(dereplicated_fasta)
 
     output:
-    val sampleId
-    path "${sampleId}.stats"
-    path "${sampleId}_clustering.log"
+    tuple val(sampleId), path("${sampleId}.stats"), emit: stats
+    path "${sampleId}_clustering.log",              emit: log
 
     shell:
     '''

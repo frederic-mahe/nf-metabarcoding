@@ -10,13 +10,11 @@ process trim_primers {
         enabled: params.fastq_folder != null
 
     input:
-    val sampleId
-    path merged_fastq
+    tuple val(sampleId), path(merged_fastq)
 
     output:
-    val sampleId
-    path "trimmed_fastq"
-    path "${sampleId}_trimming.log"
+    tuple val(sampleId), path("trimmed_fastq"), emit: trimmed
+    path "${sampleId}_trimming.log",            emit: log
 
     shell:
     '''

@@ -23,8 +23,7 @@ nextflow_process {
             script "modules/local/part_a/trim_primers.nf"
             process {
                 """
-                input[0] = merge_fastq_pairs.out[0]
-                input[1] = merge_fastq_pairs.out[1]
+                input[0] = merge_fastq_pairs.out.merged
                 """
             }
         }
@@ -32,9 +31,8 @@ nextflow_process {
             script "modules/local/part_a/filter_and_convert_to_fasta.nf"
             process {
                 """
-                input[0] = trim_primers.out[0]
-                input[1] = trim_primers.out[1]
-                input[2] = "--relabel_sha1"
+                input[0] = trim_primers.out.trimmed
+                input[1] = "--relabel_sha1"
                 """
             }
         }
@@ -42,8 +40,7 @@ nextflow_process {
             script "modules/local/part_a/dereplicate_fasta.nf"
             process {
                 """
-                input[0] = filter_and_convert_to_fasta.out[0]
-                input[1] = filter_and_convert_to_fasta.out[1]
+                input[0] = filter_and_convert_to_fasta.out.fasta
                 """
             }
         }
@@ -60,8 +57,7 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = dereplicate_fasta.out[0]
-                input[1] = dereplicate_fasta.out[1]
+                input[0] = dereplicate_fasta.out.fasta
                 """
             }
         }
@@ -73,7 +69,7 @@ nextflow_process {
             // (one per amplicon) — all filtered out. Assert the
             // output is either empty OR every surviving row carries
             // column 2 > 2; mixed bag is a [S17] violation.
-            def stats = path(process.out[1].get(0)).readLines()
+            def stats = path(process.out.stats.get(0)[1]).readLines()
             stats.each { line ->
                 if ( line.trim().isEmpty() ) {
                     return
@@ -99,14 +95,13 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = dereplicate_fasta.out[0]
-                input[1] = dereplicate_fasta.out[1]
+                input[0] = dereplicate_fasta.out.fasta
                 """
             }
         }
         then {
             assert process.success
-            def logPath = process.out[2].get(0)
+            def logPath = process.out.log.get(0)
             assert logPath.endsWith("sample_ok_clustering.log") : "unexpected log path: ${logPath}"
             assert path(logPath).readLines().size() > 0 : "expected non-empty clustering log"
         }

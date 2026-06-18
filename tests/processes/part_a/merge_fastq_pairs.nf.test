@@ -29,14 +29,14 @@ nextflow_process {
             assert process.success
 
             // merged fastq: 3 records (= 12 lines, 4 per record).
-            def merged = path(process.out[1].get(0)).readLines()
+            def merged = path(process.out.merged.get(0)[1]).readLines()
             assert merged.size() == 12 :
                 "expected 3 merged records (12 lines), got ${merged.size()}"
 
             // every input pair merged → notmerged_fwd / notmerged_rev empty.
-            assert path(process.out[3].get(0)).readLines().isEmpty() :
+            assert path(process.out.notmerged.get(0)[1]).readLines().isEmpty() :
                 "notmerged_fwd should be empty when every pair merges"
-            assert path(process.out[4].get(0)).readLines().isEmpty() :
+            assert path(process.out.notmerged.get(0)[2]).readLines().isEmpty() :
                 "notmerged_rev should be empty when every pair merges"
         }
     }
@@ -59,7 +59,7 @@ nextflow_process {
         }
         then {
             assert process.success
-            def logPath = process.out[2].get(0)
+            def logPath = process.out.log.get(0)
             assert logPath.endsWith("sample_ok_merging.log") : "unexpected log path: ${logPath}"
             assert path(logPath).readLines().size() > 0 : "expected non-empty merging log"
         }
@@ -90,9 +90,9 @@ nextflow_process {
 
             // The merged fastq is empty here (paired_merge_fail can't
             // overlap), but notmerged_fwd / notmerged_rev are not.
-            [process.out[1].get(0),
-             process.out[3].get(0),
-             process.out[4].get(0)].each { p ->
+            [process.out.merged.get(0)[1],
+             process.out.notmerged.get(0)[1],
+             process.out.notmerged.get(0)[2]].each { p ->
                 def lines = path(p).readLines()
                 if (lines.size() == 0) {
                     return  // empty fastq is valid ([S09])
@@ -132,14 +132,14 @@ nextflow_process {
         then {
             assert process.success
 
-            // out[1] = merged fastq (empty — every pair failed to merge)
-            def mergedLines = path(process.out[1].get(0)).readLines()
+            // out.merged = merged fastq (empty — every pair failed to merge)
+            def mergedLines = path(process.out.merged.get(0)[1]).readLines()
             assert mergedLines.size() == 0 :
                 "expected zero merged reads, got ${mergedLines.size()} lines"
 
-            // out[3] = notmerged_fwd, out[4] = notmerged_rev — both non-empty
-            def fwdLines = path(process.out[3].get(0)).readLines()
-            def revLines = path(process.out[4].get(0)).readLines()
+            // out.notmerged = (id, notmerged_fwd, notmerged_rev) — both non-empty
+            def fwdLines = path(process.out.notmerged.get(0)[1]).readLines()
+            def revLines = path(process.out.notmerged.get(0)[2]).readLines()
             assert fwdLines.size() > 0 && fwdLines.size() % 4 == 0 :
                 "unexpected notmerged_fwd content: ${fwdLines.size()} lines"
             assert fwdLines.size() == revLines.size() :

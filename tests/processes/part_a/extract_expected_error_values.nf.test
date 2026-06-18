@@ -23,8 +23,7 @@ nextflow_process {
             script "modules/local/part_a/trim_primers.nf"
             process {
                 """
-                input[0] = merge_fastq_pairs.out[0]
-                input[1] = merge_fastq_pairs.out[1]
+                input[0] = merge_fastq_pairs.out.merged
                 """
             }
         }
@@ -32,9 +31,8 @@ nextflow_process {
             script "modules/local/part_a/filter_and_convert_to_fasta.nf"
             process {
                 """
-                input[0] = trim_primers.out[0]
-                input[1] = trim_primers.out[1]
-                input[2] = "--relabel_sha1"
+                input[0] = trim_primers.out.trimmed
+                input[1] = "--relabel_sha1"
                 """
             }
         }
@@ -51,9 +49,8 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = filter_and_convert_to_fasta.out[0]
-                input[1] = filter_and_convert_to_fasta.out[1]
-                input[2] = 40
+                input[0] = filter_and_convert_to_fasta.out.fasta
+                input[1] = 40
                 """
             }
         }
@@ -63,7 +60,7 @@ nextflow_process {
             // Part A → Part B contract (see "Interfaces between parts"
             // in SPECIFICATIONS.md): space-separated `<SHA1> <ee> <length>`
             // sorted by length / SHA1 / ee, one row per unique SHA1.
-            def lines = path(process.out[1].get(0)).readLines()
+            def lines = path(process.out.qual.get(0)[1]).readLines()
             assert lines.size() > 0 : "expected at least one .qual line"
             lines.each { line ->
                 def cols = line.split(' ')
@@ -119,15 +116,17 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = "md5_sample"
-                input[1] = file("\${projectDir}/tests/data/hash_function/md5_filtered.fas")
-                input[2] = 32
+                input[0] = tuple(
+                    "md5_sample",
+                    file("\${projectDir}/tests/data/hash_function/md5_filtered.fas")
+                )
+                input[1] = 32
                 """
             }
         }
         then {
             assert process.success
-            def lines = path(process.out[1].get(0)).readLines()
+            def lines = path(process.out.qual.get(0)[1]).readLines()
             def shas = lines.collect { it.split(' ')[0] }
             assert shas == shas.unique() :
                 "one row per unique MD5 name expected, got duplicates: ${shas}"
