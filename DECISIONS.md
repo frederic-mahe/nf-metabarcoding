@@ -232,3 +232,173 @@ is "Part C always emits a single assigned table", because:
 This sub-question does not block `[S15]` (which scopes Part B's
 output only). It can be resolved once Part B split lands and a real
 consumer asks for split assigned output.
+
+
+## D06 — Input model: validated samplesheet vs in-process folder-glob
+
+**Blocks:** a new input-contract `[Sxx]` (next free is `[S70]`)
+**Revises on resolution:** `[S10]`, `[S11]`, `[S12]`, `[S27]` and the
+discovery processes `discover_inputs` / `discover_part_b_fasta`
+**Status:** `proposed`
+
+Discovery is performed *inside* processes that declare **no path
+inputs** and glob `params.fastq_folder` / `params.fasta_folder` off
+the launch filesystem (`modules/local/part_a/discover_inputs.nf`,
+`modules/local/part_b/discover_part_b_fasta.nf` — both call the
+`bin/discover_*.py` helpers on raw absolute paths). Consequences:
+
+- Nextflow stages and hashes nothing, so `-resume` cannot detect that
+  the input set changed, and provenance is opaque.
+- On slurm/cloud executors the task may land on a node that cannot see
+  the path unless the fastq/fasta dir is on shared storage (the README
+  quietly requires exactly this). It would not work on an
+  object-store-backed executor at all.
+
+**Question:** adopt an nf-core-style validated samplesheet CSV as the
+primary input, keep the folder-glob, or both?
+
+1. **Samplesheet-only.** `--input samplesheet.csv`
+   (`sampleId,forward,reverse,run`); discovery becomes channel logic
+   (`splitCsv` / `Channel.fromPath`), so inputs are staged and hashed.
+   Gains provenance, working `-resume`, cloud/object-store support, and
+   an explicit per-run/batch column. Breaking UX change; the carefully
+   specified pattern table (`[S11]` / `[S12]`) becomes legacy/optional.
+2. **Keep folder-glob, fix staging only.** Move the globbing out of a
+   process into a build-time Groovy function. Smaller change, but still
+   reads the launch FS and still leaves `-resume` blind to directory
+   contents; does not fix cloud / object-store.
+3. **Both (recommended).** Samplesheet is the primary, staged,
+   hashed input; folder discovery is retained as a convenience that
+   *generates* a samplesheet-shaped channel up front, feeding the same
+   downstream channels. Keeps the existing UX and the `[S11]` / `[S12]`
+   pattern table as the single source of truth for auto-pairing, while
+   gaining provenance and resume-correctness.
+
+**Proposed resolution:** option 3.
+
+Sub-questions for the human:
+- Final samplesheet columns, and whether a `run`/`batch` column should
+  drive per-run chimera/clustering grouping (it does not today).
+- Whether duplicate-sample-ID refusal (`[S13]` / `[S14]` / D03) moves
+  into samplesheet validation or stays in the discovery helpers.
+- Whether `--fastq_folder` / `--fasta_folder` survive as sugar or are
+  deprecated with a window.
+
+Until D06 lands the discovery processes stay as-is; the current
+`[S10]`–`[S12]` / `[S27]` tests remain valid and green.
+
+
+## D07 — Shadow Part C standalone toggle: parse-time disk probe vs channel
+
+**Revises on resolution:** `[S62]` (and the shadow probe at
+`main.nf:52-55`)
+**Status:** `proposed`
+
+`[S62]` specifies that standalone Part C decides whether to run the
+shadow path by testing `shadow_table_path.exists()` **at workflow-build
+time** (`main.nf:48-55`), and branches the DAG topology on the result.
+The DAG shape therefore depends on head-node disk state at parse time:
+this defeats `-resume` reproducibility and breaks when the input table
+/ results folder is remote.
+
+**Question:** keep the parse-time `.exists()` probe, or express the
+toggle as channel logic so topology is data-driven?
+
+1. **Keep `[S62]` as-is.** Simplest; brittle as above.
+2. **Channel logic (recommended).** Build the shadow branch
+   unconditionally from `Channel.fromPath(sibling, checkIfExists:
+   false)`; an empty channel self-suppresses the branch (no work, no
+   output). Topology becomes static and the toggle becomes *data
+   presence*, not a `java.io.File` call in the workflow body.
+3. **Explicit flag.** Replace the implicit sibling-probe with an
+   explicit `--shadow_table PATH` (or `--with-shadow`). Less magic, a
+   small UX change; composes with option 2.
+
+**Proposed resolution:** option 2, optionally with the explicit
+override from option 3. `[S62]` reworded so the sibling is discovered
+through a staged channel and the branch self-suppresses on an empty
+channel — no `File.exists()` in the workflow body.
+
+The current `[S62]` test stays green until the reword lands.
+
+
+## D08 — Results-folder creation: build-time `mkdirs()` vs `publishDir`
+
+**Revises on resolution:** `[S26]` (and the `new File(...).mkdirs()`
+calls at `main.nf:31`, `:85`, `:215`)
+**Status:** `proposed`
+
+`[S26]` mandates that the workflow "creates the folder (and any missing
+parent directories) at startup." It is implemented as side-effecting
+`java.io.File.mkdirs()` in the workflow body (three sites). Build-time
+filesystem I/O runs on the head node only, so it breaks for a remote /
+object-store `--results_folder` and is non-idiomatic — Nextflow's
+`publishDir` already creates the directory tree itself.
+
+**Question:** keep the explicit startup `mkdirs()`, or let `publishDir`
+materialise the folder?
+
+1. **Keep `[S26]` startup `mkdirs()`.** Works on local/shared FS;
+   head-node only.
+2. **Drop `mkdirs()`; rely on `publishDir` (recommended).** It creates
+   the directory on first publish. Removes build-time FS I/O and works
+   wherever the executor's publish layer works. Edge case: a run that
+   publishes nothing leaves no folder — acceptable, since there is
+   nothing to hold.
+3. **Creation process.** Materialise the folder inside a tiny process
+   so it runs in the task environment (consistent with remote
+   executors). Heavier; rarely needed if option 2 suffices.
+
+**Proposed resolution:** option 2; `[S26]` reworded to "`publishDir`
+materialises the results folder; the workflow performs no filesystem
+I/O at parse time." Coordinate with D09 (`--outdir`).
+
+The current `[S26]` test stays green until the reword lands.
+
+
+## D09 — Output routing: unified `--outdir` vs publishing into the input folder
+
+**Blocks:** a new output-routing `[Sxx]` (next free after D06's
+allocation, i.e. `[S71]`)
+**Revises on resolution:** `[S19]` (Part A publishes into
+`params.fastq_folder`); touches `[S45]`, `[S46]`, `[S58]`, `[S59]`, and
+`[S68]`'s "the Part A-only path has no results folder yet" note
+**Status:** `proposed`
+
+Part A publishes its per-sample artefacts **back into**
+`--fastq_folder` (`modules/local/part_a/trim_primers.nf:9` and
+siblings, `[S19]`), while Part B/C publish to `--results_folder`. There
+is no single `--outdir`. Publishing into the input directory mutates
+the user's data, mixes inputs with derived files, complicates cleanup
+(the README carries a manual "remove them from the fixture dir" step)
+and re-runs, and leaves a Part A-only run with nowhere to put
+`software_versions.yml` (`[S68]`).
+
+**Question:** introduce a unified `--outdir` (nf-core convention:
+inputs immutable, all outputs under `--outdir/<subdir>`) and stop
+writing into `--fastq_folder`?
+
+1. **Status quo.** Familiar to current users; the smells above persist.
+2. **Unified `--outdir` (recommended).** Per-part subfolders, e.g.
+   `<outdir>/part_a`, `<outdir>/part_b`, `<outdir>/pipeline_info`. Part
+   A no longer writes into `--fastq_folder`; `--results_folder` becomes
+   a back-compat alias. Gives `[S68]` a home on the Part A-only path,
+   makes inputs immutable, and unifies cleanup. The `[S59]` whitelist
+   anchors to `<outdir>/part_b` instead of `--results_folder`.
+3. **Hybrid.** Keep Part A → `fastq_folder` by default, allow
+   `--outdir` to override. A half-measure that keeps the
+   input-mutation default.
+
+**Proposed resolution:** option 2. This is a breaking change to output
+locations, so it needs a version bump and a README/migration note.
+Coordinate with D08 (folder creation).
+
+Sub-questions for the human:
+- The subfolder layout and names.
+- Whether `--results_folder` / the `--fastq_folder` publish location
+  survive as deprecated aliases for one release.
+- Migration: which existing user scripts break, and whether a
+  deprecation window is needed.
+
+Until D09 lands, `[S19]`'s publish-into-`fastq_folder` contract stands
+and its tests remain green.
