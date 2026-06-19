@@ -675,6 +675,30 @@ nextflow_pipeline {
         }
     }
 
+    test("--occurrence_table together with --fastq_folder aborts at startup") {
+        // COVERAGE: [S02]
+        // [S02]: the four input-mode selectors are mutually exclusive.
+        // Before this guard --occurrence_table silently won and the
+        // --fastq_folder Part A run was dropped without warning; now the
+        // collision aborts at startup naming both flags.
+        tag "ci"
+        when {
+            params {
+                threads          = 1
+                occurrence_table = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                fastq_folder     = "${projectDir}/tests/data"
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("mutually exclusive") :
+                "expected a mutual-exclusion error, got: ${msg}"
+            assert msg.contains("--occurrence_table") && msg.contains("--fastq_folder") :
+                "error should name both colliding selectors, got: ${msg}"
+        }
+    }
+
     test("Part A → Part B → Part C end-to-end runs Part C when --reference_dataset is set") {
         // COVERAGE: [S01], [S51]
         // End-to-end three-part workflow: --reference_dataset triggers

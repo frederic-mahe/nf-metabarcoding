@@ -42,17 +42,24 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
   entry point is selected implicitly by which input param is set
   (no explicit `--only=` flag): `--occurrence_table` runs Part C
   standalone (and the shadow path when its preconditions hold, see
-  [S62]); otherwise `--fasta_folder` runs Part B standalone (with
-  Part C chained on when `--reference_dataset` is set); otherwise
-  `--fastq_folder` runs Part A end-to-end (with Part B / Part C
-  chained on when `--project_name` / `--reference_dataset` are set).
-  At most one of `--occurrence_table` / `--fasta_folder` /
-  `--fastq_folder` should be set per run; the dispatcher uses the
-  first match in that order.
+  [S62]); `--fasta_folder` (or an `--input` samplesheet in the fasta
+  profile, [S70]) runs Part B standalone (with Part C chained on when
+  `--reference_dataset` is set); `--fastq_folder` (or an `--input`
+  samplesheet in the fastq profile) runs Part A end-to-end (with
+  Part B / Part C chained on when `--project_name` /
+  `--reference_dataset` are set).
+  The four input-mode selectors `--occurrence_table` / `--input` /
+  `--fasta_folder` / `--fastq_folder` are **mutually exclusive**:
+  setting more than one aborts at startup with a message listing the
+  ones that were set, rather than silently picking one and ignoring the
+  rest. (This supersedes the earlier "first match wins" dispatch and
+  subsumes the `--input`-vs-folder exclusivity of [S70].)
   - **Pass when:** running with only `--fastq_folder` set invokes
     every Part A process and no Part B / Part C process; the existing
     Part B standalone (`--fasta_folder`) and Part C standalone
-    (`--occurrence_table`) tests cover the other two cases.
+    (`--occurrence_table`) tests cover the other two cases; setting two
+    mode selectors (e.g. `--occurrence_table` with `--fastq_folder`)
+    aborts at startup naming both.
 - `[S03]` fastq files can be paired-end or single-end, compressed
   (`.gz`, `.bz2`) or not
   - **Pass when:** the same input data in any of these forms produces

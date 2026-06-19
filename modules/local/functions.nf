@@ -440,10 +440,24 @@ def validate_params() {
     // (fastq_folder / primers / reference datasets) stay inline in the
     // entry workflow because they depend on the selected run mode.
 
-    // [S70]: --input (samplesheet) is mutually exclusive with the
-    // folder-scan inputs; setting both is ambiguous, so abort up-front.
-    assert !(params.input && (params.fastq_folder || params.fasta_folder)) :
-        "--input is mutually exclusive with --fastq_folder / --fasta_folder"
+    // [S02]/[S70]: the four input-mode selectors are mutually exclusive.
+    // Setting more than one is ambiguous (the dispatcher would silently
+    // pick one and drop the rest), so abort up-front naming the ones that
+    // were set. Subsumes the earlier --input-vs-folder check ([S70]).
+    def mode_selectors = [
+        occurrence_table: params.occurrence_table,
+        input           : params.input,
+        fasta_folder    : params.fasta_folder,
+        fastq_folder    : params.fastq_folder,
+    ]
+    def selectors_set
+    selectors_set = mode_selectors
+        .findAll { _name, value -> value }
+        .collect { name, _value -> "--${name}" }
+    assert selectors_set.size() <= 1 :
+        "the input-mode selectors are mutually exclusive; set at most one " +
+        "of --occurrence_table / --input / --fasta_folder / --fastq_folder, " +
+        "got: ${selectors_set}"
 
     // [S71]: --results_folder is a deprecated alias for --outdir. Warn
     // once at startup when it is the active output root.
