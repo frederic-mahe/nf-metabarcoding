@@ -3,6 +3,13 @@
 .nextflow/
 .nf-test/
 .nf-test-*.nf
+
+# nextflow run outputs: the work directory and the default --outdir
+# locations ('results', plus 'demo_results' from `-profile demo`).
+# These are generated artefacts of an in-repo run, never committed.
+work/
+results/
+demo_results/
 tests/data/*.fastq
 tests/data/*.fastq.gz
 tests/data/*.fastq.bz2
