@@ -1224,6 +1224,15 @@ from placeholder values to real taxonomic assignments.
     declares a `bioconda::mumu` package, and that the `vsearch` /
     `swarm` / `cutadapt` / `mumu` pins in `environment.yml` and the CI
     workflow are identical.
+- `[S77]` the release version is declared in exactly two places —
+  `manifest.version` in `nextflow.config` and `version` in
+  `CITATION.cff` — and the two must agree, so a release can never ship a
+  workflow whose citation metadata reports a different version. (The
+  README "Releasing" section is the human-facing instruction to bump
+  both, plus `CITATION.cff`'s `date-released`; this is the automated
+  guard behind it.)
+  - **Pass when:** a repo-level check asserts that `manifest.version`
+    (`nextflow.config`) and `version` (`CITATION.cff`) are identical.
 
 
 ## Input samplesheet

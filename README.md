@@ -366,7 +366,10 @@ rm -rf .pytest_cache/ tests/python/__pycache__/
 The version number lives in two files that must be kept in sync:
 [`nextflow.config`](nextflow.config) (`manifest.version`) and
 [`CITATION.cff`](CITATION.cff) (`version:`). When bumping, update
-both and also refresh `CITATION.cff`'s `date-released`.
+both and also refresh `CITATION.cff`'s `date-released`. CI enforces
+that the two versions match (`[S77]`,
+`tests/python/test_version_sync.py`), so a half-finished bump fails the
+build rather than shipping.
 
 
 ## Status
