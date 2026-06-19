@@ -95,8 +95,11 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
   - shadow-pipeline sample IDs are `<sampleId>_notmerged`; published
     artefacts are `<sampleId>_notmerged.{fas,qual,stats}` plus the
     per-step logs from the stages that actually run in the shadow
-    path (`<sampleId>_notmerged_{trimming,dereplicating,clustering}.log`).
-    No `<sampleId>_notmerged_merging.log` is produced — see step 1
+    path: `<sampleId>_notmerged_trimming_forward.log` and
+    `<sampleId>_notmerged_trimming_reverse.log` (the two cutadapt
+    passes, see `[S19]`), `<sampleId>_notmerged_dereplicating.log`,
+    and `<sampleId>_notmerged_clustering.log`. No
+    `<sampleId>_notmerged_merging.log` is produced — see step 1
     above.
   - **Pass when:** running Part A on a paired-end fixture whose reads
     cannot overlap produces non-empty `<sampleId>_notmerged.{fas,qual,stats}`
@@ -329,14 +332,18 @@ the latter case.
     - per-step log files:
         - merging       → `<sampleId>_merging.log` (regular path
           only — the shadow path has no merging step, see `[S04]`)
-        - trimming      → `<sampleId>_trimming.log` (only when the
-          trimming step runs — see `[S20]`)
+        - trimming      → `<sampleId>_trimming_forward.log` and
+          `<sampleId>_trimming_reverse.log` (only when the trimming
+          step runs — see `[S20]`). `trim_primers` runs cutadapt in
+          two passes — the forward primer first, then the reverse
+          primer — and each pass writes its own report so the
+          per-primer trimming statistics stay separable.
         - dereplicating → `<sampleId>_dereplicating.log`
         - clustering    → `<sampleId>_clustering.log`
   - **Pass when:** running Part A on any sample produces all three
-    data files and all four log files in `params.fastq_folder`,
+    data files and all five log files in `params.fastq_folder`,
     each non-empty (three logs when `--no_trimming` is set: no
-    `_trimming.log`).
+    `_trimming_forward.log` / `_trimming_reverse.log`).
 - `[S20]` `--no_trimming` toggle (default: `false`) skips the primer
   trimming step. The toggle and the primer parameters are mutually
   exclusive:
@@ -1282,7 +1289,8 @@ from placeholder values to real taxonomic assignments.
   artefact, in a fixed layout:
     - `<outdir>/per_sample/` — Part A's per-sample artefacts ([S19]):
       `<sample>.{fas,qual,stats}` and the per-step logs
-      (`_merging` / `_trimming` / `_dereplicating` / `_clustering`).
+      (`_merging` / `_trimming_forward` / `_trimming_reverse` /
+      `_dereplicating` / `_clustering`).
     - `<outdir>/occurrence_table/` — Part B ([S46] / [S59]:
       `<basename>_table.tsv`, `<basename>_table.fas`, the six step
       logs) and Part C ([S51] / [S66]:

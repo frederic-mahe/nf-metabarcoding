@@ -21,7 +21,7 @@ nextflow_pipeline {
             // [S19] per-step logs land in <outdir>/per_sample/
             def folder = "${outputDir}/a_e2eok/per_sample"
             def sampleId = "paired_merge_ok"
-            ["merging", "trimming", "dereplicating", "clustering"].each { step ->
+            ["merging", "trimming_forward", "trimming_reverse", "dereplicating", "clustering"].each { step ->
                 def log = file("${folder}/${sampleId}_${step}.log")
                 assert log.exists()       : "missing ${step} log: ${log}"
                 assert log.size() > 0     : "empty ${step} log: ${log}"
@@ -115,9 +115,10 @@ nextflow_pipeline {
         // COVERAGE: [S20]
         // The trim_primers process must not appear in the workflow
         // trace. We check workflow.stdout (which lists every process
-        // run) rather than the absence of paired_merge_ok_trimming.log
+        // run) rather than the absence of the
+        // paired_merge_ok_trimming_forward/_reverse.log files
         // — `tests/data/` is shared across cases, so other tests in
-        // this file may have just published that log there.
+        // this file may have just published those logs there.
         tag "ci"
         when {
             params {
@@ -224,8 +225,9 @@ nextflow_pipeline {
         // --no_trimming reaches the shadow pipeline too.
         // As in the sibling [S20] test, we check workflow.stdout (the
         // process trace) rather than the absence of a published
-        // _notmerged_trimming.log — tests/data/ is shared across
-        // cases and the [S04] test may have just published one.
+        // _notmerged_trimming_forward/_reverse.log — tests/data/ is
+        // shared across cases and the [S04] test may have just
+        // published those.
         tag "ci"
         when {
             params {
@@ -286,7 +288,8 @@ nextflow_pipeline {
             def folder = "${outputDir}/a_unpaired/per_sample"
             def sampleId = "unpaired_sample"
             assert file("${folder}/${sampleId}.fas").exists()         : "missing .fas"
-            assert file("${folder}/${sampleId}_trimming.log").exists() : "missing trimming log"
+            assert file("${folder}/${sampleId}_trimming_forward.log").exists() : "missing forward trimming log"
+            assert file("${folder}/${sampleId}_trimming_reverse.log").exists() : "missing reverse trimming log"
             assert file("${folder}/${sampleId}_dereplicating.log").exists() : "missing dereplicating log"
             assert file("${folder}/${sampleId}_clustering.log").exists() : "missing clustering log"
             assert !file("${folder}/${sampleId}_merging.log").exists() :
@@ -344,7 +347,7 @@ nextflow_pipeline {
             // (`_L00[1-9]_R1_00[1-9]\.<ext>`).
             def folder = "${outputDir}/a_miseq/per_sample"
             def sampleId = "SampleX_S1"
-            ["merging", "trimming", "dereplicating", "clustering"].each { step ->
+            ["merging", "trimming_forward", "trimming_reverse", "dereplicating", "clustering"].each { step ->
                 def log = file("${folder}/${sampleId}_${step}.log")
                 assert log.exists()   : "missing ${step} log: ${log}"
                 assert log.size() > 0 : "empty ${step} log: ${log}"
@@ -401,9 +404,10 @@ nextflow_pipeline {
 
             // [S04]: shadow path has no merging step (the reads in
             // this branch could not be merged, by definition); the
-            // remaining three per-step logs land alongside the
-            // regular ones.
-            ["trimming", "dereplicating", "clustering"].each { step ->
+            // remaining per-step logs (two cutadapt passes +
+            // dereplicating + clustering) land alongside the regular
+            // ones.
+            ["trimming_forward", "trimming_reverse", "dereplicating", "clustering"].each { step ->
                 def log = file("${folder}/${shadowId}_${step}.log")
                 assert log.exists()   : "missing shadow ${step} log: ${log}"
                 assert log.size() > 0 : "empty shadow ${step} log: ${log}"

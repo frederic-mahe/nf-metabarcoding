@@ -12,8 +12,9 @@ process trim_primers {
     tuple val(sampleId), path(merged_fastq)
 
     output:
-    tuple val(sampleId), path("trimmed_fastq"), emit: trimmed
-    path "${sampleId}_trimming.log",            emit: log
+    tuple val(sampleId), path("trimmed_fastq"),     emit: trimmed
+    path "${sampleId}_trimming_forward.log",        emit: log_forward
+    path "${sampleId}_trimming_reverse.log",        emit: log_reverse
 
     shell:
     '''
@@ -25,23 +26,24 @@ process trim_primers {
 
     MIN_F=$(( !{params.forward_primer.length()} * 2 / 3 ))  # match is >= 2/3 of primer length
     MIN_R=$(( !{params.reverse_primer.length()} * 2 / 3 ))
-    {
+    # Two cutadapt passes (forward primer, then reverse primer) piped
+    # together. Each pass writes its own report so the per-primer
+    # trimming statistics stay separable ([S19]).
+    cutadapt \
+        --cores=!{task.cpus} \
+        --error-rate "${ERROR_RATE}" \
+        --revcomp \
+        --rename="{id}" \
+        --front "!{params.forward_primer};rightmost" \
+        --overlap "${MIN_F}" \
+        --discard-untrimmed \
+        !{merged_fastq} 2> !{sampleId}_trimming_forward.log | \
         cutadapt \
             --cores=!{task.cpus} \
             --error-rate "${ERROR_RATE}" \
-            --revcomp \
-            --rename="{id}" \
-            --front "!{params.forward_primer};rightmost" \
-            --overlap "${MIN_F}" \
+            --adapter "${reverse_primer_revcomp}" \
+            --overlap "${MIN_R}" \
             --discard-untrimmed \
-            !{merged_fastq} | \
-            cutadapt \
-                --cores=!{task.cpus} \
-                --error-rate "${ERROR_RATE}" \
-                --adapter "${reverse_primer_revcomp}" \
-                --overlap "${MIN_R}" \
-                --discard-untrimmed \
-                - > trimmed_fastq
-    } 2> !{sampleId}_trimming.log
+            - > trimmed_fastq 2> !{sampleId}_trimming_reverse.log
     '''
 }

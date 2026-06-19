@@ -70,8 +70,11 @@ nextflow_process {
         }
     }
 
-    test("emits a per-sample trimming log") {
+    test("emits separate forward and reverse per-sample trimming logs") {
         // COVERAGE: [S19]
+        // cutadapt runs in two passes (forward primer, then reverse
+        // primer); each pass writes its own report so the per-primer
+        // trimming statistics stay separable.
         tag "ci"
         when {
             params {
@@ -86,9 +89,16 @@ nextflow_process {
         }
         then {
             assert process.success
-            def logPath = process.out.log.get(0)
-            assert logPath.endsWith("sample_ok_trimming.log") : "unexpected log path: ${logPath}"
-            assert path(logPath).readLines().size() > 0 : "expected non-empty trimming log"
+            def fwdLog = process.out.log_forward.get(0)
+            def revLog = process.out.log_reverse.get(0)
+            assert fwdLog.endsWith("sample_ok_trimming_forward.log") :
+                "unexpected forward log path: ${fwdLog}"
+            assert revLog.endsWith("sample_ok_trimming_reverse.log") :
+                "unexpected reverse log path: ${revLog}"
+            assert path(fwdLog).readLines().size() > 0 :
+                "expected non-empty forward trimming log"
+            assert path(revLog).readLines().size() > 0 :
+                "expected non-empty reverse trimming log"
         }
     }
 }
