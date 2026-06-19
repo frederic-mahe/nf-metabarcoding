@@ -277,24 +277,38 @@ both and also refresh `CITATION.cff`'s `date-released`.
 
 ## Status
 
+The authoritative, per-specification status lives in
+[`tests/COVERAGE.md`](tests/COVERAGE.md) (each `[Sxx]` ID → its
+test(s) → `done` / `TODO` / `blocked`). The CI suite
+(`nf-test test --tag ci`, plus `bats` and `pytest`) is green and the
+coverage gate maps every `[Sxx]` in SPECIFICATIONS to at least one
+test. Summary at the time of writing:
+
 ### Implemented
-- Part A: per-sample processing — merge pairs, trim primers, derep,
-  local clustering with swarm
-- Per-process nf-test scaffolding chained via `setup{}` blocks
-- Reproducible fixture generation (`tests/data/generate.sh`)
-- HPC / slurm profile + conda / module dependency profiles (`[S07]`,
-  `[S08]`) — see "Running on an HPC cluster (slurm)" below
+- Part A — per-sample processing (merge pairs, trim primers,
+  dereplicate, extract quality, local clustering with swarm), plus the
+  experimental shadow pipeline for unmergeable pairs (`[S04]`)
+- Part B — occurrence-table assembly (global dereplication + swarm
+  clustering, cluster cleaving, chimera detection, substring-OTU
+  merging, mumu post-clustering curation)
+- Part C — taxonomic assignment (the stampa scatter-gather and the
+  sintax shadow path), with optional majority-rule assignment (`[S66]`)
+- `--input` samplesheet input (`[S70]`) and the unified `--outdir`
+  output layout (`[S71]`)
+- HPC / slurm profile + `conda` / `modules` dependency profiles
+  (`[S07]`, `[S08]`) — see "Running on an HPC cluster (slurm)" below.
+  The `conda` profile now resolves every tool — including `mumu` —
+  from bioconda
+- Multi-layer test suite: nf-test (process + workflow), bats, pytest,
+  with shellcheck / flake8 linting and a spec ↔ test coverage gate
 
-### Partial / in progress
-- Workflow-level smoke test (currently `red` on `[S01]`, `[S03]`,
-  `[S09]`)
-- Empty-sample passthrough (`[S09]`)
-
-### Planned
-- Part B: occurrence table assembly (`[S15]`)
-- Part C: taxonomic assignment
+### Planned / not yet done
+- Two-table occurrence output (`--split-occurrence-table`, `[S15]`)
+- Per-sample marker for unmerged-pair clusters (`[S05]`, blocked on
+  [`DECISIONS.md`](DECISIONS.md) D02)
 - Container profiles — docker / singularity (`[S08]`)
-- Multiplexed-input subworkflow
+- Multiplexed-input subworkflow (demultiplexing is out of scope,
+  `[S16]`)
 - Reference database auto-deduction from primers
 - Force-rerun controls (see "Re-run policy" below)
 
