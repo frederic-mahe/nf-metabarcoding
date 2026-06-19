@@ -52,6 +52,25 @@ jobs:
       - name: Audit spec <-> test mapping
         run: bash tests/coverage-gate.sh
 
+  container-profiles:
+    # [S08]: assert the docker/podman/singularity/apptainer profiles
+    # resolve their engine + Wave + the pinned conda env. Config
+    # resolution only — no engine and no container build are exercised
+    # here (that stays a manual cluster smoke test), so no tool setup is
+    # needed, just Nextflow.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Nextflow
+        uses: nf-core/setup-nextflow@v3
+      - name: Validate container profile wiring
+        run: bash tests/check-container-profiles.sh
+
   shellcheck:
     runs-on: ubuntu-latest
     steps:

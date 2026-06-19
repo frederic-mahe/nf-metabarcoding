@@ -203,10 +203,29 @@ the latter case.
     behaviour (>= 24.04), so — per `[S00]`'s "we do not re-test
     upstream tools" rule — the clamp itself is not unit-tested; the
     manual cluster smoke test confirms it.
-- `[S08]` runs local or containerized applications (vsearch, swarm,
-  cutadapt)
-  - Not part of automated CI; covered by a `-profile docker` /
-    `-profile singularity` manual smoke test.
+- `[S08]` runs tools either from the local environment (PATH /
+  `-profile conda` / `-profile modules`) or inside containers. Four
+  engine profiles — `docker`, `podman`, `singularity`, `apptainer` —
+  each enable their engine plus Seqera Wave, which builds the image on
+  the fly from `environment.yml` (the single pinned source of truth,
+  `[S69]`) and caches it; no Dockerfile or registry is maintained
+  (`DECISIONS.md` D10). The profiles compose with the executor and
+  dependency profiles (e.g. `-profile slurm,singularity`). Wave needs
+  outbound network from wherever tasks run.
+  - The profile **wiring** is checked automatically by
+    `tests/check-container-profiles.sh` (each profile resolves its
+    engine + `wave.enabled` + the pinned conda env via
+    `nextflow config`, and a plain `nextflow run` stays bare-PATH).
+    Container **execution** is not run in automated CI — per `[S00]`'s
+    "we do not re-test upstream tools" rule, running vsearch/swarm in a
+    container exercises Wave/the engine, not our glue — so it stays a
+    manual `-profile docker` / `-profile singularity` cluster smoke
+    test.
+  - **Pass when:** `nextflow config -profile <engine>` resolves
+    `<engine>.enabled` and `wave.enabled` for each of docker / podman /
+    singularity / apptainer; `-profile slurm,singularity` resolves the
+    slurm executor alongside the engine; and a plain `nextflow run`
+    (no profile) enables neither Wave nor conda.
 - `[S09]` empty input samples must travel through and appear in the
   occurrence table (but not in the two-table mode long-format)
   - **Pass when:** an empty fastq pair produces a row in the

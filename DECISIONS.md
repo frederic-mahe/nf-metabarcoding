@@ -470,3 +470,41 @@ Sub-questions for the human:
 
 Until D09 lands, `[S19]`'s publish-into-`fastq_folder` contract stands
 and its tests remain green.
+
+
+## D10 — Container packaging strategy
+
+**Blocks:** `[S08]` (container profiles)
+**Status:** `resolved` — option 1 (Wave, no freeze) (2026-06-19)
+
+**Question:** how should the `docker` / `podman` / `singularity` /
+`apptainer` profiles obtain the tool images — given that `mumu` is now
+on bioconda (so every dependency is conda-installable), the two adopting
+labs run on slurm with **outbound network on the compute nodes**, and
+the project values a single pinned source of truth (`[S69]`) without
+nf-core membership?
+
+1. **Seqera Wave, no freeze (chosen).** Wave builds the image on the
+   fly from `environment.yml` and caches it; the same pinned spec that
+   drives `-profile conda` drives the container build. No Dockerfile, no
+   registry, no manual image bump. Rebuilds are deterministic from the
+   exact conda pins, so tool versions never drift (only the image digest
+   may differ). Cost: a soft dependency on the Wave service and outbound
+   network at task start — acceptable here (compute nodes are online).
+2. **Wave + freeze to a registry (ghcr.io).** Same declarative build,
+   but Wave pushes each image into a repo the project owns, for
+   permanent self-owned artefacts. Deferred: needs a registry + token;
+   can be layered on later (flip `wave.freeze` + `wave.build.repository`)
+   without changing the profiles or the workflow.
+3. **Self-built Dockerfile on ghcr.io.** Full control and fully
+   offline-capable, but the project maintains a Dockerfile + a
+   build/push workflow and bumps the image tag with every
+   `environment.yml` change. Rejected as more maintenance than the labs
+   want.
+
+**Resolution (2026-06-19):** option 1. Each engine profile enables its
+engine + `wave.enabled` + `conda.enabled` + `process.conda =
+environment.yml`, scoped inside the profile so a plain `nextflow run`
+stays bare-PATH. Option 2 is the documented upgrade path if a
+permanent image archive is later wanted. See `[S08]` in
+[`SPECIFICATIONS.md`](SPECIFICATIONS.md).

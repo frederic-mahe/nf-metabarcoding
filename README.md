@@ -44,8 +44,11 @@ Required to run the workflow:
 - `nextflow >= 25.04.0`
 - `bash >= 4`
 - `vsearch`, `cutadapt`, `swarm`, `mumu` available on `PATH` — or
-  resolved automatically with `-profile conda` (bioconda) or
-  `-profile modules` (see "Running on an HPC cluster (slurm)" below)
+  resolved automatically with `-profile conda` (bioconda),
+  `-profile modules`, or a container engine
+  (`-profile docker`/`podman`/`singularity`/`apptainer`; see "Running
+  with containers" below). A container engine only needs the engine
+  itself installed — the tools are built into the image.
 
 Required to run the test suite and the linters:
 
@@ -142,12 +145,55 @@ glob meta-characters are limited to `*` (any chars) and the `{R1,R2}`
 brace token — anything else is matched literally.
 
 
+## Running with containers
+
+`[S08]`. Four engine profiles run every tool inside a container so the
+only thing you install is the engine itself:
+
+```bash
+nextflow run main.nf -profile docker      ...   # Docker
+nextflow run main.nf -profile podman      ...   # Podman
+nextflow run main.nf -profile singularity ...   # Singularity
+nextflow run main.nf -profile apptainer   ...   # Apptainer
+```
+
+You do **not** build or pull an image by hand. Each profile turns on
+[Seqera Wave](https://docs.seqera.io/wave), which builds the image on
+the fly from [`environment.yml`](environment.yml) — the same pinned
+dependency list the `conda` profile uses — and caches it for reuse.
+`environment.yml` stays the single source of truth: bump a version
+there and the next run rebuilds the image automatically (see
+[`DECISIONS.md`](DECISIONS.md) D10).
+
+Requirements and notes:
+
+- **Outbound network** must be reachable from wherever tasks run (the
+  login node *and* the compute nodes), because Wave resolves and builds
+  the image at task start.
+- Combine with the executor for HPC, e.g. `-profile slurm,singularity`
+  (see below). `singularity` / `apptainer` set `autoMounts` so the work
+  directory and inputs are visible inside the container.
+- Pick **one** dependency mechanism: a container profile, `conda`, or
+  `modules` — not several at once.
+- Container *execution* is validated by a manual cluster smoke test;
+  the profile *wiring* is checked in CI by
+  `tests/check-container-profiles.sh`.
+
+
 ## Running on an HPC cluster (slurm)
 
 `[S07]`/`[S08]`. Combine the `slurm` executor profile with **one**
-dependency profile:
+dependency profile (`conda`, `modules`, or a container engine —
+`singularity` / `apptainer` are the usual HPC choices, see "Running
+with containers" above):
 
 ```bash
+# tools in a container, built on the fly from environment.yml via Wave
+nextflow run main.nf -profile slurm,singularity \
+    --fastq_folder /scratch/me/run17 \
+    --slurm_queue  normal \
+    --threads      8
+
 # tools from bioconda (Nextflow builds the env once and caches it)
 nextflow run main.nf -profile slurm,conda \
     --fastq_folder /scratch/me/run17 \
@@ -299,6 +345,9 @@ test. Summary at the time of writing:
   (`[S07]`, `[S08]`) — see "Running on an HPC cluster (slurm)" below.
   The `conda` profile now resolves every tool — including `mumu` —
   from bioconda
+- Container profiles — `docker` / `podman` / `singularity` /
+  `apptainer` (`[S08]`), built on the fly from `environment.yml` via
+  Seqera Wave; see "Running with containers" below
 - Multi-layer test suite: nf-test (process + workflow), bats, pytest,
   with shellcheck / flake8 linting and a spec ↔ test coverage gate
 
@@ -306,7 +355,6 @@ test. Summary at the time of writing:
 - Two-table occurrence output (`--split-occurrence-table`, `[S15]`)
 - Per-sample marker for unmerged-pair clusters (`[S05]`, blocked on
   [`DECISIONS.md`](DECISIONS.md) D02)
-- Container profiles — docker / singularity (`[S08]`)
 - Multiplexed-input subworkflow (demultiplexing is out of scope,
   `[S16]`)
 - Reference database auto-deduction from primers
