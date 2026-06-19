@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-include { normalize_path; usage; validate_params; samplesheet_profile } from './modules/local/functions.nf'
+include { normalize_path; usage; validate_params; samplesheet_profile; check_primer_format } from './modules/local/functions.nf'
 include { part_A } from './subworkflows/local/part_a.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
 include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_fasta.nf'
@@ -228,6 +228,11 @@ workflow {
     } else {
         assert params.forward_primer : "--forward_primer must be set (no default)"
         assert params.reverse_primer : "--reverse_primer must be set (no default)"
+        // [S74]: both primers must be IUPAC nucleotide strings (the
+        // trim_primers / reverse_complement.sh alphabet) — fail fast on a
+        // typo rather than mid-run in cutadapt.
+        check_primer_format('forward_primer', params.forward_primer)
+        check_primer_format('reverse_primer', params.reverse_primer)
     }
 
     part_A()

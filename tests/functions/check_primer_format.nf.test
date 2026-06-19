@@ -1,0 +1,84 @@
+nextflow_function {
+
+    name "check_primer_format"
+    script "modules/local/functions.nf"
+    function "check_primer_format"
+
+    // [S74]: a primer must be an IUPAC nucleotide string (A C G T U plus
+    // the ambiguity codes R Y S W K M B D H V N and I for inosine),
+    // upper- or lower-case, at least 3 characters. Workflow-level wiring
+    // is covered in tests/main.nf.test.
+
+    test("a canonical forward primer is accepted") {
+        // COVERAGE: [S74]
+        tag "ci"
+        when { function { """
+            input[0] = 'forward_primer'
+            input[1] = 'CCAGCASCYGCGGTAATTCC'
+        """ } }
+        then {
+            assert function.success
+            assert function.result == 'CCAGCASCYGCGGTAATTCC'
+        }
+    }
+
+    test("a lowercase primer is accepted") {
+        // COVERAGE: [S74]
+        tag "ci"
+        when { function { """
+            input[0] = 'forward_primer'
+            input[1] = 'acgtryswn'
+        """ } }
+        then { assert function.success }
+    }
+
+    test("a primer with inosine (I) and ambiguity codes is accepted") {
+        // COVERAGE: [S74]
+        tag "ci"
+        when { function { """
+            input[0] = 'reverse_primer'
+            input[1] = 'ACGIRYS'
+        """ } }
+        then { assert function.success }
+    }
+
+    test("a primer shorter than 3 nt is rejected") {
+        // COVERAGE: [S74]
+        tag "ci"
+        when { function { """
+            input[0] = 'forward_primer'
+            input[1] = 'AC'
+        """ } }
+        then { assert !function.success }
+    }
+
+    test("a primer with a non-IUPAC character is rejected") {
+        // COVERAGE: [S74]
+        tag "ci"
+        when { function { """
+            input[0] = 'forward_primer'
+            input[1] = 'ACGTZ'
+        """ } }
+        then { assert !function.success }
+    }
+
+    test("a primer with a digit is rejected") {
+        // COVERAGE: [S74]
+        tag "ci"
+        when { function { """
+            input[0] = 'reverse_primer'
+            input[1] = 'ACG1'
+        """ } }
+        then { assert !function.success }
+    }
+
+    test("an empty primer is rejected") {
+        // COVERAGE: [S74]
+        tag "ci"
+        when { function { """
+            input[0] = 'forward_primer'
+            input[1] = ''
+        """ } }
+        then { assert !function.success }
+    }
+}

@@ -166,6 +166,54 @@ nextflow_pipeline {
         }
     }
 
+    test("a malformed --forward_primer aborts before any process runs") {
+        // COVERAGE: [S74]
+        // A primer with a non-IUPAC character (here 'X') must abort at
+        // startup naming the parameter, instead of failing mid-run in
+        // cutadapt. The format matrix is pinned in
+        // tests/functions/check_primer_format.nf.test.
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTXX"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("forward_primer") && msg.contains("IUPAC") :
+                "expected an IUPAC-format error naming forward_primer, got: ${msg}"
+        }
+    }
+
+    test("an invalid --join_padding_length aborts before any process runs") {
+        // COVERAGE: [S63]
+        // [S63]'s --join_padding_length must be a positive integer; the
+        // guard existed without a negative test. A non-positive value
+        // (0) must abort at startup naming the parameter.
+        tag "ci"
+        when {
+            params {
+                forward_primer      = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer      = "ACTTTCGTTCTTGATYRA"
+                fastq_folder        = "${projectDir}/tests/data"
+                fastq_pattern       = "/paired_merge_ok_{1,2}.fastq.gz"
+                join_padding_length = 0
+                threads             = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("join_padding_length") :
+                "expected error to name join_padding_length, got: ${msg}"
+        }
+    }
+
     test("--no_trimming true also skips trim_primers on the shadow Part A pipeline") {
         // COVERAGE: [S04], [S20]
         // paired_merge_fail produces both a regular and a shadow

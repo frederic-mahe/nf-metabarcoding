@@ -21,7 +21,7 @@ process trim_primers {
 
     readonly ERROR_RATE=0.1
 
-    reverse_primer_revcomp=$(reverse_complement.sh !{params.reverse_primer})
+    reverse_primer_revcomp=$(reverse_complement.sh "!{params.reverse_primer}")
 
     MIN_F=$(( !{params.forward_primer.length()} * 2 / 3 ))  # match is >= 2/3 of primer length
     MIN_R=$(( !{params.reverse_primer.length()} * 2 / 3 ))

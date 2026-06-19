@@ -282,6 +282,24 @@ contract ([Sxx] IDs).
 }
 
 
+def check_primer_format(String name, value) {
+    // [S74]: validate a primer is an IUPAC nucleotide string — the codes
+    // A C G T U R Y S W K M B D H V N plus I (inosine), upper- or
+    // lower-case, at least 3 nt — the same alphabet reverse_complement.sh
+    // understands. Returns the value when valid; throws
+    // IllegalArgumentException naming the parameter on a malformed value,
+    // so a typo aborts at startup rather than as a confusing cutadapt
+    // error mid-run.
+    if ( !(value ==~ /(?i)^[ACGTURYSWKMBDHVNI]{3,}$/) ) {
+        throw new IllegalArgumentException(
+            "--${name} must be an IUPAC nucleotide string (A C G T U plus " +
+            "the ambiguity codes R Y S W K M B D H V N and I), at least 3 " +
+            "characters, got '${value}'")
+    }
+    return value
+}
+
+
 def reference_first_header(ref_file, boolean gzipped) {
     // [S73] helper: return the first line of a reference fasta (its FASTA
     // header), transparently decompressing gzip. Reads a single line —

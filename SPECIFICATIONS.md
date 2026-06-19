@@ -1356,6 +1356,20 @@ from placeholder values to real taxonomic assignments.
     stampa-formatted file passed to `--reference_dataset_sintax` aborts
     naming `reference_dataset_sintax`; a `.gz` reference is decompressed
     and sniffed the same way; correctly-formatted references pass.
+- `[S74]` when primer trimming runs (`--no_trimming` false, `[S20]`),
+  `--forward_primer` and `--reverse_primer` are validated at startup to
+  be IUPAC nucleotide strings — the codes `A C G T U R Y S W K M B D H V
+  N` plus `I` (inosine), upper- or lower-case, at least 3 characters —
+  the same alphabet `reverse_complement.sh` understands. A primer that is
+  too short or carries a non-IUPAC character aborts at startup naming the
+  parameter, instead of producing a confusing cutadapt error mid-run.
+  Primer values reach cutadapt through quoted shell interpolation so a
+  stray character cannot reshape the command.
+  - **Pass when:** the primer check accepts valid IUPAC primers
+    (including lowercase, ambiguity codes, and `I`) and rejects
+    too-short / non-IUPAC values; an end-to-end Part A run with a
+    malformed `--forward_primer` aborts at startup naming
+    `forward_primer`.
 
 
 ## Dependencies
