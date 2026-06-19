@@ -89,6 +89,41 @@ nextflow_process {
         }
     }
 
+    test("--percentage threads through to cluster_cleaver.py") {
+        // COVERAGE: [S22]
+        // [S22] promises a configurable cleaving threshold exposed as
+        // --percentage. The script honours the flag (pinned by
+        // tests/python/test_cluster_cleaver.py); this test guards the
+        // *workflow wiring* — that cleaving.nf forwards params.percentage
+        // to the script. cluster_cleaver.py logs the resolved threshold
+        // and the percentage it came from on stderr (the published
+        // cleaving log), so a non-default --percentage must surface
+        // there. A regression that drops the wiring would log the 0.05
+        // default instead.
+        tag "ci"
+        when {
+            params {
+                percentage = 0.5
+            }
+            process {
+                """
+                input[0] = global_clustering.out.stats   // .stats
+                input[1] = global_clustering.out.struct   // .struct
+                input[2] = global_clustering.out.swarms   // .swarms
+                input[3] = global_dereplication.out.fasta // global .fas
+                input[4] = list_all_cluster_seeds_of_size_greater_than_2.out.stats
+                input[5] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def log = process.out.log.get(0)
+            assert path(log).text.contains("--percentage 0.5") :
+                "cleaving log should record the wired --percentage 0.5, got:\n${path(log).text}"
+        }
+    }
+
     test("--fastidious false swaps the cleaved representatives suffix from _1f to _1") {
         // COVERAGE: [S22]
         // Propagation lever from [S22]: cluster_cleaver.py receives

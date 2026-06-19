@@ -41,6 +41,7 @@ process cleaving {
         --struct ${struct} \\
         --swarms ${swarms} \\
         --fasta ${global_fasta} \\
+        --percentage ${params.percentage} \\
         ${fastidious_flag} \\
         2> ${basename}_cleaving.log
     """

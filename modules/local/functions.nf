@@ -231,6 +231,10 @@ Part B — per-sample fasta → occurrence table:
                               very large datasets where the fastidious
                               pass is too memory- or time-expensive
                               (default: ${params.fastidious})
+  --percentage FLOAT          cleaving threshold: a sub-seed candidate
+                              must appear as a per-sample cluster seed in
+                              at least this fraction of samples; real in
+                              (0, 1] (default: ${params.percentage})
 
 Part C — taxonomic assignment:
   --reference_dataset PATH    stampa-formatted reference fasta

@@ -54,6 +54,10 @@ def per_sample_stats_parse(
 
     # keep only local seeds present in at least "percentage" of samples
     threshold = percentage * number_of_samples
+    logger.info(
+        "cleaving threshold: %s (--percentage %s of %s samples)",
+        threshold, percentage, number_of_samples,
+    )
     seeds = {k: v for k, v in per_sample_stats.items() if v >= threshold}
 
     return threshold, seeds
