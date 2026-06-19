@@ -282,6 +282,87 @@ contract ([Sxx] IDs).
 }
 
 
+def numeric_param_spec() {
+    // [S72]: accepted range for each numeric parameter, pinned to the
+    // vsearch option it feeds. Pure data (no params access) so
+    // check_numeric_param() stays unit-testable. `minExclusive` marks a
+    // half-open lower bound (used by `percentage`, which must be > 0).
+    return [
+        fastq_encoding   : [type: 'enum', values: [33, 64]],
+        threads          : [type: 'int',  min: 1,   max: 256],
+        percentage       : [type: 'real', min: 0.0, max: 1.0, minExclusive: true],
+        chimera_minsize  : [type: 'int',  min: 1],
+        stripright       : [type: 'int',  min: 0],
+        iddef            : [type: 'int',  min: 0,   max: 4],
+        stampa_chunk_size: [type: 'int',  min: 0],
+        stampa_maxrejects: [type: 'int',  min: 0],
+        stampa_id        : [type: 'real', min: 0.0, max: 1.0],
+        sintax_cutoff    : [type: 'real', min: 0.0, max: 1.0],
+    ]
+}
+
+
+def check_numeric_param(String name, value) {
+    // [S72]: validate one numeric parameter against numeric_param_spec().
+    // Returns the value unchanged when valid; throws
+    // IllegalArgumentException with a message naming the parameter when
+    // the value is the wrong type or out of range, so the run aborts at
+    // startup instead of failing as an obscure vsearch error
+    // mid-pipeline.
+    def spec = numeric_param_spec()[name]
+    if ( spec == null ) {
+        throw new IllegalArgumentException(
+            "no numeric range is defined for parameter '${name}'")
+    }
+    if ( spec.type == 'enum' ) {
+        if ( !(value instanceof Number) || !((value as int) in spec.values) ) {
+            throw new IllegalArgumentException(
+                "--${name} must be one of ${spec.values}, got '${value}'")
+        }
+        return value
+    }
+    if ( !(value instanceof Number) ) {
+        throw new IllegalArgumentException(
+            "--${name} must be a number, got '${value}'")
+    }
+    if ( spec.type == 'int' ) {
+        def i = value as int
+        if ( i != value ) {
+            throw new IllegalArgumentException(
+                "--${name} must be an integer, got '${value}'")
+        }
+        def range = (spec.max != null)
+            ? "in ${spec.min}..${spec.max}"
+            : ">= ${spec.min}"
+        if ( i < spec.min || (spec.max != null && i > spec.max) ) {
+            throw new IllegalArgumentException(
+                "--${name} must be an integer ${range}, got '${value}'")
+        }
+    } else {
+        def d = value as double
+        def lower_ok = spec.minExclusive ? (d > spec.min) : (d >= spec.min)
+        def open = spec.minExclusive ? '(' : '['
+        if ( !lower_ok || d > spec.max ) {
+            throw new IllegalArgumentException(
+                "--${name} must be a real number in ${open}${spec.min}, ${spec.max}], " +
+                "got '${value}'")
+        }
+    }
+    return value
+}
+
+
+def validate_numeric_params() {
+    // [S72]: params-reading wrapper over check_numeric_param() — validate
+    // every numeric parameter against numeric_param_spec(). Called from
+    // validate_params() so an out-of-range value aborts before any
+    // process is wired.
+    numeric_param_spec().each { name, _spec ->
+        check_numeric_param(name, params[name])
+    }
+}
+
+
 def validate_params() {
     // Order-independent parameter guards, run once at the top of the
     // entry workflow (after the --help short-circuit) so an invalid value
@@ -342,4 +423,9 @@ def validate_params() {
     def jpl = params.join_padding_length
     assert (jpl instanceof Number) && (jpl as int) == jpl && (jpl as int) >= 1 :
         "--join_padding_length must be a positive integer, got '${jpl}'"
+
+    // [S72]: range-validate every numeric parameter against
+    // numeric_param_spec(). Kept last so the mode/string guards above
+    // (which produce more specific messages) fire first.
+    validate_numeric_params()
 }

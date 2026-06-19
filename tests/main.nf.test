@@ -1474,6 +1474,55 @@ nextflow_pipeline {
         }
     }
 
+    test("an out-of-range numeric parameter aborts before any process runs") {
+        // COVERAGE: [S72]
+        // Wiring + message-propagation check for validate_numeric_params()
+        // (the per-parameter range matrix is pinned in
+        // tests/functions/check_numeric_param.nf.test). --threads 0 is
+        // below the 1..256 range, so the run must abort at startup with a
+        // message naming the parameter, in an otherwise-valid Part A mode.
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                threads        = 0
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("threads") :
+                "error should name the out-of-range parameter 'threads', got: ${msg}"
+        }
+    }
+
+    test("an out-of-range Part C numeric parameter aborts before any process runs") {
+        // COVERAGE: [S72]
+        // The guard runs in validate_params() for every mode. A
+        // mistyped --sintax_cutoff 90 (instead of 0.9) is out of the
+        // [0, 1] range and must abort the Part C standalone run at
+        // startup, naming the parameter.
+        tag "ci"
+        when {
+            params {
+                occurrence_table  = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                results_folder    = "${outputDir}/bad_sintax_cutoff"
+                reference_dataset = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                sintax_cutoff     = 90
+                threads           = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("sintax_cutoff") :
+                "error should name the out-of-range parameter 'sintax_cutoff', got: ${msg}"
+        }
+    }
+
     test("Part C standalone runs the regular path through sintax when --taxonomy_method=sintax") {
         // COVERAGE: [S61], [S64]
         // The regular path can opt into sintax via params.taxonomy_method.

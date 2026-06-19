@@ -1303,6 +1303,30 @@ from placeholder values to real taxonomic assignments.
   `<outdir>/occurrence_table/`, `software_versions.yml` under
   `<outdir>/pipeline_info/` — with `--results_folder` the deprecated
   alias for `--outdir`.
+- `[S72]` numeric parameters are range-validated at workflow startup,
+  before any process is wired, so an out-of-range value aborts
+  immediately with a message naming the parameter rather than surfacing
+  as an obscure tool error mid-pipeline (the same fail-fast contract as
+  `[S63]`'s `--join_padding_length`). Each accepted range is pinned to
+  the vsearch option the parameter feeds:
+    - `fastq_encoding` — `33` or `64` (vsearch `--fastq_ascii`)
+    - `threads` — integer `1..256`
+    - `percentage` — real in `(0, 1]` (cleaving threshold, `[S22]`)
+    - `chimera_minsize` — integer `>= 1` (vsearch `--minsize`, `[S34]`)
+    - `stripright` — integer `>= 0` (`0` disables the trim, vsearch
+      `--fastq_stripright`, `[S24]`)
+    - `iddef` — integer `0..4` (vsearch `--iddef`)
+    - `stampa_chunk_size` — integer `>= 0` (`0` = no-split sentinel,
+      `[S49]`)
+    - `stampa_maxrejects` — integer `>= 0` (`0` = no-limit sentinel,
+      `[S49]`)
+    - `stampa_id` — real in `[0, 1]` (vsearch `--id`, `[S49]`)
+    - `sintax_cutoff` — real in `[0, 1]` (vsearch `--sintax_cutoff`,
+      `[S50]`)
+  - **Pass when:** for each parameter above, a representative
+    out-of-range value aborts the run before any process executes with
+    stderr naming the offending parameter; the default configuration
+    passes validation.
 
 
 ## Dependencies

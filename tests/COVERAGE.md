@@ -98,6 +98,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S69]`| exact, agreeing version pins in `environment.yml` and CI; no unresolvable `bioconda::mumu` | `tests/python/test_reproducible_pins.py` | done | — |
 | `[S70]`| `--input` samplesheet (fastq / fasta profiles): structural validation in `bin/parse_samplesheet.py`; folder-scan fallback, mutually exclusive | `tests/python/test_parse_samplesheet.py`, `tests/main.nf.test` | done | — |
 | `[S71]`| `--outdir` single output root (`per_sample`/`occurrence_table`/`pipeline_info`); `--results_folder` deprecated alias; `--fastq_folder` input-only | `tests/functions/effective_outdir.nf.test`, `tests/main.nf.test` | done | — |
+| `[S72]`| numeric params range-validated at startup (fastq_encoding, threads, percentage, chimera_minsize, stripright, iddef, stampa_chunk_size, stampa_maxrejects, stampa_id, sintax_cutoff); out-of-range aborts naming the param | `tests/functions/check_numeric_param.nf.test`, `tests/main.nf.test` | done | — |
 
 
 ## Per-process tests
