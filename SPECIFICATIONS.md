@@ -1390,6 +1390,36 @@ from placeholder values to real taxonomic assignments.
     malformed `--forward_primer` aborts at startup naming
     `forward_primer`.
 
+- `[S75]` a site adapts the workflow to its cluster through a
+  **`-c` site-config file**, never by editing `nextflow.config`. A
+  documented template (`conf/site.config.example`) carries every knob a
+  site is expected to override — slurm `slurm_queue` / `slurm_account` /
+  `slurm_queue_size`, the resource ceiling (`max_cpus` / `max_memory` /
+  `max_time`) and dataset/reference sizes (`[S07]`), the
+  container/conda cache directories, and the environment-module names
+  (`[S08]`) — to be copied, edited, and passed with
+  `-c my-site.config`, which native Nextflow merges over the pipeline
+  defaults and the active profiles. In addition,
+  `params.slurm_clusterOptions` (default `null`) is a free-form
+  passthrough appended verbatim to every sbatch submit line (QoS,
+  constraints, reservations) — the slurm profile's `clusterOptions`
+  closure combines it with `--account=<slurm_account>`, yielding `null`
+  (directive omitted) when neither is set. This is the one
+  cluster-specific submission knob that cannot be expressed through
+  `--slurm_account` / `--slurm_queue` alone.
+  - Config **resolution** is checked automatically by
+    `tests/check-site-config.sh` (the shipped template parses and
+    resolves; its overrides win over the slurm-profile defaults when
+    layered with `-c`; the `clusterOptions` closure is wired to
+    `params.slurm_clusterOptions`). Actual job submission stays a manual
+    cluster smoke test (`[S07]`), so — per `[S00]` — the runtime
+    evaluation of the `clusterOptions` closure is not unit-tested.
+  - **Pass when:** `nextflow -c conf/site.config.example config -profile
+    slurm` resolves and the template's `slurm_clusterOptions` /
+    `singularity.cacheDir` overrides appear in the resolved config;
+    `-profile slurm` (no `-c`) exposes `params.slurm_clusterOptions =
+    null` and a `clusterOptions` closure that reads it.
+
 
 ## Dependencies
 

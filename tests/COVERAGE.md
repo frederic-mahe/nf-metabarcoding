@@ -101,6 +101,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S72]`| numeric params range-validated at startup (fastq_encoding, threads, percentage, chimera_minsize, stripright, iddef, stampa_chunk_size, stampa_maxrejects, stampa_id, sintax_cutoff); out-of-range aborts naming the param | `tests/functions/check_numeric_param.nf.test`, `tests/main.nf.test` | done | — |
 | `[S73]`| reference dataset format sniffed at startup: `--reference_dataset` must be stampa-shaped (`>id <lineage>`), `--reference_dataset_sintax` sintax-shaped (`>id;tax=...;`); plain + gzip read, bz2 skipped; mismatch aborts naming the flag | `tests/functions/check_reference_format.nf.test`, `tests/main.nf.test` | done | — |
 | `[S74]`| primers validated at startup when trimming runs: IUPAC codes (A C G T U R Y S W K M B D H V N) + I, any case, >=3 nt; malformed aborts naming the param; quoted shell interpolation into cutadapt | `tests/functions/check_primer_format.nf.test`, `tests/main.nf.test` | done | — |
+| `[S75]`| site config via `-c` template (`conf/site.config.example`); `--slurm_clusterOptions` passthrough combined with `--account` | `tests/check-site-config.sh` (config resolution); submission = manual cluster smoke test | done | — |
 
 
 ## Per-process tests

@@ -1,0 +1,66 @@
+/*
+ * [S75] Site configuration template.
+ *
+ * Copy this file, edit the values for your cluster, and pass it on the
+ * command line with `-c`:
+ *
+ *     nextflow run main.nf -profile slurm,singularity \
+ *         -c /path/to/my-site.config \
+ *         --fastq_folder ... --forward_primer ... --reverse_primer ...
+ *
+ * `-c` is native Nextflow: the values below are merged over the pipeline
+ * defaults and the selected profiles, so a site never has to edit
+ * nextflow.config itself. Delete the lines you don't need — everything
+ * here is optional and has a working default.
+ */
+
+params {
+    // --- slurm submission (consumed by `-profile slurm`) ---------------
+    // Partition / queue and account for sbatch.
+    slurm_queue   = 'normal'
+    slurm_account = 'my_account'
+
+    // Extra sbatch options appended verbatim to every job's submit line
+    // ([S75]): QoS, constraints, reservations, etc. Combined with
+    // --account automatically. Leave unset (null) if not needed.
+    slurm_clusterOptions = '--qos=long --constraint=haswell'
+
+    // Max concurrent sbatch jobs the driver keeps in flight.
+    slurm_queue_size = 50
+
+    // --- resource scaling (consumed by `-profile slurm`) ---------------
+    // Approximate input / reference sizes in GB; the memory-bound steps
+    // scale their RAM request off these (see nextflow.config).
+    dataset_size_gb   = 20
+    reference_size_gb = 2
+
+    // Resource ceiling clamped onto every (escalating) request so a step
+    // never asks for more than the largest node a partition offers.
+    max_cpus   = 32
+    max_memory = '256.GB'
+    max_time   = '72.h'
+
+    // --- environment-module names (consumed by `-profile modules`) -----
+    // Uncomment and set to your site's module names/versions if you run
+    // `-profile slurm,modules` instead of a container or conda.
+    // module_vsearch  = 'vsearch/2.31.0'
+    // module_swarm    = 'swarm/3.1.6'
+    // module_cutadapt = 'cutadapt/5.2'
+    // module_mumu     = 'mumu/1.1.4'
+}
+
+// --- shared caches (build the image / conda env once) ------------------
+// Point the container/conda caches at shared scratch visible to every
+// compute node, so the Wave-built image (or the conda env) is built once
+// and reused instead of rebuilt per node. Match the cache to the engine
+// profile you run.
+singularity.cacheDir = '/scratch/shared/nf-metabarcoding/singularity_cache'
+apptainer.cacheDir   = '/scratch/shared/nf-metabarcoding/apptainer_cache'
+conda.cacheDir       = '/scratch/shared/nf-metabarcoding/conda_cache'
+
+// --- driver tuning -----------------------------------------------------
+// Keep the work directory on shared scratch (visible to all nodes) and
+// preserve it across runs so `-resume` works between separate
+// invocations (see the README HPC section on cleanup vs -resume).
+// workDir = '/scratch/shared/nf-metabarcoding/work'
+// cleanup = false

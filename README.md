@@ -237,6 +237,34 @@ What the `slurm` profile does:
   (`stampa_chunk_size = 1000`); the `local` profile sets `0` to feed
   the whole fasta to a single `vsearch` instead.
 
+### Tuning for your cluster (`-c site.config`)
+
+`[S75]`. You should **not** edit `nextflow.config` to adapt the
+pipeline to your site. Instead copy the template
+[`conf/site.config.example`](conf/site.config.example), edit the
+values for your cluster, and pass it with `-c` (native Nextflow merges
+it over the defaults and the active profiles):
+
+```bash
+nextflow run main.nf -profile slurm,singularity \
+    -c /path/to/my-site.config \
+    --fastq_folder /scratch/me/run17 \
+    --forward_primer ... --reverse_primer ...
+```
+
+The template covers the knobs a site typically overrides: the slurm
+queue/account/concurrency, the resource ceiling
+(`max_cpus`/`max_memory`/`max_time`) and dataset/reference sizes, the
+container/conda cache directories (so the image or env is built once on
+shared scratch and reused by every node), and the environment-module
+names. One knob is new and has no CLI equivalent:
+
+- `--slurm_clusterOptions` — free-form sbatch options appended verbatim
+  to every job's submit line (e.g. `'--qos=long --constraint=haswell'`,
+  a reservation, …). Combined automatically with `--slurm_account`. Use
+  it for cluster-specific submission flags that `--slurm_queue` /
+  `--slurm_account` can't express.
+
 Launching the run:
 
 - The `nextflow` driver process is long-lived (it stays up submitting
