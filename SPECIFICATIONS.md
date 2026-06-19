@@ -1420,6 +1420,28 @@ from placeholder values to real taxonomic assignments.
     `-profile slurm` (no `-c`) exposes `params.slurm_clusterOptions =
     null` and a `clusterOptions` closure that reads it.
 
+- `[S76]` a bundled `demo` profile runs the whole pipeline
+  (Part A → B → C) out of the box with **no fixture generation and no
+  required flags**: `nextflow run main.nf -profile demo` (or
+  `-profile demo,<engine>` to also validate a container setup in one
+  command). The profile points `fastq_folder`, `forward_primer`,
+  `reverse_primer`, `project_name`, and `reference_dataset` at the
+  committed demo dataset under `assets/demo/` — a tiny synthetic
+  mergeable paired-end sample plus a stampa-formatted reference,
+  produced deterministically by `assets/demo/make_demo.sh`. Unlike the
+  `tests/data/` fixtures (`.gitignore`d, regenerated per run), the demo
+  files are committed as plain text so a fresh checkout runs with no
+  setup. The reads are not biologically meaningful — the profile exists
+  so a user, or a new cluster / container environment, can confirm the
+  tools and the wiring work end to end before committing real data.
+  - **Pass when:** `tests/check-demo-profile.sh` confirms the committed
+    demo assets exist and that `nextflow config -profile demo` resolves
+    `fastq_folder` / `forward_primer` / `reverse_primer` /
+    `project_name` / `reference_dataset` to them (and
+    `-profile demo,singularity` composes). The end-to-end run behaviour
+    is covered by the Part A→B→C tests in `tests/main.nf.test`; an
+    actual `-profile demo` run is the manual smoke test.
+
 
 ## Dependencies
 
