@@ -282,6 +282,75 @@ contract ([Sxx] IDs).
 }
 
 
+def reference_first_header(ref_file, boolean gzipped) {
+    // [S73] helper: return the first line of a reference fasta (its FASTA
+    // header), transparently decompressing gzip. Reads a single line —
+    // a FASTA header is line 1 — using the same withReader idiom as
+    // samplesheet_profile(). bzip2 is not handled here (the caller skips
+    // `.bz2`).
+    def header
+    if ( gzipped ) {
+        def stream
+        stream = new java.util.zip.GZIPInputStream(ref_file.newInputStream())
+        header = stream.withReader { reader -> reader.readLine() }
+    } else {
+        header = ref_file.withReader { reader -> reader.readLine() }
+    }
+    return header
+}
+
+
+def check_reference_format(value, String expected) {
+    // [S73]: sniff the first FASTA header of a supplied reference and
+    // verify it matches `expected` ('stampa' | 'sintax'). Returns the
+    // value unchanged when valid (or unsniffable); throws
+    // IllegalArgumentException naming the flag on a format mismatch.
+    //   - stampa: `>id <space-separated lineage>` (header has whitespace)
+    //   - sintax: `>id;tax=d:...,p:...;`           (header carries `tax=`)
+    // A missing file is left for the [S47] presence assert / file()
+    // staging; a `.bz2` reference is skipped (no pure-Groovy bzip2
+    // decompressor) with a warning.
+    def flag
+    flag = ( expected == 'sintax' ) ? 'reference_dataset_sintax' : 'reference_dataset'
+    def path_str
+    path_str = normalize_path(value).toString()
+    def ref_file
+    ref_file = file(path_str)
+    if ( !ref_file.exists() ) {
+        return value
+    }
+    if ( path_str.endsWith('.bz2') ) {
+        System.err.println(
+            "WARNING: --${flag} is bzip2-compressed; skipping the startup " +
+            "format check (vsearch reads it at runtime).")
+        return value
+    }
+    def header
+    header = reference_first_header(ref_file, path_str.endsWith('.gz'))
+    if ( header == null || !header.startsWith('>') ) {
+        throw new IllegalArgumentException(
+            "--${flag} does not look like a FASTA file (first non-blank " +
+            "line is not a '>' header): ${value}")
+    }
+    def body
+    body = header.substring(1)
+    if ( expected == 'sintax' ) {
+        if ( !body.contains('tax=') ) {
+            throw new IllegalArgumentException(
+                "--${flag} must be sintax-formatted (header " +
+                "'>id;tax=d:...,p:...;'); its first header carries no " +
+                "'tax=' annotation: ${header}")
+        }
+    } else if ( !(body =~ /\s/) ) {
+        throw new IllegalArgumentException(
+            "--${flag} must be stampa-formatted (header " +
+            "'>id <space-separated lineage>'); its first header has no " +
+            "lineage after the id: ${header}")
+    }
+    return value
+}
+
+
 def numeric_param_spec() {
     // [S72]: accepted range for each numeric parameter, pinned to the
     // vsearch option it feeds. Pure data (no params access) so
@@ -425,7 +494,19 @@ def validate_params() {
         "--join_padding_length must be a positive integer, got '${jpl}'"
 
     // [S72]: range-validate every numeric parameter against
-    // numeric_param_spec(). Kept last so the mode/string guards above
-    // (which produce more specific messages) fire first.
+    // numeric_param_spec(). Kept after the mode/string guards above
+    // (which produce more specific messages) so they fire first.
     validate_numeric_params()
+
+    // [S73]: sniff the header of each supplied reference so a swapped /
+    // mis-formatted file aborts now rather than producing empty or wrong
+    // assignments mid-pipeline. Format-only — presence is mode-specific
+    // ([S47]). Kept last (after the numeric guards) so a more specific
+    // value error still wins.
+    if ( params.reference_dataset ) {
+        check_reference_format(params.reference_dataset, 'stampa')
+    }
+    if ( params.reference_dataset_sintax ) {
+        check_reference_format(params.reference_dataset_sintax, 'sintax')
+    }
 }

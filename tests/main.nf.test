@@ -1838,6 +1838,93 @@ nextflow_pipeline {
         }
     }
 
+    test("a sintax-formatted file passed to --reference_dataset aborts at startup") {
+        // COVERAGE: [S73]
+        // Wiring + message-propagation for check_reference_format (the
+        // format matrix is pinned in
+        // tests/functions/check_reference_format.nf.test). A sintax file
+        // (>id;tax=...; — no space-separated lineage) handed to the
+        // stampa flag must abort naming the parameter.
+        tag "ci"
+        setup {
+            def ref = file("${outputDir}/s73_sintax_as_stampa.fas")
+            ref.parentFile.mkdirs()
+            ref.text = ">refX;tax=d:Bacteria,p:Proteobacteria;\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+        }
+        when {
+            params {
+                threads           = 1
+                results_folder    = "${outputDir}/s73_a"
+                occurrence_table  = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                reference_dataset = "${outputDir}/s73_sintax_as_stampa.fas"
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("reference_dataset") && msg.contains("stampa-formatted") :
+                "expected a stampa-format error naming reference_dataset, got: ${msg}"
+        }
+    }
+
+    test("a stampa-formatted file passed to --reference_dataset_sintax aborts at startup") {
+        // COVERAGE: [S73]
+        // The mirror case: a stampa file (no `tax=`) handed to the sintax
+        // flag must abort naming reference_dataset_sintax.
+        tag "ci"
+        setup {
+            def ref = file("${outputDir}/s73_stampa_as_sintax.fas")
+            ref.parentFile.mkdirs()
+            ref.text = ">refY Kingdom|Phylum|Class\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+        }
+        when {
+            params {
+                threads                  = 1
+                taxonomy_method          = "sintax"
+                results_folder           = "${outputDir}/s73_b"
+                occurrence_table         = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                reference_dataset_sintax = "${outputDir}/s73_stampa_as_sintax.fas"
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("reference_dataset_sintax") && msg.contains("sintax-formatted") :
+                "expected a sintax-format error naming reference_dataset_sintax, got: ${msg}"
+        }
+    }
+
+    test("a gzip-compressed reference is decompressed and format-sniffed") {
+        // COVERAGE: [S73]
+        // A `.gz` reference must be transparently decompressed for the
+        // sniff: a gzipped stampa file (no `tax=`) handed to the sintax
+        // flag must still abort with the sintax-format error, proving the
+        // header was actually decoded rather than read as raw gzip bytes.
+        tag "ci"
+        setup {
+            def gz = file("${outputDir}/s73_stampa.fas.gz")
+            gz.parentFile.mkdirs()
+            def os = new java.util.zip.GZIPOutputStream(gz.newOutputStream())
+            os.write(">refZ Kingdom|Phylum\nACGTACGTACGTACGTACGTACGTACGTACGT\n".getBytes("UTF-8"))
+            os.close()
+        }
+        when {
+            params {
+                threads                  = 1
+                taxonomy_method          = "sintax"
+                results_folder           = "${outputDir}/s73_c"
+                occurrence_table         = "${projectDir}/tests/data/build_filtered_contingency_table/representatives"
+                reference_dataset_sintax = "${outputDir}/s73_stampa.fas.gz"
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("sintax-formatted") :
+                "expected the gzip reference to be decoded and sniffed, got: ${msg}"
+        }
+    }
+
     test("Part B standalone runs end-to-end with --fastidious false") {
         // COVERAGE: [S22], [S32]
         // [S22]/[S32] propagation lever: setting params.fastidious to

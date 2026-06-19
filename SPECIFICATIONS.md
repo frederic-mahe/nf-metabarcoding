@@ -1327,6 +1327,28 @@ from placeholder values to real taxonomic assignments.
     out-of-range value aborts the run before any process executes with
     stderr naming the offending parameter; the default configuration
     passes validation.
+- `[S73]` when a reference dataset path is supplied, its first FASTA
+  header is sniffed at workflow startup and must match the format the
+  flag declares, so a swapped or mis-formatted reference aborts before
+  any process runs instead of producing empty / wrong assignments:
+    - `--reference_dataset` must be **stampa-formatted** — a
+      space-separated lineage follows the id (`>id <lineage>`);
+    - `--reference_dataset_sintax` must be **sintax-formatted** — the
+      header carries a `tax=` annotation (`>id;tax=d:Dom,p:Phy,...;`).
+  Only the first header line is read (a declared input, like the
+  `--input` samplesheet header in `[S70]`); the rest is left for
+  vsearch. Plain and gzip (`.gz`) references are sniffed; a bzip2
+  (`.bz2`) reference is skipped with a warning (pure-Groovy startup has
+  no bzip2 decompressor). A path that is unset, or set but not present
+  on the launch filesystem, is not sniffed — presence is enforced by the
+  mode-specific `[S47]` assert and `file()` staging. The check is
+  format-only and runs for whichever flags are set, independent of the
+  selected run mode.
+  - **Pass when:** a sintax-formatted file passed to
+    `--reference_dataset` aborts at startup naming `reference_dataset`; a
+    stampa-formatted file passed to `--reference_dataset_sintax` aborts
+    naming `reference_dataset_sintax`; a `.gz` reference is decompressed
+    and sniffed the same way; correctly-formatted references pass.
 
 
 ## Dependencies

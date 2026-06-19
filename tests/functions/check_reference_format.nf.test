@@ -1,0 +1,161 @@
+nextflow_function {
+
+    name "check_reference_format"
+    script "modules/local/functions.nf"
+    function "check_reference_format"
+
+    // [S73]: startup format sniff of a supplied reference dataset.
+    // stampa headers carry a space-separated lineage (>id <lineage>);
+    // sintax headers carry a `tax=` annotation (>id;tax=...;). The
+    // workflow-level wiring + message propagation is covered in
+    // tests/main.nf.test.
+
+    test("a stampa-formatted reference passes the stampa check") {
+        // COVERAGE: [S73]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/stampa.fas")
+            f.parentFile.mkdirs()
+            f.text = ">refA Kingdom|Phylum|Class\nACGTACGTACGTACGTACGT\n"
+        }
+        when { function { """
+            input[0] = '${outputDir}/stampa.fas'
+            input[1] = 'stampa'
+        """ } }
+        then { assert function.success }
+    }
+
+    test("a sintax-formatted reference passes the sintax check") {
+        // COVERAGE: [S73]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/sintax.fas")
+            f.parentFile.mkdirs()
+            f.text = ">refA;tax=d:Bacteria,p:Proteobacteria;\nACGTACGTACGT\n"
+        }
+        when { function { """
+            input[0] = '${outputDir}/sintax.fas'
+            input[1] = 'sintax'
+        """ } }
+        then { assert function.success }
+    }
+
+    test("a sintax file is rejected when stampa is expected") {
+        // COVERAGE: [S73]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/sintax.fas")
+            f.parentFile.mkdirs()
+            f.text = ">refA;tax=d:Bacteria,p:Proteobacteria;\nACGTACGTACGT\n"
+        }
+        when { function { """
+            input[0] = '${outputDir}/sintax.fas'
+            input[1] = 'stampa'
+        """ } }
+        then { assert !function.success }
+    }
+
+    test("a stampa file is rejected when sintax is expected") {
+        // COVERAGE: [S73]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/stampa.fas")
+            f.parentFile.mkdirs()
+            f.text = ">refA Kingdom|Phylum|Class\nACGTACGTACGTACGTACGT\n"
+        }
+        when { function { """
+            input[0] = '${outputDir}/stampa.fas'
+            input[1] = 'sintax'
+        """ } }
+        then { assert !function.success }
+    }
+
+    test("the hybrid fixture (tax= AND a space) satisfies the stampa check") {
+        // COVERAGE: [S73]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/hybrid.fas")
+            f.parentFile.mkdirs()
+            f.text = ">refA;tax=d:Bacteria,p:Proteobacteria; Bacteria|Proteobacteria\nACGTACGT\n"
+        }
+        when { function { """
+            input[0] = '${outputDir}/hybrid.fas'
+            input[1] = 'stampa'
+        """ } }
+        then { assert function.success }
+    }
+
+    test("the hybrid fixture satisfies the sintax check too") {
+        // COVERAGE: [S73]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/hybrid.fas")
+            f.parentFile.mkdirs()
+            f.text = ">refA;tax=d:Bacteria,p:Proteobacteria; Bacteria|Proteobacteria\nACGTACGT\n"
+        }
+        when { function { """
+            input[0] = '${outputDir}/hybrid.fas'
+            input[1] = 'sintax'
+        """ } }
+        then { assert function.success }
+    }
+
+    test("a missing reference path is not sniffed (presence handled elsewhere)") {
+        // COVERAGE: [S73]
+        tag "ci"
+        when { function { """
+            input[0] = '${outputDir}/does_not_exist.fas'
+            input[1] = 'stampa'
+        """ } }
+        then { assert function.success }
+    }
+
+    test("a .bz2 reference is skipped (not sniffed)") {
+        // COVERAGE: [S73]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/ref.fas.bz2")
+            f.parentFile.mkdirs()
+            f.text = "arbitrary bytes; must be skipped by extension\n"
+        }
+        when { function { """
+            input[0] = '${outputDir}/ref.fas.bz2'
+            input[1] = 'sintax'
+        """ } }
+        then { assert function.success }
+    }
+
+    test("a gzip stampa reference is decompressed and passes the stampa check") {
+        // COVERAGE: [S73]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/stampa.fas.gz")
+            f.parentFile.mkdirs()
+            def os = new java.util.zip.GZIPOutputStream(f.newOutputStream())
+            os.write(">refG Kingdom|Phylum\nACGTACGTACGTACGT\n".getBytes("UTF-8"))
+            os.close()
+        }
+        when { function { """
+            input[0] = '${outputDir}/stampa.fas.gz'
+            input[1] = 'stampa'
+        """ } }
+        then { assert function.success }
+    }
+
+    test("a gzip sintax-shaped reference is decompressed and rejected for stampa") {
+        // COVERAGE: [S73]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/sintaxnospace.fas.gz")
+            f.parentFile.mkdirs()
+            def os = new java.util.zip.GZIPOutputStream(f.newOutputStream())
+            os.write(">refG;tax=d:Bacteria;\nACGTACGTACGTACGT\n".getBytes("UTF-8"))
+            os.close()
+        }
+        when { function { """
+            input[0] = '${outputDir}/sintaxnospace.fas.gz'
+            input[1] = 'stampa'
+        """ } }
+        then { assert !function.success }
+    }
+}
