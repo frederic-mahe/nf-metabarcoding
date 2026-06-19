@@ -37,14 +37,7 @@ jobs:
             vsearch=2.31.0
             cutadapt=5.2
             swarm=3.1.6
-
-      - name: Install mumu (not on bioconda; requires gcc >= 11 or clang >= 17)
-        run: |
-          gcc --version
-          git clone --branch v1.1.3 --depth 1 https://github.com/frederic-mahe/mumu.git "$RUNNER_TEMP/mumu"
-          make -C "$RUNNER_TEMP/mumu"
-          sudo install -m 0755 "$RUNNER_TEMP/mumu/mumu" /usr/local/bin/mumu
-          mumu --version
+            mumu=1.1.4
 
       - name: Generate test fixtures
         run: bash tests/data/generate.sh

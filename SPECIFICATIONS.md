@@ -1189,15 +1189,15 @@ from placeholder values to real taxonomic assignments.
   and the two files agree. This keeps the byte-exact characterization
   tests (`[S22]`, `[S35]`, `[S39]`, `[S44]`) reproducible: a floating
   pin lets an upstream release silently change tool output and flip the
-  golden files. `mumu` is **not** distributed on bioconda, so it is not
-  a conda dependency — it is built from source / provided on `PATH`
-  (see the CI workflow and README); `environment.yml` must not claim a
-  `bioconda::mumu` package that cannot be resolved.
+  golden files. `mumu` is now distributed on bioconda, so it is a
+  pinned `bioconda::mumu` conda dependency alongside `vsearch` /
+  `swarm` / `cutadapt`; the `conda` profile resolves it instead of a
+  from-source build.
   - **Pass when:** repo-level checks assert that every tool dependency
     in `environment.yml` uses an exact `=` pin, that `environment.yml`
-    lists no `mumu` conda package, and that the `vsearch` / `swarm` /
-    `cutadapt` pins in `environment.yml` and the CI workflow are
-    identical.
+    declares a `bioconda::mumu` package, and that the `vsearch` /
+    `swarm` / `cutadapt` / `mumu` pins in `environment.yml` and the CI
+    workflow are identical.
 
 
 ## Input samplesheet

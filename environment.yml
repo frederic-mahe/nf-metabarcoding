@@ -9,10 +9,10 @@
 # (.github/workflows/test.yml). Bump deliberately, in both files at
 # once.
 #
-# mumu is NOT distributed on bioconda — it is built from source (see the
-# CI workflow and README) and must be on PATH. It is deliberately absent
-# here so the `conda` profile does not advertise a package it cannot
-# resolve.
+# mumu is now distributed on bioconda, so the `conda` profile resolves it
+# alongside the other tools instead of building it from source. Keep its
+# pin in sync with the CI workflow (.github/workflows/test.yml), same as
+# the others.
 name: nf-metabarcoding
 channels:
   - conda-forge
@@ -21,4 +21,5 @@ dependencies:
   - bioconda::swarm=3.1.6
   - bioconda::vsearch=2.31.0
   - bioconda::cutadapt=5.2
+  - bioconda::mumu=1.1.4
   - conda-forge::python=3.12

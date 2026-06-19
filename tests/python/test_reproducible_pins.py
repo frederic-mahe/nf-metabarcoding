@@ -4,11 +4,12 @@ A floating pin (``>=``) lets an upstream tool release silently change
 output and break the byte-exact characterization tests
 ([S22]/[S35]/[S39]/[S44]). These checks assert that:
 
-* ``environment.yml`` pins every conda dependency to an exact ``=``
-  version;
-* ``environment.yml`` does **not** claim a ``bioconda::mumu`` package
-  (mumu is not distributed on bioconda — CI builds it from source);
-* the ``vsearch`` / ``swarm`` / ``cutadapt`` pins in
+* ``environment.yml`` pins every conda dependency (including
+  ``bioconda::mumu``) to an exact ``=`` version;
+* ``environment.yml`` declares a ``bioconda::mumu`` package (mumu is
+  now distributed on bioconda, so it is resolved by the ``conda``
+  profile rather than built from source);
+* the ``vsearch`` / ``swarm`` / ``cutadapt`` / ``mumu`` pins in
   ``environment.yml`` and the CI workflow are identical.
 """
 
@@ -20,7 +21,7 @@ import re
 from pathlib import Path
 
 # tools whose versions must agree between environment.yml and CI.
-SHARED_TOOLS = ("vsearch", "swarm", "cutadapt")
+SHARED_TOOLS = ("vsearch", "swarm", "cutadapt", "mumu")
 
 
 def _dependencies_block(text: str) -> list[str]:
@@ -74,13 +75,17 @@ def test_environment_pins_are_exact(repo_root: Path) -> None:
         )
 
 
-def test_environment_has_no_bioconda_mumu(repo_root: Path) -> None:
+def test_environment_pins_bioconda_mumu(repo_root: Path) -> None:
     entries = _dependencies_block(
         (repo_root / "environment.yml").read_text()
     )
-    assert not any("mumu" in e for e in entries), (
-        "mumu is not on bioconda; it must not be a conda dependency "
-        "([S69]) — CI builds it from source"
+    mumu = [e for e in entries if "mumu" in e]
+    assert mumu, (
+        "mumu is now distributed on bioconda and must be declared as a "
+        "pinned conda dependency ([S69]) so the conda profile resolves it"
+    )
+    assert all(re.fullmatch(r"bioconda::mumu=[\w.]+", e) for e in mumu), (
+        f"mumu must be pinned as 'bioconda::mumu=X.Y.Z', got {mumu}"
     )
 
 
