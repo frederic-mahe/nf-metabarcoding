@@ -7,6 +7,7 @@ include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_f
 include { validate_samplesheet } from './modules/local/validate_samplesheet.nf'
 include { part_C; part_C_shadow } from './subworkflows/local/part_c.nf'
 include { dump_software_versions } from './modules/local/dump_software_versions.nf'
+include { validateParameters } from 'plugin/nf-schema'
 
 
 workflow part_c {
@@ -193,6 +194,15 @@ workflow {
     // Mode-specific requirements (fastq_folder / primers / reference)
     // stay inline below because they depend on the selected run mode.
     validate_params()
+
+    // nf-schema migration (Phase 1, additive): type/enum/range checks
+    // declared in nextflow_schema.json, run alongside — and after — the
+    // Groovy guards above. validate_params() still fires first, so the
+    // existing, more specific assertion messages remain the ones users
+    // see for the values both layers cover; this call adds schema-level
+    // coverage and proves the schema matches every param without
+    // removing any Groovy validation yet.
+    validateParameters()
 
     // [S79]: under -profile slurm, warn (don't abort) when the dataset /
     // reference size hints are unset so a forgotten --dataset_size_gb

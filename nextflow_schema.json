@@ -1,0 +1,294 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/frederic-mahe/fred-metabarcoding-pipeline-nextflow/master/nextflow_schema.json",
+    "title": "nf-metabarcoding pipeline parameters",
+    "description": "Metabarcoding: swarm-based ASV inference",
+    "type": "object",
+    "$defs": {
+        "entry_point_selection": {
+            "title": "Entry-point selection",
+            "type": "object",
+            "description": "One selector chooses the run mode (set exactly one). Requiredness and mutual-exclusivity are enforced in the workflow body, not here.",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "Validated samplesheet CSV (primary input). fastq profile (sample,fastq_1,fastq_2,run) runs Part A; fasta profile (sample,fasta,qual,stats) runs Part B.",
+                    "help_text": "Mutually exclusive with the folder-scan inputs (--fastq_folder / --fasta_folder / --occurrence_table)."
+                },
+                "fastq_folder": {
+                    "type": "string",
+                    "description": "Input fastq directory (one or more, comma-separated); runs Part A and, when --project_name is also set, Part B."
+                },
+                "fasta_folder": {
+                    "type": "string",
+                    "description": "Per-sample .fas + .qual + .stats directory; runs Part B standalone."
+                },
+                "occurrence_table": {
+                    "type": "string",
+                    "description": "Part B's <basename>_table.tsv; runs Part C standalone."
+                },
+                "outdir": {
+                    "type": "string",
+                    "description": "Single root for all published outputs (<outdir>/{per_sample,occurrence_table,pipeline_info}/). Defaults to --results_folder, then 'results'."
+                },
+                "results_folder": {
+                    "type": "string",
+                    "description": "Deprecated alias for --outdir. (Not flagged with the schema `deprecated` keyword: nf-schema treats that as a hard rejection, but the alias is still supported — validate_params() emits the deprecation warning instead.)"
+                }
+            }
+        },
+        "part_a": {
+            "title": "Part A — fastq to per-sample fasta",
+            "type": "object",
+            "description": "Read merging, primer trimming, per-sample fasta conversion.",
+            "properties": {
+                "fastq_pattern": {
+                    "type": "string",
+                    "default": "*_1_{1,2}.fastq.gz",
+                    "description": "R1/R2 pair pattern (canonical patterns auto-detected)."
+                },
+                "fastq_encoding": {
+                    "type": "integer",
+                    "default": 33,
+                    "enum": [33, 64],
+                    "description": "Phred quality offset, 33 or 64."
+                },
+                "hash_function": {
+                    "type": "string",
+                    "default": "sha1",
+                    "enum": ["sha1", "md5"],
+                    "description": "Hash used to rename amplicons (vsearch --relabel_sha1 / --relabel_md5)."
+                },
+                "forward_primer": {
+                    "type": "string",
+                    "description": "IUPAC forward primer. Required unless --no_trimming, and IUPAC-validated, in the workflow body (Phase 1: the pattern stays in Groovy check_primer_format so it cannot pre-empt that message)."
+                },
+                "reverse_primer": {
+                    "type": "string",
+                    "description": "IUPAC reverse primer. Required unless --no_trimming, and IUPAC-validated, in the workflow body (Phase 1: the pattern stays in Groovy check_primer_format so it cannot pre-empt that message)."
+                },
+                "no_trimming": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip cutadapt primer trimming."
+                },
+                "recover_unmerged": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Opt in to the experimental shadow pipeline that recovers unmergeable read pairs by A-padded joining.",
+                    "help_text": "Off by default; when off, unmergeable pairs are dropped and no _notmerged artefacts are produced. The --stripright / --join_padding_length knobs only apply when this is set."
+                },
+                "stripright": {
+                    "type": "integer",
+                    "default": 30,
+                    "minimum": 0,
+                    "description": "3' nt trimmed in the shadow pipeline before R1/R2 are joined (0 disables)."
+                },
+                "join_padding_length": {
+                    "type": "integer",
+                    "default": 8,
+                    "minimum": 1,
+                    "description": "Length of the A run inserted between R1 and R2 by the shadow pipeline's vsearch --fastq_join (and its matching Phred-40 quality string)."
+                }
+            }
+        },
+        "part_b": {
+            "title": "Part B — per-sample fasta to occurrence table",
+            "type": "object",
+            "description": "Clustering, chimera removal, occurrence-table assembly.",
+            "properties": {
+                "project_name": {
+                    "type": "string",
+                    "description": "Basename prefix for Part B output (required when Part B runs, enforced in the workflow body)."
+                },
+                "chimera_minsize": {
+                    "type": "integer",
+                    "default": 2,
+                    "minimum": 1,
+                    "description": "Minimum abundance for vsearch --uchime_denovo."
+                },
+                "fastidious": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run swarm + cluster_cleaver.py with --fastidious.",
+                    "help_text": "Set false on very large datasets where the fastidious pass is too memory- or time-expensive."
+                },
+                "percentage": {
+                    "type": "number",
+                    "default": 0.05,
+                    "exclusiveMinimum": 0,
+                    "maximum": 1,
+                    "description": "Cleaving threshold: a sub-seed candidate must appear as a per-sample cluster seed in at least this fraction of samples; real in (0, 1]."
+                }
+            }
+        },
+        "part_c": {
+            "title": "Part C — taxonomic assignment",
+            "type": "object",
+            "description": "Reference-based taxonomy (stampa or sintax).",
+            "properties": {
+                "reference_dataset": {
+                    "type": "string",
+                    "description": "stampa-formatted reference fasta (.gz / .bz2 OK). Required when --taxonomy_method=stampa (default)."
+                },
+                "reference_dataset_sintax": {
+                    "type": "string",
+                    "description": "sintax-formatted reference fasta (.gz / .bz2 OK). Required when --taxonomy_method=sintax; gates the shadow Part C path."
+                },
+                "taxonomy_method": {
+                    "type": "string",
+                    "default": "stampa",
+                    "enum": ["stampa", "sintax"],
+                    "description": "Regular-path method. The shadow path always uses sintax regardless of this flag."
+                },
+                "iddef": {
+                    "type": "integer",
+                    "default": 1,
+                    "minimum": 0,
+                    "maximum": 4,
+                    "description": "vsearch --iddef value."
+                },
+                "stampa_chunk_size": {
+                    "type": "integer",
+                    "default": 1000,
+                    "minimum": 0,
+                    "description": "Sequences per stampa scatter chunk; 0 disables the split."
+                },
+                "stampa_maxrejects": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "description": "vsearch --maxrejects for the stampa scatter step; 0 = no limit."
+                },
+                "stampa_id": {
+                    "type": "number",
+                    "default": 0.5,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "vsearch --id threshold for the stampa scatter step."
+                },
+                "sintax_cutoff": {
+                    "type": "number",
+                    "default": 0.9,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "vsearch --sintax_cutoff threshold; used by the shadow path and by --taxonomy_method=sintax on the regular path."
+                },
+                "majority_assignment": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Opt-in final step: recompute a majority-rule taxonomy per OTU and publish <basename>_table_assigned_majority.tsv. Requires --taxonomy_method=stampa."
+                }
+            }
+        },
+        "runtime": {
+            "title": "Runtime",
+            "type": "object",
+            "description": "Execution-wide knobs.",
+            "properties": {
+                "threads": {
+                    "type": "integer",
+                    "default": 4,
+                    "minimum": 1,
+                    "maximum": 256,
+                    "description": "Threads per process."
+                },
+                "publish_mode": {
+                    "type": "string",
+                    "default": "link",
+                    "enum": ["copy", "copyNoFollow", "link", "move", "rellink", "symlink"],
+                    "description": "publishDir mode. Use 'copy' when the results folder is on a different filesystem than the work directory."
+                },
+                "help": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show the usage message and exit.",
+                    "hidden": true
+                }
+            }
+        },
+        "slurm_profile": {
+            "title": "Slurm profile",
+            "type": "object",
+            "description": "Only consulted under -profile slurm. Submission/queue knobs and resource size hints.",
+            "properties": {
+                "slurm_queue": {
+                    "type": "string",
+                    "description": "sbatch -p / --partition."
+                },
+                "slurm_account": {
+                    "type": "string",
+                    "description": "sbatch -A / --account."
+                },
+                "slurm_clusterOptions": {
+                    "type": "string",
+                    "description": "Extra sbatch options appended verbatim to every job's submit line (QoS, constraints, reservations)."
+                },
+                "slurm_queue_size": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 1,
+                    "description": "Max concurrent sbatch jobs."
+                },
+                "dataset_size_gb": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Approximate input dataset size in GB; the memory-bound steps scale off this."
+                },
+                "reference_size_gb": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Approximate reference-database size in GB; the taxonomic-assignment steps scale off this."
+                },
+                "max_cpus": {
+                    "type": "integer",
+                    "default": 16,
+                    "minimum": 1,
+                    "description": "resourceLimits CPU ceiling."
+                },
+                "max_memory": {
+                    "type": "string",
+                    "default": "128.GB",
+                    "description": "resourceLimits memory ceiling (quoted Nextflow units, e.g. '256.GB')."
+                },
+                "max_time": {
+                    "type": "string",
+                    "default": "240.h",
+                    "description": "resourceLimits wall-time ceiling (quoted Nextflow units, e.g. '120.h')."
+                }
+            }
+        },
+        "modules_profile": {
+            "title": "Modules profile",
+            "type": "object",
+            "description": "Only consulted under -profile modules. Site-specific environment-module names; empty means 'already on PATH'.",
+            "properties": {
+                "module_vsearch": {
+                    "type": "string",
+                    "description": "Environment module providing vsearch (e.g. vsearch/2.28.1)."
+                },
+                "module_swarm": {
+                    "type": "string",
+                    "description": "Environment module providing swarm."
+                },
+                "module_cutadapt": {
+                    "type": "string",
+                    "description": "Environment module providing cutadapt."
+                },
+                "module_mumu": {
+                    "type": "string",
+                    "description": "Environment module providing mumu."
+                }
+            }
+        }
+    },
+    "allOf": [
+        { "$ref": "#/$defs/entry_point_selection" },
+        { "$ref": "#/$defs/part_a" },
+        { "$ref": "#/$defs/part_b" },
+        { "$ref": "#/$defs/part_c" },
+        { "$ref": "#/$defs/runtime" },
+        { "$ref": "#/$defs/slurm_profile" },
+        { "$ref": "#/$defs/modules_profile" }
+    ]
+}
