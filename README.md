@@ -18,9 +18,10 @@ are grouped in a ready-to-use occurrence table.
 ```
 main.nf                <- entry workflow + Part B/C standalone routers
 nextflow.config        <- manifest, parameter defaults, profiles
+nextflow_schema.json   <- parameter schema (nf-schema validation + --help)
 nf-test.config         <- nf-test wiring
 modules/local/         <- one .nf per process; functions.nf holds the
-                          Groovy helpers (normalize_path, usage, ...)
+                          Groovy helpers (normalize_path, validate_params, ...)
 subworkflows/local/    <- part_a / part_b / part_c subworkflow wiring
 SPECIFICATIONS.md      <- behaviour spec (single source of truth)
 DECISIONS.md           <- open spec questions blocking [Sxx] IDs

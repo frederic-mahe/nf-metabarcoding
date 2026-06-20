@@ -65,13 +65,15 @@ nextflow_pipeline {
             assert workflow.success
             def out = workflow.stdout.toString()
 
-            // header + all three entry-point flags appear in the
-            // usage block (their presence is what makes the help
-            // discoverable).
+            // [S57] Pass-when: a `Usage:` line plus all three entry-point
+            // flags make the help discoverable. The flags now come from
+            // the schema-generated paramsHelp() listing; the `[default:`
+            // token confirms that listing renders type/default metadata.
             ["Usage:",
              "--fastq_folder",
              "--fasta_folder",
-             "--occurrence_table"].each { marker ->
+             "--occurrence_table",
+             "[default:"].each { marker ->
                 assert out.contains(marker) :
                     "--help output should contain '${marker}', got: ${out}"
             }

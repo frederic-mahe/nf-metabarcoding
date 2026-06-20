@@ -1,13 +1,13 @@
 #!/usr/bin/env nextflow
 
-include { normalize_path; usage; validate_params; samplesheet_profile; check_primer_format; resource_size_warnings } from './modules/local/functions.nf'
+include { normalize_path; validate_params; samplesheet_profile; check_primer_format; resource_size_warnings } from './modules/local/functions.nf'
 include { part_A } from './subworkflows/local/part_a.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
 include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_fasta.nf'
 include { validate_samplesheet } from './modules/local/validate_samplesheet.nf'
 include { part_C; part_C_shadow } from './subworkflows/local/part_c.nf'
 include { dump_software_versions } from './modules/local/dump_software_versions.nf'
-include { validateParameters } from 'plugin/nf-schema'
+include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 
 
 workflow part_c {
@@ -186,7 +186,29 @@ workflow {
     // the conventional channel for help output and what nf-test
     // captures in workflow.stdout.
     if ( params.help ) {
-        print usage()
+        // [S57]: a small hand-written banner carries the two things the
+        // parameter schema cannot express — the three entry points and
+        // the README/SPECIFICATIONS pointer — wrapped around the
+        // schema-generated parameter listing from paramsHelp() (every
+        // params.* flag grouped by part, with type and default).
+        print """\
+            nf-metabarcoding — swarm-based metabarcoding pipeline
+
+            Usage:
+              nextflow run main.nf --fastq_folder PATH      [Part A → B [→ C]]
+              nextflow run main.nf --fasta_folder PATH      [Part B standalone]
+              nextflow run main.nf --occurrence_table PATH  [Part C standalone]
+
+            """.stripIndent()
+        print paramsHelp(
+            command: "nextflow run main.nf --fastq_folder PATH " +
+                     "--forward_primer SEQ --reverse_primer SEQ"
+        )
+        print """\
+
+            See README.md for examples and SPECIFICATIONS.md for the behaviour
+            contract ([Sxx] IDs).
+            """.stripIndent()
         return
     }
 

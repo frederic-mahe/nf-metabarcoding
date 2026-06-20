@@ -33,7 +33,7 @@
                 },
                 "results_folder": {
                     "type": "string",
-                    "description": "Deprecated alias for --outdir. (Not flagged with the schema `deprecated` keyword: nf-schema treats that as a hard rejection, but the alias is still supported — validate_params() emits the deprecation warning instead.)"
+                    "description": "Deprecated alias for --outdir; prefer --outdir."
                 }
             }
         },
@@ -61,11 +61,11 @@
                 },
                 "forward_primer": {
                     "type": "string",
-                    "description": "IUPAC forward primer. Required unless --no_trimming, and IUPAC-validated, in the workflow body (Phase 1: the pattern stays in Groovy check_primer_format so it cannot pre-empt that message)."
+                    "description": "IUPAC forward primer (required unless --no_trimming)."
                 },
                 "reverse_primer": {
                     "type": "string",
-                    "description": "IUPAC reverse primer. Required unless --no_trimming, and IUPAC-validated, in the workflow body (Phase 1: the pattern stays in Groovy check_primer_format so it cannot pre-empt that message)."
+                    "description": "IUPAC reverse primer (required unless --no_trimming)."
                 },
                 "no_trimming": {
                     "type": "boolean",
