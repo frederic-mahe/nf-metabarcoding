@@ -508,3 +508,41 @@ environment.yml`, scoped inside the profile so a plain `nextflow run`
 stays bare-PATH. Option 2 is the documented upgrade path if a
 permanent image archive is later wanted. See `[S08]` in
 [`SPECIFICATIONS.md`](SPECIFICATIONS.md).
+
+
+## D11 — Shadow pipeline: always-on vs opt-in
+
+**Blocks:** `[S04]`, `[S78]` (and touches `[S05]`, `[S50]`, `[S56]`,
+`[S62]`, `[S64]`)
+**Status:** `resolved` — opt-in, default off (2026-06-20)
+
+**Question:** the shadow pipeline ([S04]) — recovering unmergeable read
+pairs by A-padded joining — fired automatically whenever a pair failed
+to merge, and (as seen on the `demo` profile, where 100 % of pairs
+merge) `part_B_shadow` / `part_C_shadow` were invoked even with **zero**
+not-merged reads, publishing empty `_notmerged` artefacts. The path is
+explicitly experimental and its output carries a caveat (the run of
+`A`s is artificial padding, not biological sequence). Should it stay
+always-on, or become opt-in?
+
+1. **Always-on (status quo).** No flag. But the experimental, caveated
+   output is produced unasked, empty `_notmerged` files clutter the
+   output even when nothing failed to merge, and the extra
+   `part_B_shadow` / `part_C_shadow` work runs needlessly.
+2. **Opt-in via `--recover_unmerged` (default `false`) (chosen).** The
+   shadow path is off unless the user explicitly asks for it. Default
+   runs are simpler (no `_notmerged` artefacts, no wasted shadow work),
+   and enabling it is a deliberate, documented acknowledgement of the
+   experimental caveat — "hard to misuse". Cost: a breaking change to
+   default behaviour for anyone who relied on the shadow output, and a
+   migration of the shadow tests to set the flag.
+
+**Resolution (2026-06-20):** option 2. `params.recover_unmerged`
+(default `false`) gates the whole shadow path: Part A drops the
+not-merged reads instead of routing them into the A-padded join, and the
+three entry points only invoke `part_B_shadow` / `part_C_shadow` when it
+is set. The `[S23]` reserved-suffix guard stays always-on (independent
+of the flag) so a user sample can never collide with shadow naming if
+the flag is later enabled. See `[S78]` and the gated clauses on `[S04]`
+/ `[S50]` / `[S56]` / `[S62]` / `[S64]` in
+[`SPECIFICATIONS.md`](SPECIFICATIONS.md).

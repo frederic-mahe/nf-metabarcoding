@@ -236,6 +236,7 @@ nextflow_pipeline {
                 no_trimming    = true
                 fastq_folder   = "${projectDir}/tests/data"
                 fastq_pattern  = "/paired_merge_fail_{1,2}.fastq.gz"
+                recover_unmerged = true   // [S78]: opt in to the shadow path
                 threads        = 1
             }
         }
@@ -393,6 +394,7 @@ nextflow_pipeline {
                 reverse_primer = "ACTTTCGTTCTTGATYRA"
                 fastq_folder   = "${projectDir}/tests/data"
                 fastq_pattern  = "/paired_merge_fail_{1,2}.fastq.gz"
+                recover_unmerged = true   // [S78]: opt in to the shadow path
                 threads        = 1
             }
         }
@@ -435,6 +437,44 @@ nextflow_pipeline {
         }
     }
 
+    test("the shadow path is off by default (no --recover_unmerged)") {
+        // COVERAGE: [S78]
+        // The shadow pipeline ([S04]) is opt-in. With --recover_unmerged
+        // unset (the default), unmergeable pairs are dropped: no
+        // shadow-only process runs and no _notmerged artefact is
+        // published — even on a fixture whose pairs cannot merge.
+        tag "ci"
+        when {
+            params {
+                outdir         = "${outputDir}/a_no_shadow"
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_fail_{1,2}.fastq.gz"
+                threads        = 1
+                // recover_unmerged deliberately left at its default (false)
+            }
+        }
+        then {
+            assert workflow.success
+            def out = workflow.stdout.toString()
+            // the shadow-only Part A processes must not run
+            ["join_notmerged", "strip_reads"].each { proc ->
+                assert !out.contains(proc) :
+                    "${proc} must not run when --recover_unmerged is unset, got: ${out}"
+            }
+            // no _notmerged per-sample artefacts are published
+            def folder = "${outputDir}/a_no_shadow/per_sample"
+            def shadowId = "paired_merge_fail_notmerged"
+            assert !file("${folder}/${shadowId}.fas").exists() :
+                "no shadow .fas should be published when --recover_unmerged is unset"
+            assert !file("${folder}/${shadowId}.qual").exists() :
+                "no shadow .qual should be published when --recover_unmerged is unset"
+            assert !file("${folder}/${shadowId}.stats").exists() :
+                "no shadow .stats should be published when --recover_unmerged is unset"
+        }
+    }
+
     test("--join_padding_length lever widens the A run in the shadow .fas") {
         // COVERAGE: [S04], [S63]
         // End-to-end check that the param threads through Part A.
@@ -448,6 +488,7 @@ nextflow_pipeline {
                 fastq_folder         = "${projectDir}/tests/data"
                 fastq_pattern        = "/paired_merge_fail_{1,2}.fastq.gz"
                 join_padding_length  = 16
+                recover_unmerged     = true   // [S78]: opt in to the shadow path
                 outdir               = "${outputDir}/a_padding"
                 threads              = 1
             }
@@ -528,6 +569,7 @@ nextflow_pipeline {
                 project_name   = "myproj"
                 results_folder = "${outputDir}/part_b_results"
                 fasta_folder   = "${projectDir}/tests/data/part_b"
+                recover_unmerged = true   // [S78]: process the S1_notmerged.fas shadow sample
                 threads        = 1
             }
         }
@@ -817,6 +859,7 @@ nextflow_pipeline {
                 fastq_pattern  = ""
                 project_name   = "shadow_e2e"
                 results_folder = "${outputDir}/shadow_e2e_results"
+                recover_unmerged = true   // [S78]: opt in to the shadow path
                 threads        = 1
             }
         }
@@ -876,6 +919,7 @@ nextflow_pipeline {
                 fastq_pattern  = ""
                 project_name   = "whitelist"
                 results_folder = "${outputDir}/whitelist_results"
+                recover_unmerged = true   // [S78]: shadow path on, so the whitelist includes _notmerged siblings
                 threads        = 1
             }
         }
@@ -1615,6 +1659,7 @@ nextflow_pipeline {
                 reference_dataset_sintax = "${outputDir}/part_c_regular_sintax_ref.fas"
                 occurrence_table         = "${outputDir}/part_c_regular_sintax_table.tsv"
                 sintax_cutoff            = 0.5
+                recover_unmerged         = true   // [S78]: isolate the no-sibling gate (no _notmerged sibling exists)
             }
         }
         setup {
@@ -1674,6 +1719,7 @@ nextflow_pipeline {
                 reference_dataset_sintax = "${outputDir}/part_c_shadow_ref.fas"
                 occurrence_table         = "${outputDir}/part_c_shadow_table.tsv"
                 sintax_cutoff            = 0.5
+                recover_unmerged         = true   // [S78]: opt in to the shadow path
             }
         }
         setup {
@@ -1738,6 +1784,7 @@ nextflow_pipeline {
                 results_folder    = "${outputDir}/part_c_no_shadow"
                 reference_dataset = "${outputDir}/part_c_no_shadow_ref.fas"
                 occurrence_table  = "${outputDir}/part_c_no_shadow_table.tsv"
+                recover_unmerged  = true   // [S78]: isolate the no-sibling gate
             }
         }
         setup {
@@ -1785,6 +1832,7 @@ nextflow_pipeline {
                 reference_dataset_sintax = "${outputDir}/part_c_two_refs_sintax_ref.fas"
                 occurrence_table         = "${outputDir}/part_c_two_refs_table.tsv"
                 sintax_cutoff            = 0.5
+                recover_unmerged         = true   // [S78]: opt in to the shadow path
             }
         }
         setup {
@@ -1854,6 +1902,7 @@ nextflow_pipeline {
                 results_folder    = "${outputDir}/part_c_shadow_skip"
                 reference_dataset = "${outputDir}/part_c_shadow_skip_ref.fas"
                 occurrence_table  = "${outputDir}/part_c_shadow_skip_table.tsv"
+                recover_unmerged  = true   // [S78]: isolate the missing-sintax-ref gate
                 // reference_dataset_sintax deliberately unset
             }
         }

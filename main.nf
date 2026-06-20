@@ -42,14 +42,14 @@ workflow part_c {
 
     // [S62]/[S64]/D07: route the shadow sibling through a staged
     // channel instead of a parse-time disk probe. part_C_shadow is
-    // wired unconditionally, so the DAG shape no longer depends on
-    // head-node disk state at parse time; a runtime
+    // wired unconditionally (within the gate), so the DAG shape no
+    // longer depends on head-node disk state at parse time; a runtime
     // `.filter { it.exists() }` empties the channel when the
     // <basename>_notmerged_table.tsv sibling is absent, so the branch
-    // self-suppresses (no work, no output). The
-    // --reference_dataset_sintax gate is a param check (config, not
-    // disk state), so it stays an `if`.
-    if ( params.reference_dataset_sintax ) {
+    // self-suppresses (no work, no output). The --recover_unmerged
+    // ([S78]) and --reference_dataset_sintax gates are param checks
+    // (config, not disk state), so they stay an `if`.
+    if ( params.recover_unmerged && params.reference_dataset_sintax ) {
         def shadow_table_ch = Channel
             .fromPath(
                 "${table_path.parent}/${derived_basename}_notmerged_table.tsv",
@@ -145,11 +145,11 @@ workflow part_b {
             .collect()
     }
     part_B(fasta_list, qual_list, stats_list)
-    part_B_shadow(s_fasta_list, s_qual_list, s_stats_list)
 
     // [S47]/[S64]: invoke Part C when the user supplied the reference
     // matching the selected method. Shadow Part C ([S50]) additionally
-    // requires --reference_dataset_sintax — see [S64].
+    // requires --recover_unmerged ([S78]) and --reference_dataset_sintax
+    // — see [S64].
     def regular_ref_present = ( params.taxonomy_method == 'sintax' )
         ? params.reference_dataset_sintax
         : params.reference_dataset
@@ -159,14 +159,22 @@ workflow part_b {
         }
         part_C(part_B.out.table, basename_ch)
     }
-    if ( params.reference_dataset_sintax ) {
-        // [S50]/[S64]: shadow taxonomy on part_B_shadow's occurrence
-        // table. The header-only gate inside part_C_shadow suppresses
-        // output when the shadow side had no samples upstream.
-        def shadow_basename_ch = s_fasta_list.map { files ->
-            "${params.project_name}_${files.size()}_samples_notmerged"
+
+    // [S78]: the shadow Part B / Part C path is opt-in. When
+    // --recover_unmerged is unset (the default), part_B_shadow is never
+    // invoked, so no `_notmerged` Part B table is produced even if
+    // `_notmerged.fas` files were discovered in --fasta_folder.
+    if ( params.recover_unmerged ) {
+        part_B_shadow(s_fasta_list, s_qual_list, s_stats_list)
+        if ( params.reference_dataset_sintax ) {
+            // [S50]/[S64]: shadow taxonomy on part_B_shadow's occurrence
+            // table. The header-only gate inside part_C_shadow
+            // suppresses output when the shadow side had no samples.
+            def shadow_basename_ch = s_fasta_list.map { files ->
+                "${params.project_name}_${files.size()}_samples_notmerged"
+            }
+            part_C_shadow(part_B_shadow.out.table, shadow_basename_ch)
         }
-        part_C_shadow(part_B_shadow.out.table, shadow_basename_ch)
     }
 }
 
@@ -262,10 +270,6 @@ workflow {
         def regular_qual  = part_A.out.qual .filter { id, _f -> !id.endsWith("_notmerged") }
         def regular_stats = part_A.out.stats.filter { id, _f -> !id.endsWith("_notmerged") }
 
-        def shadow_fasta = part_A.out.fasta.filter { id, _f -> id.endsWith("_notmerged") }
-        def shadow_qual  = part_A.out.qual .filter { id, _f -> id.endsWith("_notmerged") }
-        def shadow_stats = part_A.out.stats.filter { id, _f -> id.endsWith("_notmerged") }
-
         // join the three streams on sample ID so the lists stay
         // aligned even when processes complete out of order.
         def joined_b = regular_fasta
@@ -276,20 +280,8 @@ workflow {
         def b_stats = joined_b.map { _id, _f, _q, s -> s }.collect()
         part_B(b_fasta, b_qual, b_stats)
 
-        def joined_shadow = shadow_fasta
-            .join(shadow_qual)
-            .join(shadow_stats)
-        def s_fasta = joined_shadow.map { _id, f, _q, _s -> f }.collect()
-        def s_qual  = joined_shadow.map { _id, _f, q, _s -> q }.collect()
-        def s_stats = joined_shadow.map { _id, _f, _q, s -> s }.collect()
-        part_B_shadow(s_fasta, s_qual, s_stats)
-
-        // [S47]/[S64]: same routing as `workflow part_b`. Run regular
-        // Part C when the reference matching --taxonomy_method is set;
-        // run shadow Part C ([S50]) when --reference_dataset_sintax is
-        // set. The two gates are independent: a stampa-only run still
-        // produces regular taxonomy; supplying just the sintax flag
-        // skips the regular part_C and produces shadow taxonomy only.
+        // [S47]/[S64]: run regular Part C when the reference matching
+        // --taxonomy_method is set.
         def regular_ref_present = ( params.taxonomy_method == 'sintax' )
             ? params.reference_dataset_sintax
             : params.reference_dataset
@@ -299,14 +291,32 @@ workflow {
             }
             part_C(part_B.out.table, basename_ch)
         }
-        if ( params.reference_dataset_sintax ) {
-            // [S50]/[S64]: shadow taxonomy on part_B_shadow's table.
-            // The header-only gate inside part_C_shadow suppresses
-            // output when the shadow side had zero _notmerged samples.
-            def shadow_basename_ch = s_fasta.map { files ->
-                "${params.project_name}_${files.size()}_samples_notmerged"
+
+        // [S78]: the shadow Part B / Part C path is opt-in. When
+        // --recover_unmerged is unset (the default), Part A emits no
+        // `_notmerged` samples and the shadow sub-workflows are never
+        // invoked. Shadow Part C ([S50]) additionally requires
+        // --reference_dataset_sintax ([S64]).
+        if ( params.recover_unmerged ) {
+            def shadow_fasta = part_A.out.fasta.filter { id, _f -> id.endsWith("_notmerged") }
+            def shadow_qual  = part_A.out.qual .filter { id, _f -> id.endsWith("_notmerged") }
+            def shadow_stats = part_A.out.stats.filter { id, _f -> id.endsWith("_notmerged") }
+
+            def joined_shadow = shadow_fasta
+                .join(shadow_qual)
+                .join(shadow_stats)
+            def s_fasta = joined_shadow.map { _id, f, _q, _s -> f }.collect()
+            def s_qual  = joined_shadow.map { _id, _f, q, _s -> q }.collect()
+            def s_stats = joined_shadow.map { _id, _f, _q, s -> s }.collect()
+            part_B_shadow(s_fasta, s_qual, s_stats)
+
+            if ( params.reference_dataset_sintax ) {
+                // [S50]/[S64]: shadow taxonomy on part_B_shadow's table.
+                def shadow_basename_ch = s_fasta.map { files ->
+                    "${params.project_name}_${files.size()}_samples_notmerged"
+                }
+                part_C_shadow(part_B_shadow.out.table, shadow_basename_ch)
             }
-            part_C_shadow(part_B_shadow.out.table, shadow_basename_ch)
         }
     }
 }

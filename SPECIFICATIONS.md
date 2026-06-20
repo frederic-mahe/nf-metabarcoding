@@ -65,10 +65,13 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
   - **Pass when:** the same input data in any of these forms produces
     byte-identical Part A outputs
 - `[S04]` when processing paired-end fastq files, reads that can be
-  merged are processed normally; reads that cannot be merged are
-  collected via `vsearch --fastq_mergepairs --fastqout_notmerged_fwd`
-  and `--fastqout_notmerged_rev` (reads stay in sync) and routed
-  through a parallel **shadow** Part A pipeline:
+  merged are processed normally. The handling of reads that **cannot**
+  be merged is gated by `--recover_unmerged` ([S78], default `false`):
+  when it is unset the not-merged reads are dropped (no shadow
+  artefacts, the default), and only when it is set are they collected
+  via `vsearch --fastq_mergepairs --fastqout_notmerged_fwd` and
+  `--fastqout_notmerged_rev` (reads stay in sync) and routed through a
+  parallel **shadow** Part A pipeline:
     1. join R1/R2 with `vsearch --fastq_join`, passing
        `--join_padgap` set to a run of `A`s of length
        `params.join_padding_length` (default 8; see [S63]) and
@@ -102,12 +105,37 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
     `<sampleId>_notmerged_merging.log` is produced — see step 1
     above.
   - **Pass when:** running Part A on a paired-end fixture whose reads
-    cannot overlap produces non-empty `<sampleId>_notmerged.{fas,qual,stats}`
+    cannot overlap **with `--recover_unmerged true`** produces non-empty
+    `<sampleId>_notmerged.{fas,qual,stats}`
     in `params.fastq_folder`, the published `.fas` contains a run of
     `params.join_padding_length` `A`s (default 8), no shadow output
     sequence line contains `N`, the trimming / dereplicating /
     clustering shadow logs are present and non-empty, and no
-    `<sampleId>_notmerged_merging.log` exists.
+    `<sampleId>_notmerged_merging.log` exists. Running the same fixture
+    **without** `--recover_unmerged` (the default) produces no
+    `_notmerged` artefacts and runs no `join_notmerged` / `strip_reads`
+    process ([S78]).
+- `[S78]` `params.recover_unmerged` (boolean, default `false`) is the
+  master switch for the experimental shadow pipeline ([S04]). When
+  `false` (the default) the whole shadow path is off: Part A drops the
+  not-merged reads (no `join_notmerged` / `strip_reads`, no
+  `<sampleId>_notmerged.*` artefacts), and the three entry points
+  (end-to-end Part A→B→C, Part B standalone, Part C standalone) never
+  invoke `part_B_shadow` / `part_C_shadow` — so no `_notmerged`
+  occurrence table or taxonomy is produced, and no empty shadow
+  artefacts appear when every pair merges. When `true` the shadow path
+  runs as described in [S04] / [S56] / [S50], subject to its other
+  preconditions (e.g. `--reference_dataset_sintax` for shadow Part C,
+  [S64]). The `[S23]` reserved-suffix guard is **independent** of this
+  flag (a sample whose ID ends in `notmerged` is always rejected, so it
+  cannot collide with shadow naming if the flag is later enabled). The
+  `stripright` ([S24]) and `join_padding_length` ([S63]) knobs only take
+  effect when this flag is set.
+  - **Pass when:** an end-to-end run on a paired-end fixture whose reads
+    cannot merge produces `_notmerged` per-sample artefacts only when
+    `--recover_unmerged true` is set; the same run at the default
+    (unset) produces none and schedules no `join_notmerged` /
+    `strip_reads` / `part_B_shadow` process.
 - `[S05]` unmerged-pair clusters appear in the occurrence table with a
   per-sample marker (working name: `sampleID_partial`)
   - **Blocked by:** [`DECISIONS.md`](DECISIONS.md) — final marker name
@@ -827,8 +855,10 @@ from placeholder values to real taxonomic assignments.
   alongside the regular `part_C` from all three entry points
   (end-to-end Part A→B→C, Part B standalone with a reference,
   and Part C standalone — see [S61]) **only when
-  `--reference_dataset_sintax` is set** ([S64]). When the
-  sintax-formatted reference is missing, or when no shadow
+  `--recover_unmerged` is set ([S78]) and
+  `--reference_dataset_sintax` is set** ([S64]). When
+  `--recover_unmerged` is unset (the default), the
+  sintax-formatted reference is missing, or no shadow
   occurrence table is available (no `_notmerged` sample upstream,
   or no sibling file in standalone mode), the shadow Part C
   workflow is not invoked — silently, no error.
@@ -900,7 +930,11 @@ from placeholder values to real taxonomic assignments.
 - `[S56]` shadow Part B is a separate workflow (`part_B_shadow`)
   called alongside `part_B` from both the end-to-end
   (`--project_name`) and the standalone (`--fasta_folder`) entry
-  points. It runs the **same processes as regular Part B with no
+  points, **only when `--recover_unmerged` is set** ([S78]); at the
+  default (unset) it is never invoked, so no `_notmerged` Part B
+  artefacts are produced even if `_notmerged.fas` files are present in
+  a `--fasta_folder`. When enabled it runs the **same processes as
+  regular Part B with no
   mask / restore wrapping around `global_clustering`** — the
   A-padding emitted by Part A ([S04]) is composed entirely of
   A/C/G/T, so swarm accepts the sequences as-is and the
@@ -1034,18 +1068,19 @@ from placeholder values to real taxonomic assignments.
 - `[S62]` In Part C **standalone mode** (`--occurrence_table
   /path/to/<basename>_table.tsv`), the workflow looks for a
   shadow occurrence-table sibling at
-  `<dirname>/<basename>_notmerged_table.tsv`. If that file
-  exists **and** `--reference_dataset_sintax` is set ([S64]),
+  `<dirname>/<basename>_notmerged_table.tsv`. If `--recover_unmerged`
+  is set ([S78]) **and** that file exists **and**
+  `--reference_dataset_sintax` is set ([S64]),
   `part_C_shadow` ([S50]) runs on the sibling alongside the
   regular `part_C`, publishing both
   `<basename>_table_assigned.tsv` and
   `<basename>_notmerged_table_assigned.tsv` under
-  `--results_folder`. If the sibling does **not** exist, or if
-  `--reference_dataset_sintax` is unset, the shadow workflow is
-  not invoked and only the regular `_table_assigned.tsv` is
-  published — no error. There is no boolean CLI flag to opt in or
-  out: the presence of the sibling file **and** the sintax
-  reference together are the toggle.
+  `--results_folder`. If `--recover_unmerged` is unset (the default),
+  the sibling does **not** exist, or `--reference_dataset_sintax` is
+  unset, the shadow workflow is not invoked and only the regular
+  `_table_assigned.tsv` is published — no error. The opt-in is
+  `--recover_unmerged`; beyond it, the presence of the sibling file
+  **and** the sintax reference are the further preconditions.
 
   The sibling toggle is expressed as **channel logic, not a
   parse-time disk probe** (D07): `part_C_shadow` is wired
@@ -1096,7 +1131,8 @@ from placeholder values to real taxonomic assignments.
        `--reference_dataset` (stampa- and sintax-formatted
        references differ in incompatible ways; a single file
        cannot satisfy both methods in production use).
-  When `--reference_dataset_sintax` is **unset**, the shadow Part
+  When `--recover_unmerged` is **unset** (the default, [S78]) or
+  `--reference_dataset_sintax` is **unset**, the shadow Part
   C workflow is silently skipped from every entry point (no
   error, no published shadow artefact) and the regular path
   must run through stampa. Path-typed normalisation ([S60])

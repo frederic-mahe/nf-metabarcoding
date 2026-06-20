@@ -62,27 +62,34 @@ workflow part_A {
     // discover pairs and merge
     merge_fastq_pairs(paired_ch)
 
-    // [S04] shadow pipeline: optionally strip the low-quality 3' tails
-    // ([S24]) and then join unmerged R1/R2 with A-padding (length
-    // params.join_padding_length, default 8 — see [S63]). The shadow
-    // sampleId is `<sampleId>_notmerged`, so all subsequent processes
-    // naturally publish artefacts at `<sampleId>_notmerged.*` without
-    // touching the regular pipeline. Because the padding uses A/C/G/T
-    // only, the shadow and regular paths share the same downstream
-    // filters (--fastq_maxns 0) and the same swarm invocation —
-    // no per-path branching is needed after this point.
-    strip_reads(merge_fastq_pairs.out.notmerged)
-    join_notmerged(
-        strip_reads.out.stripped.map { id, fwd, rev ->
-            tuple("${id}_notmerged", fwd, rev)
-        }
-    )
-
     // Build a unified (id, fastq) stream for the rest of Part A.
     def regular_ch = merge_fastq_pairs.out.merged.mix(unpaired_ch)
-    def shadow_ch = join_notmerged.out.joined
 
-    def to_process = regular_ch.mix(shadow_ch)
+    // [S04]/[S78] shadow pipeline, opt-in via --recover_unmerged
+    // (default false). When enabled, optionally strip the low-quality
+    // 3' tails ([S24]) and then join unmerged R1/R2 with A-padding
+    // (length params.join_padding_length, default 8 — see [S63]). The
+    // shadow sampleId is `<sampleId>_notmerged`, so all subsequent
+    // processes naturally publish artefacts at `<sampleId>_notmerged.*`
+    // without touching the regular pipeline. Because the padding uses
+    // A/C/G/T only, the shadow and regular paths share the same
+    // downstream filters (--fastq_maxns 0) and the same swarm
+    // invocation — no per-path branching is needed after this point.
+    // When disabled (the default), the not-merged reads are simply not
+    // consumed: no shadow processes run and no `_notmerged` artefacts
+    // are produced.
+    def to_process
+    if ( params.recover_unmerged ) {
+        strip_reads(merge_fastq_pairs.out.notmerged)
+        join_notmerged(
+            strip_reads.out.stripped.map { id, fwd, rev ->
+                tuple("${id}_notmerged", fwd, rev)
+            }
+        )
+        to_process = regular_ch.mix(join_notmerged.out.joined)
+    } else {
+        to_process = regular_ch
+    }
 
     // trim primers (skipped when --no_trimming is set)
     def trimmed_ch

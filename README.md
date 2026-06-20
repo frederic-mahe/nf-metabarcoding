@@ -384,7 +384,8 @@ test. Summary at the time of writing:
 ### Implemented
 - Part A — per-sample processing (merge pairs, trim primers,
   dereplicate, extract quality, local clustering with swarm), plus the
-  experimental shadow pipeline for unmergeable pairs (`[S04]`)
+  experimental shadow pipeline for unmergeable pairs — opt-in via
+  `--recover_unmerged`, off by default (`[S04]` / `[S78]`)
 - Part B — occurrence-table assembly (global dereplication + swarm
   clustering, cluster cleaving, chimera detection, substring-OTU
   merging, mumu post-clustering curation)

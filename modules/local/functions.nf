@@ -208,6 +208,14 @@ Part A — fastq → per-sample fasta:
   --forward_primer SEQ        IUPAC forward primer (required unless --no_trimming)
   --reverse_primer SEQ        IUPAC reverse primer (required unless --no_trimming)
   --no_trimming               skip cutadapt primer trimming (default: ${params.no_trimming})
+  --recover_unmerged          opt in to the experimental shadow
+                              pipeline that recovers unmergeable read
+                              pairs by A-padded joining. Off by default;
+                              when off, unmergeable pairs are dropped and
+                              no _notmerged artefacts are produced. The
+                              --stripright / --join_padding_length knobs
+                              below only apply when this is set
+                              (default: ${params.recover_unmerged})
   --stripright INT            3' nt trimmed in the shadow pipeline
                               before R1/R2 are joined (default: ${params.stripright})
   --join_padding_length INT   length of the A run inserted between R1
