@@ -550,3 +550,37 @@ def validate_params() {
         check_reference_format(params.reference_dataset_sintax, 'sintax')
     }
 }
+
+
+def resource_size_warnings(profile, dataset_size_gb, reference_size_gb, boolean reference_in_use) {
+    // [S79]: the slurm profile scales the memory-bound steps off
+    // --dataset_size_gb (the dataset-bound steps) and --reference_size_gb
+    // (the taxonomic-assignment steps); when those hints are unset the
+    // steps fall back to fixed defaults that can be far too small for a
+    // large run and OOM mid-pipeline. Return a startup warning per unset
+    // hint so a forgotten flag surfaces immediately instead of as a kill
+    // deep in the run. Pure (no params / no `workflow` access) so it is
+    // unit-testable; the entry workflow reads `workflow.profile` + params
+    // and prints whatever this returns. The resource tiers only exist
+    // under `-profile slurm`, so outside it this is silent.
+    def warnings = []
+    if ( !profile || !profile.toString().tokenize(',').contains('slurm') ) {
+        return warnings
+    }
+    if ( !dataset_size_gb ) {
+        warnings << ("--dataset_size_gb is unset: the memory-bound steps " +
+            "(global_clustering, global_dereplication, chimera detection, " +
+            "the all-vs-all search, mumu, occurrence-table assembly) fall " +
+            "back to fixed memory that may be too small for a large dataset " +
+            "and OOM mid-run. Set --dataset_size_gb to the approximate " +
+            "input size in GB (or override the step's memory in a " +
+            "-c site.config).")
+    }
+    if ( reference_in_use && !reference_size_gb ) {
+        warnings << ("--reference_size_gb is unset: the taxonomic-assignment " +
+            "steps fall back to fixed memory that may be too small for a " +
+            "large reference database. Set --reference_size_gb to the " +
+            "approximate reference size in GB.")
+    }
+    return warnings
+}

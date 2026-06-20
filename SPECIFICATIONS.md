@@ -234,6 +234,25 @@ the latter case.
     behaviour (>= 24.04), so — per `[S00]`'s "we do not re-test
     upstream tools" rule — the clamp itself is not unit-tested; the
     manual cluster smoke test confirms it.
+- `[S79]` under `-profile slurm`, the memory-bound steps scale their RAM
+  request off `--dataset_size_gb` (the dataset-bound steps) and
+  `--reference_size_gb` (the taxonomic-assignment steps), falling back to
+  fixed defaults when those hints are unset ([S07]). Because a forgotten
+  hint silently under-provisions a large run — surfacing only as an OOM
+  kill deep in the pipeline — the workflow emits a **startup warning**
+  (it does not abort) for each unset hint: one for `--dataset_size_gb`,
+  and, when a reference is in use, one for `--reference_size_gb`. The
+  warning fires only under `-profile slurm` (the resource tiers do not
+  apply otherwise) and points the user at the flag (or at overriding the
+  step's memory in a `-c site.config`, [S75]). The pure helper
+  `resource_size_warnings(profile, dataset_size_gb, reference_size_gb,
+  reference_in_use)` returns the messages; the entry workflow reads
+  `workflow.profile` + the params and prints them.
+  - **Pass when:** `resource_size_warnings` unit tests show: under
+    `slurm` with `--dataset_size_gb` unset it returns a warning naming
+    `dataset_size_gb`; with it set, none; the reference warning appears
+    only when a reference is in use and `--reference_size_gb` is unset;
+    a non-`slurm` profile returns no warnings regardless.
 - `[S08]` runs tools either from the local environment (PATH /
   `-profile conda` / `-profile modules`) or inside containers. Four
   engine profiles — `docker`, `podman`, `singularity`, `apptainer` —

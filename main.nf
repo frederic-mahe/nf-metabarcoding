@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-include { normalize_path; usage; validate_params; samplesheet_profile; check_primer_format } from './modules/local/functions.nf'
+include { normalize_path; usage; validate_params; samplesheet_profile; check_primer_format; resource_size_warnings } from './modules/local/functions.nf'
 include { part_A } from './subworkflows/local/part_a.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
 include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_fasta.nf'
@@ -193,6 +193,19 @@ workflow {
     // Mode-specific requirements (fastq_folder / primers / reference)
     // stay inline below because they depend on the selected run mode.
     validate_params()
+
+    // [S79]: under -profile slurm, warn (don't abort) when the dataset /
+    // reference size hints are unset so a forgotten --dataset_size_gb
+    // surfaces here rather than as an OOM kill deep in a large run. The
+    // resource tiers only apply under slurm, so the helper is silent
+    // otherwise; `workflow.profile` is the active comma-joined profile
+    // list.
+    resource_size_warnings(
+        workflow.profile,
+        params.dataset_size_gb,
+        params.reference_size_gb,
+        (params.reference_dataset || params.reference_dataset_sintax) as boolean
+    ).each { System.err.println("WARNING: ${it}") }
 
     // [S60]: every path-typed param is read through `normalize_path()`
     // at its use site (file(), publishDir, etc.) — see the helper at the

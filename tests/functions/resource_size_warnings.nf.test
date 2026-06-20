@@ -1,0 +1,127 @@
+nextflow_function {
+
+    name "resource_size_warnings"
+    script "modules/local/functions.nf"
+    function "resource_size_warnings"
+
+    // [S79]: under -profile slurm the memory-bound steps scale off
+    // --dataset_size_gb / --reference_size_gb and fall back to fixed
+    // defaults when those are unset. resource_size_warnings is the pure
+    // core that returns one warning per unset hint (so a forgotten flag
+    // surfaces at startup instead of as an OOM kill mid-run); the entry
+    // workflow reads workflow.profile + params and prints whatever it
+    // returns. Inputs: (profile, dataset_size_gb, reference_size_gb,
+    // reference_in_use).
+
+    test("slurm + dataset_size_gb unset warns, naming the parameter") {
+        // COVERAGE: [S79]
+        tag "ci"
+        when { function { """
+            input[0] = 'slurm'
+            input[1] = null
+            input[2] = null
+            input[3] = false
+        """ } }
+        then {
+            assert function.success
+            assert function.result.size() == 1
+            assert function.result[0].contains('dataset_size_gb')
+        }
+    }
+
+    test("slurm + dataset_size_gb set is silent (no reference in use)") {
+        // COVERAGE: [S79]
+        tag "ci"
+        when { function { """
+            input[0] = 'slurm'
+            input[1] = 20
+            input[2] = null
+            input[3] = false
+        """ } }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("slurm + a reference in use + reference_size_gb unset adds a second warning") {
+        // COVERAGE: [S79]
+        tag "ci"
+        when { function { """
+            input[0] = 'slurm'
+            input[1] = null
+            input[2] = null
+            input[3] = true
+        """ } }
+        then {
+            assert function.success
+            assert function.result.size() == 2
+            assert function.result.any { it.contains('dataset_size_gb') }
+            assert function.result.any { it.contains('reference_size_gb') }
+        }
+    }
+
+    test("slurm + a reference in use but reference_size_gb set warns only about reference when dataset is also set") {
+        // COVERAGE: [S79]
+        tag "ci"
+        when { function { """
+            input[0] = 'slurm'
+            input[1] = 20
+            input[2] = null
+            input[3] = true
+        """ } }
+        then {
+            assert function.success
+            assert function.result.size() == 1
+            assert function.result[0].contains('reference_size_gb')
+        }
+    }
+
+    test("everything set is silent") {
+        // COVERAGE: [S79]
+        tag "ci"
+        when { function { """
+            input[0] = 'slurm'
+            input[1] = 20
+            input[2] = 2
+            input[3] = true
+        """ } }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("a non-slurm profile is silent regardless of the size hints") {
+        // COVERAGE: [S79]
+        tag "ci"
+        when { function { """
+            input[0] = 'test'
+            input[1] = null
+            input[2] = null
+            input[3] = true
+        """ } }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("slurm detected inside a comma-joined profile list") {
+        // COVERAGE: [S79]
+        // workflow.profile is the active profiles joined with commas, e.g.
+        // 'slurm,singularity' — the helper must find slurm in the list.
+        tag "ci"
+        when { function { """
+            input[0] = 'slurm,singularity'
+            input[1] = null
+            input[2] = null
+            input[3] = false
+        """ } }
+        then {
+            assert function.success
+            assert function.result.size() == 1
+            assert function.result[0].contains('dataset_size_gb')
+        }
+    }
+}

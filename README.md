@@ -250,7 +250,11 @@ What the `slurm` profile does:
   steps (`vsearch --usearch_global`/`--sintax`) are reference-bound
   instead — they load the reference database and a k-mer index, so
   they scale off `--reference_size_gb` (~4× to cover the index).
-  Fixed fallbacks apply when those params are unset. On an OOM or
+  Fixed fallbacks apply when those params are unset — and the workflow
+  **warns at startup** when they are (`[S79]`), since the fallback may be
+  too small for a large run and OOM mid-pipeline; set the size hints, or
+  override a specific step's memory in a `-c site.config` (see "Tuning
+  for your cluster" and `conf/site.config.example`). On an OOM or
   timeout kill, a process retries up to twice with proportionally
   more memory and wall-time.
 - keeps the `[S49]` stampa scatter at its slurm default

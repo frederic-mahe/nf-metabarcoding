@@ -30,7 +30,9 @@ params {
 
     // --- resource scaling (consumed by `-profile slurm`) ---------------
     // Approximate input / reference sizes in GB; the memory-bound steps
-    // scale their RAM request off these (see nextflow.config).
+    // scale their RAM request off these (see nextflow.config). Leaving
+    // them unset triggers a startup warning ([S79]) because the steps
+    // then fall back to fixed memory that may OOM a large run.
     dataset_size_gb   = 20
     reference_size_gb = 2
 
@@ -48,6 +50,22 @@ params {
     // module_cutadapt = 'cutadapt/5.2'
     // module_mumu     = 'mumu/1.1.4'
 }
+
+// --- per-step resource overrides (optional) ----------------------------
+// The dataset/reference size hints above scale the memory-bound steps
+// proportionally. To override a *single* step instead — e.g. give the
+// heaviest step (swarm fastidious global clustering) a fixed, larger
+// allocation on your cluster — set it directly by process name. These
+// win over the slurm-profile defaults. Uncomment and adjust as needed.
+// process {
+//     withName: 'global_clustering' {
+//         memory = '200.GB'
+//         time   = '24.h'
+//     }
+//     withName: 'find_similar_sequences' {
+//         cpus = 32
+//     }
+// }
 
 // --- shared caches (build the image / conda env once) ------------------
 // Point the container/conda caches at shared scratch visible to every
