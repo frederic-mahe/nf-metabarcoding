@@ -259,87 +259,6 @@ def check_reference_format(value, String expected) {
 }
 
 
-def numeric_param_spec() {
-    // [S72]: accepted range for each numeric parameter, pinned to the
-    // vsearch option it feeds. Pure data (no params access) so
-    // check_numeric_param() stays unit-testable. `minExclusive` marks a
-    // half-open lower bound (used by `percentage`, which must be > 0).
-    return [
-        fastq_encoding   : [type: 'enum', values: [33, 64]],
-        threads          : [type: 'int',  min: 1,   max: 256],
-        percentage       : [type: 'real', min: 0.0, max: 1.0, minExclusive: true],
-        chimera_minsize  : [type: 'int',  min: 1],
-        stripright       : [type: 'int',  min: 0],
-        iddef            : [type: 'int',  min: 0,   max: 4],
-        stampa_chunk_size: [type: 'int',  min: 0],
-        stampa_maxrejects: [type: 'int',  min: 0],
-        stampa_id        : [type: 'real', min: 0.0, max: 1.0],
-        sintax_cutoff    : [type: 'real', min: 0.0, max: 1.0],
-    ]
-}
-
-
-def check_numeric_param(String name, value) {
-    // [S72]: validate one numeric parameter against numeric_param_spec().
-    // Returns the value unchanged when valid; throws
-    // IllegalArgumentException with a message naming the parameter when
-    // the value is the wrong type or out of range, so the run aborts at
-    // startup instead of failing as an obscure vsearch error
-    // mid-pipeline.
-    def spec = numeric_param_spec()[name]
-    if ( spec == null ) {
-        throw new IllegalArgumentException(
-            "no numeric range is defined for parameter '${name}'")
-    }
-    if ( spec.type == 'enum' ) {
-        if ( !(value instanceof Number) || !((value as int) in spec.values) ) {
-            throw new IllegalArgumentException(
-                "--${name} must be one of ${spec.values}, got '${value}'")
-        }
-        return value
-    }
-    if ( !(value instanceof Number) ) {
-        throw new IllegalArgumentException(
-            "--${name} must be a number, got '${value}'")
-    }
-    if ( spec.type == 'int' ) {
-        def i = value as int
-        if ( i != value ) {
-            throw new IllegalArgumentException(
-                "--${name} must be an integer, got '${value}'")
-        }
-        def range = (spec.max != null)
-            ? "in ${spec.min}..${spec.max}"
-            : ">= ${spec.min}"
-        if ( i < spec.min || (spec.max != null && i > spec.max) ) {
-            throw new IllegalArgumentException(
-                "--${name} must be an integer ${range}, got '${value}'")
-        }
-    } else {
-        def d = value as double
-        def lower_ok = spec.minExclusive ? (d > spec.min) : (d >= spec.min)
-        def open = spec.minExclusive ? '(' : '['
-        if ( !lower_ok || d > spec.max ) {
-            throw new IllegalArgumentException(
-                "--${name} must be a real number in ${open}${spec.min}, ${spec.max}], " +
-                "got '${value}'")
-        }
-    }
-    return value
-}
-
-
-def validate_numeric_params() {
-    // [S72]: params-reading wrapper over check_numeric_param() — validate
-    // every numeric parameter against numeric_param_spec(). Called from
-    // validate_params() so an out-of-range value aborts before any
-    // process is wired.
-    numeric_param_spec().each { name, _spec ->
-        check_numeric_param(name, params[name])
-    }
-}
-
-
 def validate_params() {
     // Order-independent parameter guards, run once at the top of the
     // entry workflow (after the --help short-circuit) so an invalid value
@@ -377,19 +296,13 @@ def validate_params() {
         )
     }
 
-    // [S58]: validate --publish_mode before any process is wired so a
-    // typo aborts the run immediately with a clear message instead of
-    // failing on the first PublishDir attempt.
-    def allowed_modes = ['copy', 'copyNoFollow', 'link', 'move', 'rellink', 'symlink']
-    assert params.publish_mode in allowed_modes :
-        "--publish_mode must be one of ${allowed_modes}, got '${params.publish_mode}'"
-
-    // [S61]: validate --taxonomy_method up-front. Only the regular
-    // Part C path consults this flag; shadow Part C always uses sintax
-    // ([S50]).
-    def allowed_taxonomy_methods = ['stampa', 'sintax']
-    assert params.taxonomy_method in allowed_taxonomy_methods :
-        "--taxonomy_method must be one of ${allowed_taxonomy_methods}, got '${params.taxonomy_method}'"
+    // [S58]/[S61]/[S65]/[S63]/[S72]: the per-value type / enum / range
+    // checks (--publish_mode, --taxonomy_method, --hash_function,
+    // --join_padding_length, and the numeric ranges) are declared in
+    // nextflow_schema.json and enforced by validateParameters(), which
+    // the entry workflow calls *before* this function. The guards that
+    // remain here are cross-parameter or file-content checks the schema
+    // cannot express.
 
     // [S66]: majority assignment recomputes a per-OTU taxonomy from the
     // reference accessions listed in the `references` column. Only the
@@ -399,26 +312,6 @@ def validate_params() {
     assert !(params.majority_assignment && params.taxonomy_method == 'sintax') :
         "--majority_assignment requires --taxonomy_method=stampa " +
         "(sintax leaves the references column unpopulated)"
-
-    // [S65]: validate --hash_function up-front so an unsupported hash
-    // aborts before any process is wired rather than surfacing as an
-    // obscure vsearch --relabel error mid-pipeline.
-    def allowed_hash_functions = ['sha1', 'md5']
-    assert params.hash_function in allowed_hash_functions :
-        "--hash_function must be one of ${allowed_hash_functions}, got '${params.hash_function}'"
-
-    // [S63]: validate --join_padding_length as a positive integer
-    // before any process is scheduled. Non-positive values, non-integers,
-    // and other invalid inputs would otherwise surface as a confusing
-    // vsearch error mid-pipeline.
-    def jpl = params.join_padding_length
-    assert (jpl instanceof Number) && (jpl as int) == jpl && (jpl as int) >= 1 :
-        "--join_padding_length must be a positive integer, got '${jpl}'"
-
-    // [S72]: range-validate every numeric parameter against
-    // numeric_param_spec(). Kept after the mode/string guards above
-    // (which produce more specific messages) so they fire first.
-    validate_numeric_params()
 
     // [S73]: sniff the header of each supplied reference so a swapped /
     // mis-formatted file aborts now rather than producing empty or wrong

@@ -212,19 +212,20 @@ workflow {
         return
     }
 
-    // [S58]/[S61]/[S65]/[S66]/[S63]: order-independent parameter guards.
-    // Mode-specific requirements (fastq_folder / primers / reference)
-    // stay inline below because they depend on the selected run mode.
-    validate_params()
-
-    // nf-schema migration (Phase 1, additive): type/enum/range checks
-    // declared in nextflow_schema.json, run alongside — and after — the
-    // Groovy guards above. validate_params() still fires first, so the
-    // existing, more specific assertion messages remain the ones users
-    // see for the values both layers cover; this call adds schema-level
-    // coverage and proves the schema matches every param without
-    // removing any Groovy validation yet.
+    // [S58]/[S61]/[S65]/[S63]/[S72]: per-value type / enum / range checks,
+    // declared in nextflow_schema.json and enforced here. Runs first so a
+    // bad scalar aborts naming the parameter before validate_params()'
+    // file-content check ([S73]) — which reads a reference header — gets a
+    // chance to fire on an otherwise-doomed run.
     validateParameters()
+
+    // [S02]/[S66]/[S71]: cross-parameter and file-content guards the
+    // schema cannot express (input-mode exclusivity, the majority/sintax
+    // incompatibility, reference-format sniffing, the --results_folder
+    // deprecation warning). Mode-specific requirements (fastq_folder /
+    // primers / reference) stay inline below because they depend on the
+    // selected run mode.
+    validate_params()
 
     // [S79]: under -profile slurm, warn (don't abort) when the dataset /
     // reference size hints are unset so a forgotten --dataset_size_gb

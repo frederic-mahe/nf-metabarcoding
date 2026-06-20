@@ -211,9 +211,16 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
-            assert msg.contains("join_padding_length") :
-                "expected error to name join_padding_length, got: ${msg}"
+            // nf-schema writes the per-parameter detail to .nextflow.log
+            // (the console / errorReport carry only the summary line), so
+            // follow the log pointer the error prints and assert the detail
+            // names the parameter.
+            def report = (workflow.stdout + workflow.errorReport).toString()
+            def hit = (report =~ /Check '([^']+nextflow\.log)'/)
+            assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
+            def detail = file(hit.group(1)).text
+            assert detail.contains("join_padding_length") :
+                "expected validation error to name join_padding_length, got: ${detail}"
         }
     }
 
@@ -1455,9 +1462,15 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
-            assert msg.contains("publish_mode") :
-                "error should mention 'publish_mode', got: ${msg}"
+            // nf-schema writes the per-parameter detail to .nextflow.log
+            // (the console / errorReport carry only the summary line), so
+            // follow the log pointer and assert the detail names the param.
+            def report = (workflow.stdout + workflow.errorReport).toString()
+            def hit = (report =~ /Check '([^']+nextflow\.log)'/)
+            assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
+            def detail = file(hit.group(1)).text
+            assert detail.contains("publish_mode") :
+                "error should mention 'publish_mode', got: ${detail}"
         }
     }
 
@@ -1570,9 +1583,15 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
-            assert msg.contains("taxonomy_method") :
-                "error should mention 'taxonomy_method', got: ${msg}"
+            // nf-schema writes the per-parameter detail to .nextflow.log
+            // (the console / errorReport carry only the summary line), so
+            // follow the log pointer and assert the detail names the param.
+            def report = (workflow.stdout + workflow.errorReport).toString()
+            def hit = (report =~ /Check '([^']+nextflow\.log)'/)
+            assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
+            def detail = file(hit.group(1)).text
+            assert detail.contains("taxonomy_method") :
+                "error should mention 'taxonomy_method', got: ${detail}"
         }
     }
 
@@ -1590,19 +1609,27 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
-            assert msg.contains("hash_function") :
-                "error should mention 'hash_function', got: ${msg}"
+            // nf-schema writes the per-parameter detail to .nextflow.log
+            // (the console / errorReport carry only the summary line), so
+            // follow the log pointer and assert the detail names the param.
+            def report = (workflow.stdout + workflow.errorReport).toString()
+            def hit = (report =~ /Check '([^']+nextflow\.log)'/)
+            assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
+            def detail = file(hit.group(1)).text
+            assert detail.contains("hash_function") :
+                "error should mention 'hash_function', got: ${detail}"
         }
     }
 
     test("an out-of-range numeric parameter aborts before any process runs") {
         // COVERAGE: [S72]
-        // Wiring + message-propagation check for validate_numeric_params()
-        // (the per-parameter range matrix is pinned in
-        // tests/functions/check_numeric_param.nf.test). --threads 0 is
-        // below the 1..256 range, so the run must abort at startup with a
-        // message naming the parameter, in an otherwise-valid Part A mode.
+        // Wiring + message-propagation check for the schema-declared
+        // numeric ranges, enforced by validateParameters() (the
+        // per-parameter range matrix is pinned in nextflow_schema.json,
+        // cross-checked by tests/python/test_schema_params_sync.py).
+        // --threads 0 is below the 1..256 range, so the run must abort at
+        // startup with a message naming the parameter, in an
+        // otherwise-valid Part A mode.
         tag "ci"
         when {
             params {
@@ -1615,16 +1642,22 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
-            assert msg.contains("threads") :
-                "error should name the out-of-range parameter 'threads', got: ${msg}"
+            // nf-schema writes the per-parameter detail to .nextflow.log
+            // (the console / errorReport carry only the summary line), so
+            // follow the log pointer and assert the detail names the param.
+            def report = (workflow.stdout + workflow.errorReport).toString()
+            def hit = (report =~ /Check '([^']+nextflow\.log)'/)
+            assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
+            def detail = file(hit.group(1)).text
+            assert detail.contains("threads") :
+                "error should name the out-of-range parameter 'threads', got: ${detail}"
         }
     }
 
     test("an out-of-range Part C numeric parameter aborts before any process runs") {
         // COVERAGE: [S72]
-        // The guard runs in validate_params() for every mode. A
-        // mistyped --sintax_cutoff 90 (instead of 0.9) is out of the
+        // validateParameters() enforces the schema ranges for every mode.
+        // A mistyped --sintax_cutoff 90 (instead of 0.9) is out of the
         // [0, 1] range and must abort the Part C standalone run at
         // startup, naming the parameter.
         tag "ci"
@@ -1639,9 +1672,15 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
-            assert msg.contains("sintax_cutoff") :
-                "error should name the out-of-range parameter 'sintax_cutoff', got: ${msg}"
+            // nf-schema writes the per-parameter detail to .nextflow.log
+            // (the console / errorReport carry only the summary line), so
+            // follow the log pointer and assert the detail names the param.
+            def report = (workflow.stdout + workflow.errorReport).toString()
+            def hit = (report =~ /Check '([^']+nextflow\.log)'/)
+            assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
+            def detail = file(hit.group(1)).text
+            assert detail.contains("sintax_cutoff") :
+                "error should name the out-of-range parameter 'sintax_cutoff', got: ${detail}"
         }
     }
 
