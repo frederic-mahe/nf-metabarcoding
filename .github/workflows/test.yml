@@ -74,6 +74,10 @@ jobs:
         run: bash tests/check-site-config.sh
       - name: Validate slurm profile wiring
         run: bash tests/check-slurm-config.sh
+      - name: Validate cleanup default
+        run: bash tests/check-cleanup-default.sh
+      - name: Validate offline / pre-built container path
+        run: bash tests/check-offline-container.sh
       - name: Validate demo profile wiring
         run: bash tests/check-demo-profile.sh
 

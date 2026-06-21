@@ -9,6 +9,14 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+### Added
+
+- Documented an air-gapped / offline container path (`[S83]`): build the
+  Wave image once on a connected node and reuse it from the shared
+  container cache, or supply a pre-pulled `process.container` image via a
+  `-c site.config` composed with `-profile slurm` (no Wave). See the
+  README "Air-gapped clusters" section and `conf/site.config.example`.
+
 ### Fixed
 
 - A Part A-only run (`--fastq_folder` without `--project_name`) now
@@ -28,6 +36,11 @@ version here must match `manifest.version` in
 
 ### Changed
 
+- **`cleanup` now defaults to `false`** (`[S82]`, was `true`). A
+  successful run keeps its per-task `work/` directories, so `-resume`
+  works across separate invocations and a run stays inspectable. Clean
+  `work/` by hand when done, or set `cleanup = true` in a `-c` override
+  for throwaway runs that should auto-reclaim it.
 - Repository metadata made internally consistent (`[S80]`):
   `manifest.homePage` and the `nextflow_schema.json` `$id` now point at
   the canonical `frederic-mahe/nf-metabarcoding` repository on its

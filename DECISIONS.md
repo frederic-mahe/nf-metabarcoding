@@ -679,10 +679,24 @@ included) and the other piped scripts remain unprotected.
 
 ## D13 — Default run-directory retention (`cleanup`) vs `-resume`
 
-**Blocks:** a new run-retention `[Sxx]` (tentatively `[S82]`)
-**Revises on resolution:** `cleanup = true` in `nextflow.config`; the
-README "Running on an HPC cluster" cleanup/`-resume` note
-**Status:** `proposed` — option 2 (default off), awaiting confirmation
+**Blocks:** `[S82]`
+**Revises:** `cleanup` in `nextflow.config`; the README cleanup/`-resume`
+notes
+**Status:** `resolved` — option 2 (default off), implemented 2026-06-21
+(`[S82]`)
+
+**Resolution (2026-06-21):** option 2. `cleanup` flipped from `true` to
+`false` in `nextflow.config`, so a successful run retains its `work/`
+directories and `-resume` works across separate invocations. The option-3
+`--cleanup` param knob was **dropped**: a top-level `cleanup` directive
+reads `params` at config-parse time (it does not defer like a process
+closure), so a `--cleanup`/`-c` param override would not reliably reach
+it, and `nextflow config` cannot validate a param-driven value anyway.
+Sites that want auto-reclaim set `cleanup = true` directly in their
+`-c site.config` ([S75]) — the established override mechanism. Guarded by
+`[S82]` (`tests/check-cleanup-default.sh`: `nextflow config` resolves
+`cleanup = false` with no profile and under `-profile test`). The
+original analysis follows, for the record.
 
 `nextflow.config` sets `cleanup = true` at top level (the `test` profile
 overrides it to `false` so nf-test can read work files). `cleanup`
@@ -730,8 +744,31 @@ Until D13 lands, `cleanup = true` stands.
 
 ## D14 — Offline / air-gapped container path
 
-**Revises on resolution:** `[S08]` (container profiles); extends D10
-**Status:** `proposed` — options 1 + 3, awaiting confirmation
+**Revises:** `[S08]` (extends it with `[S83]`); extends D10
+**Status:** `resolved` — options 1 + 3, implemented 2026-06-21 (`[S83]`)
+
+**Resolution (2026-06-21):** options 1 + 3, both realised **without new
+code in the engine profiles**. (1) Documented the build-once-online,
+run-offline-from-cache recipe in the README — it uses the existing [S08]
+Wave profiles unchanged. (3) The "site-supplied image" override is
+realised through the existing `-c site.config` mechanism ([S75]) rather
+than a dedicated `--container` flag: a site enables the engine and sets
+`process.container` in its `-c` and composes it with `-profile slurm`
+(the executor profile), so Wave is never turned on. A dedicated
+`--container` param was **rejected**: a lone flag could not also disable
+Wave (the engine profiles hard-enable it), and a param read inside a
+profile block evaluates at config-parse time so it would not reliably
+reflect a CLI/`-c` override anyway (the same eval-order limitation that
+sank D13's `--cleanup` knob). The `-c` path sidesteps both issues — it
+sets the engine, the image, and (by not using an engine profile) leaves
+Wave off, all in one place. Covered by `[S83]`
+(`tests/check-offline-container.sh`: a site `-c` resolves
+`process.container` + the engine with no `wave.enabled`; a plain
+`-profile slurm` resolves no container). `conf/site.config.example` and
+the README "Air-gapped clusters" section document both paths. Option 2
+(freeze to a project-owned registry) remains the documented upgrade path
+from D10 if a site cannot build its own image. The original analysis
+follows, for the record.
 
 D10 chose Wave-from-`environment.yml` with no freeze and no registry,
 explicitly on the assumption that "the two adopting labs run on slurm

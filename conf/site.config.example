@@ -76,9 +76,23 @@ singularity.cacheDir = '/scratch/shared/nf-metabarcoding/singularity_cache'
 apptainer.cacheDir   = '/scratch/shared/nf-metabarcoding/apptainer_cache'
 conda.cacheDir       = '/scratch/shared/nf-metabarcoding/conda_cache'
 
+// --- air-gapped / pre-built image ([S83]) ------------------------------
+// If your compute nodes have NO outbound network, Seqera Wave cannot
+// build the image at task start. Two options:
+//   1. Build once on a connected node: run with an engine profile (e.g.
+//      `-profile slurm,singularity`) once so Wave caches the image in the
+//      singularity.cacheDir above; later offline runs reuse it.
+//   2. Point at a pre-pulled image yourself: enable the engine here and
+//      set process.container, then run with `-profile slurm` (NOT
+//      `-profile singularity`, which would turn Wave on). Uncomment:
+// singularity.enabled    = true
+// singularity.autoMounts = true
+// process.container      = '/scratch/shared/nf-metabarcoding/nf-metabarcoding.sif'
+
 // --- driver tuning -----------------------------------------------------
-// Keep the work directory on shared scratch (visible to all nodes) and
-// preserve it across runs so `-resume` works between separate
-// invocations (see the README HPC section on cleanup vs -resume).
+// Keep the work directory on shared scratch (visible to all nodes). The
+// pipeline already defaults to `cleanup = false` so `work/` survives for
+// `-resume` across separate invocations ([S82]); set `cleanup = true`
+// here only for throwaway runs that should auto-reclaim it.
 // workDir = '/scratch/shared/nf-metabarcoding/work'
-// cleanup = false
+// cleanup = true

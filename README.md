@@ -200,6 +200,46 @@ Requirements and notes:
   the profile *wiring* is checked in CI by
   `tests/check-container-profiles.sh`.
 
+### Air-gapped clusters (no outbound network on compute nodes)
+
+`[S83]`. Wave builds the image at task start, so it needs outbound
+network from wherever tasks run. If your compute nodes are air-gapped,
+use a pre-built image instead — two options, neither needing network
+from the compute nodes:
+
+1. **Build once, run offline.** On a connected node (or the login node,
+   if it has network), run the pipeline once under an engine profile so
+   Wave builds the image and caches it on shared scratch:
+
+   ```bash
+   # point the cache at shared scratch (see conf/site.config.example)
+   nextflow run main.nf -profile slurm,singularity -c my-site.config -profile demo
+   ```
+
+   Subsequent runs reuse the cached `.sif` from `singularity.cacheDir`
+   with no further network.
+
+2. **Bring your own image.** Pre-pull/transfer an image, then enable the
+   engine and set `process.container` in your `-c site.config`, and run
+   with `-profile slurm` (**not** `-profile singularity`, which turns
+   Wave on):
+
+   ```groovy
+   // my-site.config
+   singularity.enabled    = true
+   singularity.autoMounts = true
+   process.container      = '/scratch/shared/nf-metabarcoding/nf-metabarcoding.sif'
+   ```
+
+   ```bash
+   nextflow run main.nf -profile slurm -c my-site.config \
+       --fastq_folder /scratch/me/run17 --forward_primer ... --reverse_primer ...
+   ```
+
+   `conf/site.config.example` carries a commented block for this. A plain
+   `-profile slurm` with no such `-c` sets no container, so nothing
+   changes for everyone else.
+
 
 ## Running on an HPC cluster (slurm)
 
@@ -308,11 +348,12 @@ Launching the run:
   ```
 
 - `-resume` lets an interrupted run pick up where it left off, but it
-  needs the per-task `work/` directories to still exist. The default
-  `cleanup = true` deletes them on success, which defeats `-resume`
-  across separate invocations — set `cleanup = false` (e.g. a small
-  `-c` override) for long or flaky runs, and clean `work/` by hand
-  afterwards.
+  needs the per-task `work/` directories to still exist. `cleanup`
+  defaults to `false` (`[S82]`) precisely so `work/` survives a
+  successful run and `-resume` works across separate invocations — clean
+  `work/` by hand when you are done (see "Cleaning up after a run"). For
+  throwaway runs that should auto-reclaim `work/` on success, set
+  `cleanup = true` in a `-c` override.
 
 Notes:
 
@@ -346,9 +387,11 @@ pending-test convention.
 
 ## Cleaning up after a run
 
-`cleanup = true` in [`nextflow.config`](nextflow.config) removes
-per-task `work/` directories on success, but each runner leaves some
-state behind:
+`cleanup` defaults to `false` (`[S82]`), so per-task `work/`
+directories are **kept** after a successful run (this is what lets
+`-resume` work across invocations). Clean them up by hand when you no
+longer need to resume — and each runner leaves some other state behind
+too:
 
 ```bash
 # nextflow runs (in the project root or wherever you launched from)

@@ -1620,3 +1620,44 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
     with an empty `.results`; and `chimera_detection_post_cleave` on a
     cleaved input large enough to overflow the pipe buffer completes
     without a SIGPIPE abort.
+- `[S82]` `cleanup` defaults to `false` in `nextflow.config`, so a
+  successful run **retains** its per-task `work/` directories. This keeps
+  `-resume` working across separate invocations — the large-dataset
+  workflow, where a follow-up run (adding Part C, re-running after a
+  downstream tweak) should reuse cached tasks rather than recompute — and
+  leaves a "succeeded but wrong" run inspectable for post-mortem
+  debugging. The cost is that `work/` accumulates and is cleaned by hand
+  (the README documents `rm -rf work/`); a site that prefers
+  auto-reclaim on success sets `cleanup = true` in a `-c site.config`
+  ([S75]). The `test` profile keeps `cleanup = false` explicitly so
+  nf-test can read task outputs after a run.
+  - **Pass when:** `nextflow config main.nf -flat` resolves
+    `cleanup = false` with no profile, and also under `-profile test`.
+- `[S83]` an air-gapped site — one whose compute (and possibly login)
+  nodes cannot reach the network at task start — can run from a
+  pre-built container image instead of building one on the fly with
+  Seqera Wave ([S08]), via either of two paths, neither needing
+  outbound network from the compute nodes:
+    - **build once, run offline:** on a connected node, run the pipeline
+      once under an engine profile ([S08]) so Wave builds the image and
+      caches it in `singularity.cacheDir` / `apptainer.cacheDir` on
+      shared scratch; later runs reuse the cached image with no network.
+      This uses the existing [S08] profiles unchanged — documentation
+      only.
+    - **site-supplied image:** the site sets `process.container` to a
+      pre-pulled image (a `.sif` path or registry URI) and enables the
+      engine in its `-c site.config` ([S75]), composing with the
+      executor profile (`-profile slurm`) rather than an engine profile
+      ([S08]) — so Wave is never enabled and no build is attempted. A
+      plain `-profile slurm` with no such `-c` sets no
+      `process.container`, so the default behaviour is unchanged. The
+      template in `conf/site.config.example` carries a commented block
+      for this.
+  Documented in the README "Running with containers" section. Offline
+  execution itself is a manual cluster smoke test (as for [S08]); the
+  config wiring is checked automatically.
+  - **Pass when:** `nextflow config main.nf -flat -profile slurm` with a
+    `-c` that sets `process.container` + the engine resolves that
+    `process.container` and the engine, with no `wave.enabled = true`; a
+    plain `nextflow config main.nf -flat -profile slurm` resolves no
+    `process.container`.
