@@ -551,10 +551,10 @@ the flag is later enabled. See `[S78]` and the gated clauses on `[S04]`
 ## D12 — Strict bash (`pipefail`) for piped process scripts
 
 **Blocks:** a new strict-shell `[Sxx]` (tentatively `[S81]`)
-**Revises on resolution:** every process module with a piped `script:` /
-`shell:` block; supersedes the per-process `set -euo pipefail` lines in
-`chimera_detection_post_cleave.nf` and `merge_substring_otus.nf`
-**Status:** `open` — recommendation is conditional on the pipe audit below
+**Revises on resolution:** the piped `script:` / `shell:` blocks listed
+in the audit below
+**Status:** `proposed` — per-script `set -euo pipefail` (option 1),
+audit complete 2026-06-21
 
 Nextflow does not enable `pipefail` for task scripts by default, and the
 pipeline sets no global `process.shell`. So in a pipe like
@@ -568,54 +568,93 @@ the task's exit status is the **right-hand** command's. If the left
 `vsearch` dies (bad input, partial OOM), the task is still marked
 successful and a silently truncated `.uchime` table flows into the
 occurrence table — exactly the failure mode that goes unnoticed on a
-large dataset. There are ~14 piped process scripts; only **two**
+large dataset. There are 15 piped process scripts; only **two**
 (`chimera_detection_post_cleave`, `merge_substring_otus`) currently set
-`set -euo pipefail` themselves, so the protection is inconsistent.
+`set -euo pipefail`, so protection is inconsistent.
 
-**Question:** make strict-bash the uniform default, and at what
-strictness?
+**Question:** make strict-bash uniform via a global `process.shell`, or
+per-script `set -euo pipefail`?
 
-1. **Status quo (per-process opt-in).** A maintainer remembers to add
-   `set -euo pipefail` to each new piped script. Brittle — the current
-   2-of-14 coverage shows the failure mode.
-2. **Global `process.shell = ['/bin/bash', '-e', '-o', 'pipefail']`
-   (recommended).** One line in `nextflow.config`; every task fails when
-   any stage of a pipe fails. The two per-process `set` lines become
-   redundant and are removed. `-e` + `-o pipefail` without `-u`.
-3. **Global with `-u` as well (`-euo pipefail`).** Also fails on
-   unset-variable expansion. Stricter, but `-u` trips on any genuinely
-   unset bash var and is the most likely source of new false failures;
-   needs a separate audit of every script's variable use.
+1. **Per-script `set -euo pipefail` (chosen).** Add the line to each
+   piped script (matching the two that already have it). Explicit,
+   visible at the point of use, and — crucially — the only approach that
+   actually works uniformly (see the shebang finding below).
+2. **Global `process.shell = ['/bin/bash', '-e', '-o', 'pipefail']`.**
+   One config line. **Rejected:** the audit found a `#!/bin/bash`
+   shebang at the top of a script *overrides* `process.shell` entirely
+   (verified empirically — a shebang script ignored a global pipefail),
+   so this would silently skip the 4 scripts that carry a shebang
+   (`trim_primers`, `list_local_clusters`, and the two already-protected
+   ones). A global flag that covers only 11 of 15 scripts is worse than
+   an explicit per-script line.
 
-**Prerequisite audit (why this is `open`, not `proposed`):** `pipefail`
-turns a non-zero exit *anywhere* in a pipe into a task failure, which is
-only correct if every left-hand stage is *meant* to exit zero. Two
-common idioms break under it and must be checked in each of the ~14
-piped scripts before flipping the switch:
+**Audit (2026-06-21).** Empirically established, in this environment:
+`swarm`, all five piped `vsearch` subcommands, `cat`, `sort`, `awk` all
+exit 0 on empty input; `grep` with no match exits 1; a `#!/bin/bash`
+shebang overrides `process.shell`; a SIGPIPE in `cmd | sort -n | head`
+aborts under `pipefail` **even inside a `$()` assignment**, but a
+failing/SIGPIPE `$()` in a *printf-argument* position does **not** abort.
+With those facts, adding `set -euo pipefail` is **not** uniformly "just
+add a line" — the 15 scripts split into three buckets:
 
-- `... | head` / `... | head -n1` — `head` closing the pipe early sends
-  `SIGPIPE` to the producer (exit 141), which `pipefail` then reports as
-  a task failure (`dump_software_versions` uses `| head -n 1`).
-- `grep ... | ...` where a no-match (`grep` exit 1) is a legitimate,
-  expected outcome (e.g. an empty `.uchime` table when no chimeras are
-  found, `[S34]` / `[S37]`).
+- **Bucket A — add the line, no other change (9 scripts):**
+  `chimera_detection` (the headline win), `rebuild_post_mumu_table`
+  (also catches a currently-masked python failure), `global_dereplication`,
+  `find_similar_sequences`, `build_expected_error_file`,
+  `extract_expected_error_values`, `dump_software_versions` (its
+  `$(tool --version | head)` is in printf-argument position, verified to
+  survive a missing tool → the `[S68]` `n/a` path is preserved),
+  `trim_primers` and `list_local_clusters` (both already carry a
+  `#!/bin/bash` shebang but **no** `set` line — add it there).
+- **Bucket B — needs a guard *before* the line (1 script):**
+  `fake_taxonomic_assignment` pipes `grep "^>" | sed`; `grep` exits 1 on
+  a header-less representatives fasta, so the bare `set -euo pipefail`
+  would turn a legitimate empty result into a task failure. Mirror the
+  `: > file` pre-create + trailing `|| true` that its sibling
+  `fake_taxonomic_assignment2` already uses, *then* the line is safe.
+- **Bucket C — the line is already present and is itself the hazard
+  (1 script):** `chimera_detection_post_cleave` already has
+  `set -euo pipefail` **and** a latent SIGPIPE bug —
+  `lowest="$(sed ... | sort -n | head -n 1)"`. On the tiny CI fixture the
+  sorted output fits the 64 KB pipe buffer so `sort` finishes before
+  `head` closes (exit 0); on a real study with enough distinct cleaved
+  sizes, `head` closing early SIGPIPEs `sort` (exit 141) and `pipefail`
+  aborts the task. This is a **pre-existing bug** (independent of this
+  rollout) that bites exactly the large-dataset case the adopting labs
+  care about. Fix with a SIGPIPE-safe minimum (`sort -n | sed -n 1p`, or
+  a one-pass `awk` min) — *not* another `set` line.
 
-Each such case needs an explicit guard (`|| true`, `{ grep ... || test
-$? = 1; }`, reordering, or `set +o pipefail` around the line). The
-decision is therefore *flip the global default **and** land the
-per-script guards in the same change*, not a one-line config edit.
+The remaining 4 are already correct: `merge_substring_otus` (already
+`set -euo pipefail`; its `head` reads a file, not a pipe);
+`fake_taxonomic_assignment2`, `build_distribution_file`,
+`search_for_terminal_gaps` (each already guards its pipe with `|| true`).
+Minor note: `search_for_terminal_gaps`'s `|| true` is over-broad — it
+masks a `vsearch` failure as well as the intended `grep "^H"` no-match;
+narrowing it to the `grep` is an optional cleanup.
 
-**Proposed resolution:** option 2 (`-e -o pipefail`, no `-u`), **after**
-the pipe audit produces the per-script guards. New `[Sxx]`: "every task
-runs under `bash -e -o pipefail`; a failure in any stage of a pipe fails
-the task." Test: a process whose first pipe stage is forced to fail
-(e.g. a malformed input to the left-hand `vsearch`) makes the task exit
-non-zero rather than publishing a truncated artefact. The two existing
-`set -euo pipefail` lines are removed as redundant (a comment-touch that
-needs the usual authorization).
+So the user's instinct — per-script `set -euo pipefail` on the
+safe scripts — is the right direction *and* the right approach, but it
+is a one-liner only for Bucket A (9 of 15). Bucket B needs a guard in
+the same change; Bucket C is a separate SIGPIPE fix that should ship
+alongside. `-u` is safe for every Bucket-A script: each uses only
+Nextflow `!{...}` / `${...}` interpolation or locally-assigned bash vars
+(no unset references), matching the two scripts that already carry
+`set -euo pipefail`.
 
-Until D12 lands, the per-process `set` lines stand and the other piped
-scripts remain unprotected.
+**Proposed resolution:** option 1, in one change covering all three
+buckets. New `[Sxx]`: "every piped process script runs under
+`set -euo pipefail`; a failure in any stage of a pipe fails the task,
+and the documented empty-result pipes (`grep` no-match) stay guarded."
+Tests: (a) a process whose first pipe stage is forced to fail exits
+non-zero instead of publishing a truncated artefact; (b) the
+`fake_taxonomic_assignment` Bucket-B guard keeps a header-less input
+succeeding with an empty `.results`; (c) a `chimera_detection_post_cleave`
+fixture large enough to exceed the pipe buffer no longer aborts (the
+SIGPIPE regression guard). Touching the existing `script:` blocks and
+their comments needs the usual authorization.
+
+Until D12 lands, the two per-process `set` lines stand (Bucket C's bug
+included) and the other piped scripts remain unprotected.
 
 
 ## D13 — Default run-directory retention (`cleanup`) vs `-resume`
