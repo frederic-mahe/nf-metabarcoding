@@ -546,3 +546,179 @@ of the flag) so a user sample can never collide with shadow naming if
 the flag is later enabled. See `[S78]` and the gated clauses on `[S04]`
 / `[S50]` / `[S56]` / `[S62]` / `[S64]` in
 [`SPECIFICATIONS.md`](SPECIFICATIONS.md).
+
+
+## D12 — Strict bash (`pipefail`) for piped process scripts
+
+**Blocks:** a new strict-shell `[Sxx]` (tentatively `[S81]`)
+**Revises on resolution:** every process module with a piped `script:` /
+`shell:` block; supersedes the per-process `set -euo pipefail` lines in
+`chimera_detection_post_cleave.nf` and `merge_substring_otus.nf`
+**Status:** `open` — recommendation is conditional on the pipe audit below
+
+Nextflow does not enable `pipefail` for task scripts by default, and the
+pipeline sets no global `process.shell`. So in a pipe like
+`chimera_detection`'s
+
+```
+vsearch --fastx_filter ... --fastaout - | vsearch --uchime_denovo - ...
+```
+
+the task's exit status is the **right-hand** command's. If the left
+`vsearch` dies (bad input, partial OOM), the task is still marked
+successful and a silently truncated `.uchime` table flows into the
+occurrence table — exactly the failure mode that goes unnoticed on a
+large dataset. There are ~14 piped process scripts; only **two**
+(`chimera_detection_post_cleave`, `merge_substring_otus`) currently set
+`set -euo pipefail` themselves, so the protection is inconsistent.
+
+**Question:** make strict-bash the uniform default, and at what
+strictness?
+
+1. **Status quo (per-process opt-in).** A maintainer remembers to add
+   `set -euo pipefail` to each new piped script. Brittle — the current
+   2-of-14 coverage shows the failure mode.
+2. **Global `process.shell = ['/bin/bash', '-e', '-o', 'pipefail']`
+   (recommended).** One line in `nextflow.config`; every task fails when
+   any stage of a pipe fails. The two per-process `set` lines become
+   redundant and are removed. `-e` + `-o pipefail` without `-u`.
+3. **Global with `-u` as well (`-euo pipefail`).** Also fails on
+   unset-variable expansion. Stricter, but `-u` trips on any genuinely
+   unset bash var and is the most likely source of new false failures;
+   needs a separate audit of every script's variable use.
+
+**Prerequisite audit (why this is `open`, not `proposed`):** `pipefail`
+turns a non-zero exit *anywhere* in a pipe into a task failure, which is
+only correct if every left-hand stage is *meant* to exit zero. Two
+common idioms break under it and must be checked in each of the ~14
+piped scripts before flipping the switch:
+
+- `... | head` / `... | head -n1` — `head` closing the pipe early sends
+  `SIGPIPE` to the producer (exit 141), which `pipefail` then reports as
+  a task failure (`dump_software_versions` uses `| head -n 1`).
+- `grep ... | ...` where a no-match (`grep` exit 1) is a legitimate,
+  expected outcome (e.g. an empty `.uchime` table when no chimeras are
+  found, `[S34]` / `[S37]`).
+
+Each such case needs an explicit guard (`|| true`, `{ grep ... || test
+$? = 1; }`, reordering, or `set +o pipefail` around the line). The
+decision is therefore *flip the global default **and** land the
+per-script guards in the same change*, not a one-line config edit.
+
+**Proposed resolution:** option 2 (`-e -o pipefail`, no `-u`), **after**
+the pipe audit produces the per-script guards. New `[Sxx]`: "every task
+runs under `bash -e -o pipefail`; a failure in any stage of a pipe fails
+the task." Test: a process whose first pipe stage is forced to fail
+(e.g. a malformed input to the left-hand `vsearch`) makes the task exit
+non-zero rather than publishing a truncated artefact. The two existing
+`set -euo pipefail` lines are removed as redundant (a comment-touch that
+needs the usual authorization).
+
+Until D12 lands, the per-process `set` lines stand and the other piped
+scripts remain unprotected.
+
+
+## D13 — Default run-directory retention (`cleanup`) vs `-resume`
+
+**Blocks:** a new run-retention `[Sxx]` (tentatively `[S82]`)
+**Revises on resolution:** `cleanup = true` in `nextflow.config`; the
+README "Running on an HPC cluster" cleanup/`-resume` note
+**Status:** `proposed` — option 2 (default off), awaiting confirmation
+
+`nextflow.config` sets `cleanup = true` at top level (the `test` profile
+overrides it to `false` so nf-test can read work files). `cleanup`
+deletes the per-task `work/` directories on **successful** completion.
+For the target use case — multi-hour/day runs on very large datasets —
+this has two costs the README already warns about but the default works
+against:
+
+- `-resume` across separate invocations needs `work/` to survive; with
+  `cleanup = true` a successful run leaves nothing to resume from, so a
+  follow-up run (e.g. adding Part C, or re-running after a downstream
+  tweak) recomputes everything.
+- a run that "succeeded but produced something wrong" has no work
+  directories left for post-mortem inspection.
+
+A footgun-by-default sits awkwardly against the project's "hard to
+misuse" goal, and nf-core ships `cleanup` **off** by default for exactly
+these reasons.
+
+**Question:** keep `cleanup = true`, flip it off, or make it a knob?
+
+1. **Status quo (`cleanup = true`).** Tidy by default; defeats `-resume`
+   and forensics, as above. Documented but easy to get bitten by.
+2. **Default `cleanup = false` (recommended).** Matches nf-core; serves
+   the large-dataset / `-resume` workflow out of the box; post-mortem
+   debugging stays possible. Cost: `work/` accumulates on scratch and
+   must be cleaned by hand (the README already documents `rm -rf work/`),
+   so it trades silent disk reclamation for resume-correctness.
+3. **Expose `--cleanup` (param, default off).** Same default as option 2
+   but lets a user opt back into auto-clean for throwaway runs. Cheap;
+   composes with option 2.
+
+**Proposed resolution:** option 2, optionally with the option-3 knob.
+This changes a default, so it warrants a CHANGELOG entry and a one-line
+README note ("`work/` is no longer auto-deleted; clean it by hand, or
+set `cleanup = true` in a `-c` override / `--cleanup` for throwaway
+runs"). The `test` profile's explicit `cleanup = false` is unaffected.
+New `[Sxx]`: "`cleanup` defaults to `false`; a successful run retains
+`work/` so `-resume` works across invocations." Testable via
+`nextflow config` resolving `cleanup = false` with no profile (mirrors
+the `tests/check-*.sh` config-resolution style).
+
+Until D13 lands, `cleanup = true` stands.
+
+
+## D14 — Offline / air-gapped container path
+
+**Revises on resolution:** `[S08]` (container profiles); extends D10
+**Status:** `proposed` — options 1 + 3, awaiting confirmation
+
+D10 chose Wave-from-`environment.yml` with no freeze and no registry,
+explicitly on the assumption that "the two adopting labs run on slurm
+with **outbound network on the compute nodes**." For the broader
+"portability to other HPC setups" goal, that assumption does not hold
+everywhere: many clusters air-gap their compute nodes (and sometimes the
+login node), so Wave — which resolves and builds the image at task start
+— cannot reach the network from where tasks run. Such a site is left
+with `-profile modules` as the only option, since `conda` may also be
+blocked. There is currently no way to point the workflow at a
+pre-built image.
+
+**Question:** what offline story should the container profiles support?
+
+1. **Document a "build once online, run offline" recipe (recommended,
+   cheap).** On a connected node, run the pipeline (or `nextflow inspect`
+   / a Wave pull) once so the Wave-built image lands in
+   `singularity.cacheDir` / `apptainer.cacheDir` on shared scratch; then
+   compute nodes reuse the cached `.sif` with no further network. Pure
+   documentation + a note in `conf/site.config.example`.
+2. **Freeze to a project-owned registry (D10 option 2).** Flip
+   `wave.freeze` + `wave.build.repository` so Wave pushes a permanent
+   image to ghcr.io. Self-owned artefacts, but needs a registry + token
+   and a release step — heavier; deferrable.
+3. **Add an optional `--container <uri>` override (recommended,
+   cheap).** Let a site set `process.container` to a pre-pulled `.sif`
+   path or a registry URI, bypassing Wave entirely. One param + a
+   `withName`-free `process.container = params.container ?: null`,
+   scoped so it is null (Wave path unchanged) unless set.
+
+**Proposed resolution:** options 1 + 3 together — they are both low-cost
+and cover the realistic air-gapped cases without committing to running a
+registry (option 2 stays the documented upgrade path from D10). New
+`[Sxx]`: "an air-gapped site can run from a pre-built image via the
+container cache (build-once recipe) or a `--container` override, with no
+network from compute nodes." Wiring is testable by `nextflow config`
+(the override resolves to `process.container`); execution stays a manual
+cluster smoke test, as for the rest of `[S08]`.
+
+Sub-questions for the human:
+- Is `--container` a single image for all tools (matches the single
+  `environment.yml` image Wave builds today), or per-process? Single is
+  almost certainly right here.
+- Should the project commit to publishing a frozen image per release
+  (option 2) for sites that cannot build their own, or leave that to the
+  site? This is the only part that adds ongoing maintenance.
+
+Until D14 lands, the Wave-online assumption from D10 stands and
+air-gapped sites use `-profile modules`.
