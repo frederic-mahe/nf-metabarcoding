@@ -72,6 +72,8 @@ jobs:
         run: bash tests/check-container-profiles.sh
       - name: Validate site-config override wiring
         run: bash tests/check-site-config.sh
+      - name: Validate slurm profile wiring
+        run: bash tests/check-slurm-config.sh
       - name: Validate demo profile wiring
         run: bash tests/check-demo-profile.sh
 
