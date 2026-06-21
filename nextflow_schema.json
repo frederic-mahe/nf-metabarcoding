@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://raw.githubusercontent.com/frederic-mahe/fred-metabarcoding-pipeline-nextflow/master/nextflow_schema.json",
+    "$id": "https://raw.githubusercontent.com/frederic-mahe/nf-metabarcoding/main/nextflow_schema.json",
     "title": "nf-metabarcoding pipeline parameters",
     "description": "Metabarcoding: swarm-based ASV inference",
     "type": "object",

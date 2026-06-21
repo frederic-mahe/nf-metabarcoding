@@ -1288,6 +1288,23 @@ from placeholder values to real taxonomic assignments.
   guard behind it.)
   - **Pass when:** a repo-level check asserts that `manifest.version`
     (`nextflow.config`) and `version` (`CITATION.cff`) are identical.
+- `[S80]` repository metadata stays internally consistent so the
+  workflow never ships dead documentation links or an undocumented
+  release:
+    - `manifest.homePage` (`nextflow.config`) and `url` (`CITATION.cff`)
+      reference the **same** GitHub repository (`owner/repo`);
+    - `manifest.defaultBranch` is declared, and `nextflow_schema.json`'s
+      `$id` URL points at that branch (and the same `owner/repo`), so the
+      published schema link resolves instead of 404-ing on a stale
+      branch name;
+    - a `CHANGELOG.md` exists and carries an entry for the current
+      `manifest.version`.
+  This is the metadata sibling of `[S77]`'s version-sync guard.
+  - **Pass when:** a repo-level check asserts (a) the `manifest.homePage`
+    and `CITATION.cff` `url` resolve to the same `owner/repo`; (b)
+    `manifest.defaultBranch` is non-empty and the schema `$id` path
+    contains `/<owner>/<repo>/<defaultBranch>/`; (c) `CHANGELOG.md`
+    exists and contains the `manifest.version` string.
 
 
 ## Input samplesheet
