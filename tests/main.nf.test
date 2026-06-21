@@ -2236,4 +2236,37 @@ nextflow_pipeline {
             }
         }
     }
+
+    test("a Part A-only run publishes pipeline_info/software_versions.yml") {
+        // COVERAGE: [S68]
+        // [S68] requires the versions file on *every* entry point,
+        // "including a Part A-only run". A --fastq_folder run without
+        // --project_name (no Part B / Part C) is that entry point: assert
+        // the report still lands under <outdir>/pipeline_info/ and names
+        // every tool with a non-empty value.
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                outdir         = "${outputDir}/a_versions_only"
+                threads        = 1
+                // project_name deliberately unset → Part A only
+            }
+        }
+        then {
+            assert workflow.success
+            def versions = file("${outputDir}/a_versions_only/pipeline_info/software_versions.yml")
+            assert versions.exists() :
+                "[S68] Part A-only run must publish software_versions.yml: ${versions}"
+            assert versions.size() > 0 : "software_versions.yml is empty"
+            def text = versions.text
+            ["vsearch", "swarm", "cutadapt", "mumu", "python"].each { tool ->
+                assert text.contains(tool) :
+                    "[S68] software_versions.yml must name ${tool}, got: ${text}"
+            }
+        }
+    }
 }

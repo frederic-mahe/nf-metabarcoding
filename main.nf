@@ -31,8 +31,6 @@ workflow part_c {
     // <outdir>/<subdir> on first publish (no parse-time filesystem I/O).
     // --outdir always resolves (default 'results'), so no output-folder
     // param is required ([S26] superseded).
-    // [S68]: record tool versions under <outdir>/pipeline_info/.
-    dump_software_versions()
 
     def table_path = file(normalize_path(params.occurrence_table))
     def derived_basename = table_path.baseName.replaceFirst(/_table$/, '')
@@ -84,8 +82,6 @@ workflow part_b {
     // <outdir>/<subdir> on first publish (no parse-time filesystem I/O).
     // --outdir always resolves (default 'results'), so no output-folder
     // param is required ([S26] superseded).
-    // [S68]: record tool versions under <outdir>/pipeline_info/.
-    dump_software_versions()
 
     // Build the six per-sample lists (regular + shadow × fasta/qual/
     // stats) from either the validated --input samplesheet (fasta
@@ -240,6 +236,13 @@ workflow {
         (params.reference_dataset || params.reference_dataset_sintax) as boolean
     ).each { System.err.println("WARNING: ${it}") }
 
+    // [S68]/[S71]: record tool versions under <outdir>/pipeline_info/ on
+    // every entry point — including a Part A-only run. --outdir always
+    // resolves (default 'results'), so the report is published regardless
+    // of the selected mode. Invoked once here (not per router/branch) so
+    // the single-host process is never scheduled twice in one run.
+    dump_software_versions()
+
     // [S60]: every path-typed param is read through `normalize_path()`
     // at its use site (file(), publishDir, etc.) — see the helper at the
     // top of this file. Nextflow 25's `params` map is read-only from
@@ -309,8 +312,6 @@ workflow {
         // <outdir>/<subdir> on first publish (no parse-time filesystem
         // I/O). --outdir always resolves (default 'results'), so no
         // output-folder param is required ([S26] superseded).
-        // [S68]: record tool versions under <outdir>/pipeline_info/.
-        dump_software_versions()
 
         def regular_fasta = part_A.out.fasta.filter { id, _f -> !id.endsWith("_notmerged") }
         def regular_qual  = part_A.out.qual .filter { id, _f -> !id.endsWith("_notmerged") }
