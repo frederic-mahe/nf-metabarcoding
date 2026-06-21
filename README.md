@@ -117,8 +117,17 @@ fixed layout:
 ├── per_sample/         per-sample .fas / .qual / .stats + Part A logs
 ├── occurrence_table/   the occurrence table(s), step logs, and the
 │                       taxonomy-annotated tables (Part B + Part C)
-└── pipeline_info/      software_versions.yml (tool versions for the run)
+└── pipeline_info/      software_versions.yml (tool versions) +
+                        execution_{report,timeline}.html,
+                        execution_trace.txt, pipeline_dag.html
 ```
+
+The `pipeline_info/` reports (`[S84]`) are Nextflow's own execution
+records. `execution_trace.txt` and `execution_report.html` list the
+requested vs observed CPU/memory and the real `peak_rss` / `realtime`
+per task — the easiest way to size `--dataset_size_gb` /
+`--reference_size_gb` (or a per-step override) when tuning the pipeline
+for a new cluster (see "Running on an HPC cluster").
 
 Inputs are never written to — `--fastq_folder` / `--fasta_folder` are
 read-only.

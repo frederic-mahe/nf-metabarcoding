@@ -78,6 +78,8 @@ jobs:
         run: bash tests/check-cleanup-default.sh
       - name: Validate offline / pre-built container path
         run: bash tests/check-offline-container.sh
+      - name: Validate execution-report wiring
+        run: bash tests/check-execution-reports.sh
       - name: Validate demo profile wiring
         run: bash tests/check-demo-profile.sh
 

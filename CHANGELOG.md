@@ -11,6 +11,13 @@ version here must match `manifest.version` in
 
 ### Added
 
+- Nextflow execution reports (`[S84]`): every run now writes
+  `execution_timeline.html`, `execution_report.html`,
+  `execution_trace.txt`, and `pipeline_dag.html` to
+  `<outdir>/pipeline_info/`. The trace/report give per-task `peak_rss` /
+  `realtime` against the requested CPU/memory — the primary input for
+  sizing `--dataset_size_gb` / `--reference_size_gb` and per-step
+  overrides on a new cluster.
 - Documented an air-gapped / offline container path (`[S83]`): build the
   Wave image once on a connected node and reuse it from the shared
   container cache, or supply a pre-pulled `process.container` image via a

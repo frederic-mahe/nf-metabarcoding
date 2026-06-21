@@ -1661,3 +1661,26 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
     `process.container` and the engine, with no `wave.enabled = true`; a
     plain `nextflow config main.nf -flat -profile slurm` resolves no
     `process.container`.
+- `[S84]` every run writes Nextflow's execution reports — `timeline`,
+  `report`, `trace`, and `dag` — into `<outdir>/pipeline_info/`
+  (alongside `software_versions.yml`, [S68]). The `trace` and `report`
+  are the primary tool for tuning per-step resources on a new cluster:
+  they record the requested cpus/memory against the observed
+  `peak_rss` / `peak_vmem` / `realtime` / `%cpu` per task, which is how a
+  site chooses `--dataset_size_gb` / `--reference_size_gb` ([S79]) or a
+  per-step memory override ([S75]). Files use fixed names with
+  `overwrite = true`, so a rerun / `-resume` refreshes them in place. The
+  output root follows the [S71] precedence (`--outdir`, then the
+  `--results_folder` alias, then `results`) when set via `--outdir` /
+  `-params-file`. Because the report `file` paths are config values
+  resolved at parse time — before profiles are applied, and they cannot
+  be closures — a profile that sets `params.outdir` is not seen by them;
+  the one shipped such profile, `demo` ([S76]), re-points the four report
+  files to its `demo_results/` explicitly so its reports sit beside its
+  other outputs.
+  - **Pass when:** `nextflow config main.nf -flat` resolves `timeline` /
+    `report` / `trace` / `dag` enabled with `file` paths under
+    `<outdir>/pipeline_info/` (default `results/`), the `trace` carrying
+    `peak_rss` / `peak_vmem`. Report *generation* itself (and following a
+    run-time `--outdir`) is upstream Nextflow behaviour, exercised by the
+    demo / cluster smoke runs, not unit-tested ([S00]).
