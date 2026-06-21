@@ -22,6 +22,8 @@ process chimera_detection {
 
     shell:
     '''
+    set -euo pipefail
+
     vsearch \
         --fastx_filter !{representatives} \
         --minsize !{params.chimera_minsize} \

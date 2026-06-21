@@ -372,6 +372,24 @@ emit_hash_function_fixtures() {
     } > "${dir}/S2_md5.qual"
 }
 
+emit_large_cleaved_fixture() {
+    # [S81]: a cleaved-representatives fasta large enough that the
+    # `sed ... | sort -n | head -n 1` minsize computation in
+    # chimera_detection_post_cleave overflows the OS pipe buffer
+    # (~64 KB of sorted size numbers) and SIGPIPEs `sort` under
+    # `set -euo pipefail`. 10k records with 6-digit sizes (~70 KB of
+    # sorted output) reliably trigger it; the SIGPIPE-safe `sed -n 1p`
+    # must survive. Sequences are identical so the downstream uchime
+    # pass stays fast.
+    local -r dir="part_b"
+    mkdir -p "${dir}"
+    awk 'BEGIN {
+        seq = "ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT"
+        for (i = 1; i <= 10000; i++)
+            printf ">cleaved_%d;size=%d\n%s\n", i, 100000 + i, seq
+    }' > "${dir}/big_cleaved.fas2"
+}
+
 
 emit_paired "paired_merge_ok"   "${AMPLICONS_OK[@]}"
 emit_paired "paired_merge_fail" "${AMPLICONS_LONG[@]}"
@@ -386,5 +404,6 @@ emit_part_b_fixtures
 emit_e2e_part_b_fixture
 emit_compression_variants
 emit_hash_function_fixtures
+emit_large_cleaved_fixture
 
 echo "Wrote fixtures to ${DATA_DIR}"

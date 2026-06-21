@@ -69,4 +69,34 @@ nextflow_process {
             }
         }
     }
+
+    test("a header-less input yields an empty .results, not a failure") {
+        // COVERAGE: [S81]
+        // [S81] Bucket B: the `grep "^>" | sed` pipe exits 1 when the
+        // input carries no FASTA headers (`grep` no-match). Adding
+        // `set -euo pipefail` without a guard would turn that legitimate
+        // empty result into a task failure, so the pipe is pre-created +
+        // `|| true`-guarded (mirroring fake_taxonomic_assignment2). An
+        // empty input must still produce an empty .results and succeed.
+        tag "ci"
+        when {
+            process {
+                """
+                def noheaders = workDir.resolve("no_headers.fas")
+                noheaders.text = "ACGTACGTACGT\\nTTTTGGGGCCCC\\n"
+                input[0] = file(noheaders.toString())
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success :
+                "[S81] grep no-match (header-less input) must stay guarded, not abort"
+            def outPath = process.out.results.get(0)
+            assert outPath.endsWith("proj_3_samples_1f_representatives.results") :
+                "unexpected output filename: ${outPath}"
+            assert path(outPath).readLines().isEmpty() :
+                "a header-less input should yield an empty .results"
+        }
+    }
 }

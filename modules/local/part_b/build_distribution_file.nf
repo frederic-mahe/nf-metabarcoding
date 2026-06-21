@@ -17,6 +17,8 @@ process build_distribution_file {
 
     shell:
     '''
+    set -euo pipefail
+
     : > !{basename}.distr
     for f in !{fastas} ; do
         sample="$(basename "${f}" .fas)"

@@ -11,6 +11,8 @@ process find_similar_sequences {
 
     shell:
     '''
+    set -euo pipefail
+
     vsearch \
         --usearch_global !{otu_fasta} \
         --db !{otu_fasta} \

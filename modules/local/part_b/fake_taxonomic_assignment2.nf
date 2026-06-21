@@ -17,6 +17,8 @@ process fake_taxonomic_assignment2 {
 
     shell:
     '''
+    set -euo pipefail
+
     : > !{basename}_1f_representatives.results2
     grep "^>" !{cleaved_representatives} | \
         sed -r 's/^>//

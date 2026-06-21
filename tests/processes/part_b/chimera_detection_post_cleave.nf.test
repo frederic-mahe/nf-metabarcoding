@@ -119,4 +119,36 @@ ACACACACAC
             assert path(process.out.log.get(0)).readLines().size() > 0
         }
     }
+
+    test("a large cleaved fas2 does not SIGPIPE-abort the minsize computation") {
+        // COVERAGE: [S81]
+        // [S81] Bucket C: the dynamic --minsize is computed as
+        // `lowest="$(sed ... | sort -n | head -n 1)"`. With `set -euo
+        // pipefail` active, `head` closing the pipe after one line
+        // SIGPIPEs `sort` (exit 141) once the sorted output overflows the
+        // OS pipe buffer (~64 KB) — aborting the task on a large dataset
+        // while passing on the tiny fixtures above. This fixture has 10k
+        // cleaved records with 6-digit sizes (~70 KB of sorted output),
+        // which reliably triggers the SIGPIPE on the un-fixed code; the
+        // SIGPIPE-safe minimum must let the task complete. The fixture
+        // (10k records, 6-digit sizes, identical sequences) is built by
+        // tests/data/generate.sh; identical sequences keep the
+        // downstream uchime pass fast.
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = global_clustering.out.representatives
+                input[1] = file("\${projectDir}/tests/data/part_b/big_cleaved.fas2")
+                input[2] = chimera_detection.out.log
+                input[3] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success :
+                "[S81] the sort|head minsize computation must be SIGPIPE-safe on large cleaved input"
+            assert file(process.out.uchime.get(0)).exists()
+        }
+    }
 }

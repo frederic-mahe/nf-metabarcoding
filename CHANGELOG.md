@@ -15,6 +15,16 @@ version here must match `manifest.version` in
   publishes `pipeline_info/software_versions.yml`, as `[S68]` requires
   on every entry point. The version dump was previously skipped outside
   the Part B / Part C paths.
+- Every piped process script now runs under `set -euo pipefail`
+  (`[S81]`), so a failure in any stage of a pipe fails the task instead
+  of being masked by the last stage's exit status (e.g. a crashed
+  `vsearch --fastx_filter` feeding `vsearch --uchime_denovo` in
+  `chimera_detection` no longer silently truncates the `.uchime` table).
+  Fixed a latent SIGPIPE abort in `chimera_detection_post_cleave`'s
+  minimum-size computation (`sort -n | head -n 1` →
+  `sort -n | sed -n '1p'`) that would bite large datasets, and guarded
+  `fake_taxonomic_assignment`'s `grep` so a header-less input still
+  yields an empty `.results`.
 
 ### Changed
 

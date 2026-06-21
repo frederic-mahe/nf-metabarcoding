@@ -15,6 +15,8 @@ process extract_expected_error_values {
 
     shell:
     '''
+    set -euo pipefail
+
     length_of_sequence_IDs=!{id_length}
     extract_ee.awk !{filtered_fasta} | \
         sort --key=3,3n --key=1,1d --key=2,2n | \

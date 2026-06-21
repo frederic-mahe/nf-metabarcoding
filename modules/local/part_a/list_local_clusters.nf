@@ -21,6 +21,7 @@ process list_local_clusters {
     shell:
     '''
     #!/bin/bash
+    set -euo pipefail
 
     swarm \
         --threads !{task.cpus} \

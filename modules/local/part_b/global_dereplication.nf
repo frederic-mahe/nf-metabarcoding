@@ -22,6 +22,8 @@ process global_dereplication {
 
     shell:
     '''
+    set -euo pipefail
+
     cat !{fastas} | \
         vsearch \
             --fastx_uniques - \

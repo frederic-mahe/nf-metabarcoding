@@ -20,6 +20,8 @@ process rebuild_post_mumu_table {
 
     shell:
     """
+    set -euo pipefail
+
     rebuild_table_after_mumu.py \\
         --mumu_table ${mumu_table} \\
         --old_table  ${old_table} | \\

@@ -550,11 +550,31 @@ the flag is later enabled. See `[S78]` and the gated clauses on `[S04]`
 
 ## D12 — Strict bash (`pipefail`) for piped process scripts
 
-**Blocks:** a new strict-shell `[Sxx]` (tentatively `[S81]`)
-**Revises on resolution:** the piped `script:` / `shell:` blocks listed
-in the audit below
-**Status:** `proposed` — per-script `set -euo pipefail` (option 1),
-audit complete 2026-06-21
+**Blocks:** `[S81]`
+**Revises:** the piped `script:` / `shell:` blocks listed in the audit
+below
+**Status:** `resolved` — per-script `set -euo pipefail` (option 1),
+implemented 2026-06-21 (`[S81]`)
+
+**Resolution (2026-06-21):** option 1, implemented across all 15 piped
+process scripts. Every piped `script:` / `shell:` block now carries
+`set -euo pipefail`. The two pre-existing lines
+(`chimera_detection_post_cleave`, `merge_substring_otus`) stay; nine
+scripts (Bucket A) gained the line with no other change; the three
+already-`|| true`-guarded scripts (`fake_taxonomic_assignment2`,
+`build_distribution_file`, `search_for_terminal_gaps`) gained it on top
+of their guards so the invariant is uniform. Bucket B
+(`fake_taxonomic_assignment`) gained the `: >` pre-create + `|| true`
+guard its sibling already had, so a header-less input still yields an
+empty `.results`. Bucket C (`chimera_detection_post_cleave`) had its
+`sort -n | head -n 1` minimum swapped to the SIGPIPE-safe
+`sort -n | sed -n '1p'`. Covered by `[S81]` (three nf-test cases:
+left-pipe failure propagates, header-less Bucket-B guard, large-cleaved
+SIGPIPE regression). `-u` was kept (matches the two original scripts;
+the audit confirmed no Bucket-A script references an unset var). The
+global `process.shell` route (option 2) was rejected: a `#!/bin/bash`
+shebang overrides `process.shell`, so it would silently skip the four
+shebang-carrying scripts. The original analysis follows, for the record.
 
 Nextflow does not enable `pipefail` for task scripts by default, and the
 pipeline sets no global `process.shell`. So in a pipe like

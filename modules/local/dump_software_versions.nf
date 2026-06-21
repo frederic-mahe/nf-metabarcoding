@@ -17,6 +17,8 @@ process dump_software_versions {
 
     script:
     """
+    set -euo pipefail
+
     {
         printf 'vsearch\\t%s\\n'  "\$(vsearch  --version 2>&1 | head -n 1)"
         printf 'swarm\\t%s\\n'    "\$(swarm    --version 2>&1 | head -n 1)"

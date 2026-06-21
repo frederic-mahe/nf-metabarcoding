@@ -21,6 +21,8 @@ process search_for_terminal_gaps {
 
     shell:
     '''
+    set -euo pipefail
+
     awk 'NR > 1 {printf ">"$1"\\n"$10"\\n"}' !{otu_table} | \
         vsearch \
             --threads !{task.cpus} \

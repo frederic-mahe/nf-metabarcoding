@@ -19,6 +19,8 @@ process build_expected_error_file {
 
     shell:
     '''
+    set -euo pipefail
+
     sort --key=3,3n --key=1,1d --key=2,2n --merge !{quals} | \
         uniq --check-chars=!{id_length} > !{basename}.qual
     '''

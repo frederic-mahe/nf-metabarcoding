@@ -98,4 +98,30 @@ nextflow_process {
                 "expected uchime to report 0 unique sequences, got:\n${path(logPath).text}"
         }
     }
+
+    test("a failing first pipe stage fails the task instead of truncating output") {
+        // COVERAGE: [S81]
+        // [S81]: chimera_detection pipes `vsearch --fastx_filter | vsearch
+        // --uchime_denovo`. A non-FASTA `representatives` input makes the
+        // left-hand vsearch exit non-zero while emitting nothing, so the
+        // right-hand uchime reads an empty stream and exits 0. Without
+        // `set -euo pipefail` the task is reported successful with an
+        // empty `.uchime` — the silent-truncation failure mode. Under
+        // pipefail the left-hand failure propagates and the task fails.
+        tag "ci"
+        when {
+            process {
+                """
+                def junk = workDir.resolve("not_a_fasta.txt")
+                junk.text = "this is not a fasta file at all\\njust random text\\n"
+                input[0] = file(junk.toString())
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.failed :
+                "[S81] a failure in the left-hand vsearch of the pipe must fail the task"
+        }
+    }
 }

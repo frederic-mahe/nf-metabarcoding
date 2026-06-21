@@ -19,6 +19,7 @@ process trim_primers {
     shell:
     '''
     #!/bin/bash
+    set -euo pipefail
 
     readonly ERROR_RATE=0.1
 

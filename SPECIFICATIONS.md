@@ -1589,3 +1589,34 @@ The two sides of the brace token must differ (`{1,2}`, `{R1,R2}` —
 not `{1,1}`): they are the R1/R2 discriminator, so equal sides would
 make the derived R2 name identical to the R1 name and pair a file
 with itself. A pattern with equal sides is rejected (`[S67]`).
+
+
+## Execution robustness
+
+- `[S81]` every piped process script runs under `set -euo pipefail`, so
+  a failure in **any** stage of a pipe fails the task rather than being
+  masked by the exit status of the last stage alone. Without it, a crash
+  in the left-hand command of a pipe — e.g. the `vsearch --fastx_filter`
+  feeding `vsearch --uchime_denovo` in `chimera_detection` (`[S34]`) — is
+  silently swallowed and a truncated artefact flows downstream into the
+  occurrence table. Two classes of pipe are deliberately exempted so
+  `pipefail` does not turn a correct outcome into a spurious failure:
+    - pipes whose non-zero exit is a **legitimate empty result** stay
+      explicitly guarded. In particular the `grep "^>"` header scans in
+      `fake_taxonomic_assignment`, `fake_taxonomic_assignment2`, and
+      `build_distribution_file` exit non-zero on a header-less input
+      (`grep` returns 1 when nothing matches), so they pre-create the
+      output and trail the pipe with `|| true` — an empty input yields an
+      empty output and a successful task (`[S09]` / `[S33]`).
+    - minimum-size computations that close a pipe early
+      (`... | sort -n | head -n 1` in `chimera_detection_post_cleave`,
+      `[S37]`) are written SIGPIPE-safe (the producer is allowed to run
+      to completion) so they do not abort under `pipefail` once the
+      sorted output exceeds the OS pipe buffer on a large dataset.
+  - **Pass when:** a process whose first pipe stage is forced to fail
+    (`chimera_detection` on a non-FASTA `representatives` input) exits
+    non-zero instead of publishing a truncated `.uchime`;
+    `fake_taxonomic_assignment` on a header-less input still succeeds
+    with an empty `.results`; and `chimera_detection_post_cleave` on a
+    cleaved input large enough to overflow the pipe buffer completes
+    without a SIGPIPE abort.

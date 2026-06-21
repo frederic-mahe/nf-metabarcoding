@@ -35,8 +35,14 @@ process chimera_detection_post_cleave {
     #!/bin/bash
     set -euo pipefail
 
+    # [S81]: `sed -n 1p` (not `head -n 1`) takes the smallest size. `head`
+    # closes the pipe after one line, which SIGPIPEs `sort` (exit 141)
+    # once the sorted output overflows the OS pipe buffer on a large
+    # cleaved file — under `set -euo pipefail` that aborts the task.
+    # `sed -n 1p` reads its input to completion, so the producer never
+    # gets SIGPIPE.
     lowest="$(sed -rn '/^>/ s/.*;size=([0-9]+);?/\\1/p' !{cleaved_representatives} \
-                | sort -n | head -n 1)"
+                | sort -n | sed -n '1p')"
     lowest="${lowest:-0}"
     if (( lowest < !{params.chimera_minsize} )) ; then
         lowest=!{params.chimera_minsize}
