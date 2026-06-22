@@ -1,4 +1,4 @@
-include { publish_dir } from '../functions.nf'
+include { log_dir } from '../functions.nf'
 
 
 process cleaving {
@@ -15,8 +15,9 @@ process cleaving {
     //
     // [S59]: only the log reaches the results folder; the .stats2 /
     // .swarms2 / _representatives.fas2 cleaver outputs are internal
-    // intermediates consumed by build_occurrence_table.
-    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
+    // intermediates consumed by build_occurrence_table. [D15]: logs go
+    // to logs/occurrence_table/.
+    publishDir path: { log_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     path global_stats        // <basename>_<sfx>.stats

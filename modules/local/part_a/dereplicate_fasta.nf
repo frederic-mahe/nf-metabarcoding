@@ -1,9 +1,11 @@
-include { publish_dir } from '../functions.nf'
+include { publish_dir; log_dir } from '../functions.nf'
 
 
 process dereplicate_fasta {
     // dereplicate and discard expected error values (ee)
-    publishDir path: { publish_dir('per_sample') }, mode: params.publish_mode
+    // [D15]: data (.fas) to per_sample/, log to logs/per_sample/.
+    publishDir path: { publish_dir('per_sample') }, mode: params.publish_mode, pattern: "*.fas"
+    publishDir path: { log_dir('per_sample') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     tuple val(sampleId), path(filtered_fasta)

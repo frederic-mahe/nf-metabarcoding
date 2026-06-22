@@ -1,4 +1,4 @@
-include { publish_dir } from '../functions.nf'
+include { log_dir } from '../functions.nf'
 
 
 process global_dereplication {
@@ -9,8 +9,9 @@ process global_dereplication {
     // ([S45]).
     //
     // [S59]: only the log reaches the results folder; the
-    // dereplicated .fas is an internal intermediate.
-    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
+    // dereplicated .fas is an internal intermediate. [D15]: logs go to
+    // the parallel logs/occurrence_table/ tree.
+    publishDir path: { log_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     path fastas

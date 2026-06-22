@@ -1,4 +1,4 @@
-include { publish_dir } from '../functions.nf'
+include { log_dir } from '../functions.nf'
 
 
 process global_clustering {
@@ -11,8 +11,8 @@ process global_clustering {
     //
     // [S59]: only the log reaches the results folder; the
     // .swarms / .stats / .struct / _representatives.fas are
-    // internal intermediates.
-    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
+    // internal intermediates. [D15]: logs go to logs/occurrence_table/.
+    publishDir path: { log_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     path global_fasta

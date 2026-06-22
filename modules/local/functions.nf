@@ -124,6 +124,15 @@ def publish_dir(part) {
 }
 
 
+def log_dir(part) {
+    // [S71]/D15: publishDir target for step logs, grouped under a
+    // parallel logs/ tree that mirrors publish_dir()'s subdirectory
+    // names ('per_sample' / 'occurrence_table'). Data files keep
+    // publish_dir(); logs go here so the two never interleave.
+    return "${resolve_outdir()}/logs/${part}"
+}
+
+
 def hash_relabel_flag() {
     // [S65]: the vsearch relabel flag matching params.hash_function,
     // threaded into filter_and_convert_to_fasta as an explicit input.

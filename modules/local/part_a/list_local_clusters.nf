@@ -1,4 +1,4 @@
-include { publish_dir } from '../functions.nf'
+include { publish_dir; log_dir } from '../functions.nf'
 
 
 // refactoring:
@@ -9,7 +9,9 @@ include { publish_dir } from '../functions.nf'
 process list_local_clusters {
     // retain only clusters with more than 2 reads
     // (do not use the fastidious option here)
-    publishDir path: { publish_dir('per_sample') }, mode: params.publish_mode
+    // [D15]: data (.stats) to per_sample/, log to logs/per_sample/.
+    publishDir path: { publish_dir('per_sample') }, mode: params.publish_mode, pattern: "*.stats"
+    publishDir path: { log_dir('per_sample') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     tuple val(sampleId), path(dereplicated_fasta)

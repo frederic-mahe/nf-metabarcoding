@@ -1,4 +1,4 @@
-include { publish_dir } from '../functions.nf'
+include { publish_dir; log_dir } from '../functions.nf'
 
 
 process assign_taxonomy_sintax {
@@ -20,7 +20,10 @@ process assign_taxonomy_sintax {
     // params.taxonomy_method == 'sintax' ([S61]); the published
     // filename embeds `basename`, which carries the `_notmerged` token
     // on the shadow path.
-    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode
+    // [D15]: data (.tsv) to occurrence_table/, log to
+    // logs/occurrence_table/.
+    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.tsv"
+    publishDir path: { log_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     path representatives
