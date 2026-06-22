@@ -27,11 +27,19 @@ process trim_primers {
 
     MIN_F=$(( !{params.forward_primer.length()} * 2 / 3 ))  # match is >= 2/3 of primer length
     MIN_R=$(( !{params.reverse_primer.length()} * 2 / 3 ))
+    # The two passes run concurrently through the pipe, so naming
+    # task.cpus on each would request twice the reservation. Split the
+    # budget instead: the forward pass searches both orientations
+    # (--revcomp), roughly double the reverse pass' matching work, so it
+    # gets ~2/3 of the cores. Both are floored at 1 (cutadapt treats
+    # --cores=0 as "use every core on the machine").
+    readonly FWD_CORES=$(( !{task.cpus} > 2 ? !{task.cpus} * 2 / 3 : 1 ))
+    readonly REV_CORES=$(( !{task.cpus} - FWD_CORES > 0 ? !{task.cpus} - FWD_CORES : 1 ))
     # Two cutadapt passes (forward primer, then reverse primer) piped
     # together. Each pass writes its own report so the per-primer
     # trimming statistics stay separable ([S19]).
     cutadapt \
-        --cores=!{task.cpus} \
+        --cores="${FWD_CORES}" \
         --error-rate "${ERROR_RATE}" \
         --revcomp \
         --rename="{id}" \
@@ -40,7 +48,7 @@ process trim_primers {
         --discard-untrimmed \
         !{merged_fastq} 2> !{sampleId}_trimming_forward.log | \
         cutadapt \
-            --cores=!{task.cpus} \
+            --cores="${REV_CORES}" \
             --error-rate "${ERROR_RATE}" \
             --adapter "${reverse_primer_revcomp}" \
             --overlap "${MIN_R}" \
