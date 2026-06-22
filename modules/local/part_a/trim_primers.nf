@@ -6,7 +6,7 @@ process trim_primers {
     // are in the same orientation. Matching leftmost is the default.
     // Length and N-count filtering are delegated to
     // filter_and_convert_to_fasta (vsearch --fastq_minlen / --fastq_maxns).
-    publishDir path: { log_dir('per_sample') }, mode: params.publish_mode, pattern: "*.log"
+    publishDir path: { log_dir('part_a/per_sample') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     tuple val(sampleId), path(merged_fastq)

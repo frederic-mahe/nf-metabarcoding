@@ -5,7 +5,7 @@ process merge_fastq_pairs {
     // --fastqout_notmerged_fwd/_rev capture reads that fail to merge;
     // they feed the shadow Part A pipeline ([S04]). Fwd and rev are
     // kept in sync by vsearch.
-    publishDir path: { log_dir('per_sample') }, mode: params.publish_mode, pattern: "*.log"
+    publishDir path: { log_dir('part_a/per_sample') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     tuple val(sampleId), path(fastq_pair)

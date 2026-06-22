@@ -9,8 +9,8 @@ process run_mumu {
     // [S45]: the mumu --log output is the canonical post-clustering
     // curation log. The intermediate _raw_mumu.table is **not**
     // published ([S46]); the publishDir pattern keeps the log only.
-    // [D15]: logs go to logs/occurrence_table/.
-    publishDir path: { log_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
+    // [D16]: logs go to logs/part_b/.
+    publishDir path: { log_dir('part_b') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     path reduced_table

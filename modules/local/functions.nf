@@ -125,9 +125,10 @@ def publish_dir(part) {
 
 
 def log_dir(part) {
-    // [S71]/D15: publishDir target for step logs, grouped under a
-    // parallel logs/ tree that mirrors publish_dir()'s subdirectory
-    // names ('per_sample' / 'occurrence_table'). Data files keep
+    // [S71]/D16: publishDir target for step logs, grouped under a
+    // dedicated logs/ tree organised by the producing pipeline stage
+    // ('part_a/per_sample' / 'part_a' / 'part_b' / 'part_c' — D16
+    // superseded D15's data-mirroring layout). Data files keep
     // publish_dir(); logs go here so the two never interleave.
     return "${resolve_outdir()}/logs/${part}"
 }

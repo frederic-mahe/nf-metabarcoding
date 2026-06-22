@@ -98,8 +98,8 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
   - shadow-pipeline sample IDs are `<sampleId>_notmerged`; published
     artefacts are `<sampleId>_notmerged.{fas,qual,stats}` (data, under
     `<outdir>/per_sample/`) plus the per-step logs from the stages that
-    actually run in the shadow path (under `<outdir>/logs/per_sample/`,
-    [S71]/D15): `<sampleId>_notmerged_trimming_forward.log` and
+    actually run in the shadow path (under `<outdir>/logs/part_a/per_sample/`,
+    [S71]/D16): `<sampleId>_notmerged_trimming_forward.log` and
     `<sampleId>_notmerged_trimming_reverse.log` (the two cutadapt
     passes, see `[S19]`), `<sampleId>_notmerged_dereplicating.log`,
     and `<sampleId>_notmerged_clustering.log`. No
@@ -112,7 +112,7 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
     `params.join_padding_length` `A`s (default 8), no shadow output
     sequence line contains `N`, the trimming / dereplicating /
     clustering shadow logs are present and non-empty in
-    `<outdir>/logs/per_sample/`, and no
+    `<outdir>/logs/part_a/per_sample/`, and no
     `<sampleId>_notmerged_merging.log` exists. Running the same fixture
     **without** `--recover_unmerged` (the default) produces no
     `_notmerged` artefacts and runs no `join_notmerged` / `strip_reads`
@@ -377,10 +377,10 @@ the latter case.
 - `[S19]` every Part A per-sample artefact is published under
   `<outdir>` ([S71]; `--fastq_folder` is input-only). Data files go to
   `<outdir>/per_sample/`; the per-step logs go to the parallel
-  `<outdir>/logs/per_sample/` (D15):
+  `<outdir>/logs/part_a/per_sample/` (D16):
     - data files (`<outdir>/per_sample/`): `<sampleId>.fas`,
       `<sampleId>.qual`, `<sampleId>.stats`
-    - per-step log files (`<outdir>/logs/per_sample/`):
+    - per-step log files (`<outdir>/logs/part_a/per_sample/`):
         - merging       → `<sampleId>_merging.log` (regular path
           only — the shadow path has no merging step, see `[S04]`)
         - trimming      → `<sampleId>_trimming_forward.log` and
@@ -393,7 +393,7 @@ the latter case.
         - clustering    → `<sampleId>_clustering.log`
   - **Pass when:** running Part A on any sample produces all three
     data files under `<outdir>/per_sample/` and all five log files
-    under `<outdir>/logs/per_sample/`, each non-empty (three logs when
+    under `<outdir>/logs/part_a/per_sample/`, each non-empty (three logs when
     `--no_trimming` is set: no `_trimming_forward.log` /
     `_trimming_reverse.log`); no `*.log` is left in
     `<outdir>/per_sample/`.
@@ -725,7 +725,7 @@ the latter case.
     the join (size=0 → 1 hotfix is the bash wrapper's
     responsibility).
 - `[S45]` Part B publishes one step-level log file per major step into
-  `<outdir>/logs/occurrence_table/` ([S71]/D15),
+  `<outdir>/logs/part_b/` ([S71]/D16),
   named with the project-wide basename `<project>_<N>_samples`
   (the same construct as the final occurrence table, see `[S46]`)
   and a step suffix. The six step logs are:
@@ -750,7 +750,7 @@ the latter case.
       `--log` output (`[S43]`)
   - **Pass when:** running Part B on the documented fixture
     publishes the six step logs above into
-    `<outdir>/logs/occurrence_table/` ([S71]/D15); each file is
+    `<outdir>/logs/part_b/` ([S71]/D16); each file is
     non-empty; none of them appears in `<outdir>/occurrence_table/`.
 - `[S46]` Part B publishes its final occurrence table as
   `<project>_<N>_samples_table.tsv` (after `rebuild_post_mumu_table`
@@ -1019,7 +1019,8 @@ from placeholder values to real taxonomic assignments.
     error mentioning `publish_mode`.
 - `[S59]` `<outdir>/occurrence_table/` ([S71]) holds a closed
   whitelist of **data** artefacts per regular / shadow run (the step
-  logs moved to `<outdir>/logs/occurrence_table/` — D15):
+  logs moved to `<outdir>/logs/part_b/` and `<outdir>/logs/part_c/` —
+  D15/D16):
     1. exactly one occurrence table: `<basename>_table.tsv` (from
        [S46]);
     2. exactly one FASTA: the post-mumu
@@ -1027,8 +1028,8 @@ from placeholder values to real taxonomic assignments.
        (column 10 of the final table, header
        `>amplicon;size=total;`).
   The directory contains **no** `*.log`: the six canonical `[S45]` step
-  logs and Part C's `_taxonomy.log` are published to
-  `<outdir>/logs/occurrence_table/` instead (D15).
+  logs are published to `<outdir>/logs/part_b/` and Part C's
+  `_taxonomy.log` to `<outdir>/logs/part_c/` instead (D16).
   When Part C runs, its `<basename>_table_assigned.tsv` ([S51]) and
   `<basename>_table_assigned_majority.tsv` ([S66]) are published into
   the same directory (they are not Part B intermediates and are not
@@ -1053,7 +1054,7 @@ from placeholder values to real taxonomic assignments.
     `{<basename>_table.tsv, <basename>_table.fas}` (plus the same set
     with `_notmerged` if the shadow path fired) and contains no `*.log`;
     the six `[S45]` step logs appear under
-    `<outdir>/logs/occurrence_table/` instead; none of the blacklisted
+    `<outdir>/logs/part_b/` instead; none of the blacklisted
     intermediate filenames appear; `software_versions.yml` is in
     `<outdir>/pipeline_info/`, not `occurrence_table/`.
 - `[S60]` Path-typed parameters are normalised at workflow startup so
@@ -1366,8 +1367,8 @@ from placeholder values to real taxonomic assignments.
     profile). An end-to-end `--input` (fastq profile) run with
     `--project_name` / `--results_folder` set drives Part A → Part B
     and publishes the Part B occurrence table to `occurrence_table/`
-    and the step logs to `logs/occurrence_table/` ([S46] / [S45] /
-    D15) under `--results_folder`, exactly like the equivalent
+    and the step logs to `logs/part_b/` ([S46] / [S45] /
+    D16) under `--results_folder`, exactly like the equivalent
     `--fastq_folder` run; setting `--input` together with
     `--fastq_folder` (or `--fasta_folder`) aborts at startup. Part A's
     per-sample artefacts ([S19]) publish under `<outdir>/per_sample/`
@@ -1380,7 +1381,8 @@ from placeholder values to real taxonomic assignments.
 - `[S71]` `--outdir <dir>` is the single root for every published
   artefact, in a fixed layout. **Data files and step logs are kept
   apart** (D15): data lands in the part subdirectory, logs land under a
-  parallel `<outdir>/logs/` tree that mirrors the same subdir names.
+  dedicated `<outdir>/logs/` tree organised by the producing pipeline
+  stage (D16 — superseding D15's data-mirroring sub-layout).
     - `<outdir>/per_sample/` — Part A's per-sample **data** files
       ([S19]): `<sample>.{fas,qual,stats}`.
     - `<outdir>/occurrence_table/` — Part B **data** ([S46] / [S59]:
@@ -1388,18 +1390,21 @@ from placeholder values to real taxonomic assignments.
       ([S51] / [S66]: `<basename>_table_assigned.tsv`,
       `<basename>_table_assigned_majority.tsv`), regular and
       `_notmerged` shadow siblings together.
-    - `<outdir>/logs/per_sample/` — Part A's per-step **logs** ([S19]):
-      `_merging` / `_trimming_forward` / `_trimming_reverse` /
+    - `<outdir>/logs/part_a/per_sample/` — Part A's per-step **logs**
+      ([S19]): `_merging` / `_trimming_forward` / `_trimming_reverse` /
       `_dereplicating` / `_clustering` (and their `_notmerged` shadow
       siblings, [S04]).
-    - `<outdir>/logs/occurrence_table/` — Part B's six step logs
-      ([S45]) and Part C's `_taxonomy.log`, regular and `_notmerged`
-      shadow siblings together.
+    - `<outdir>/logs/part_a/<basename>_read_counts.tsv` — the Part A
+      read-count summary ([S86]), a sibling of `per_sample/`.
+    - `<outdir>/logs/part_b/` — Part B's six step logs ([S45]), regular
+      and `_notmerged` shadow siblings together.
+    - `<outdir>/logs/part_c/` — Part C's `_taxonomy.log`, regular and
+      `_notmerged` shadow siblings together.
     - `<outdir>/pipeline_info/` — `software_versions.yml` ([S68]); a
       sibling of `occurrence_table/`, **not** inside it. Nextflow's own
       execution reports (timeline / report / trace / dag) also live
-      here; they are not step logs and are unaffected by the `logs/`
-      split.
+      here; they are not step logs and live outside the `logs/` tree.
+  Only stages that run produce a `logs/part_*` directory.
   Inputs are never written to. `publishDir` materialises the tree on
   first publish (D08). Two sibling helpers resolve each process's
   target — `publish_dir('<subdir>')` → `<outdir>/<subdir>` for data and
@@ -1425,11 +1430,11 @@ from placeholder values to real taxonomic assignments.
     (`--outdir` > deprecated `--results_folder` > `results`) and `~`
     expansion. An end-to-end run (`--fastq_folder` or `--input`) with
     `--outdir <d>` publishes Part A data files under `<d>/per_sample/`
-    and Part A step logs under `<d>/logs/per_sample/`; the Part B table
+    and Part A step logs under `<d>/logs/part_a/per_sample/`; the Part B table
     and the Part C assigned table under `<d>/occurrence_table/`, with
-    the Part B six step logs and the Part C `_taxonomy.log` under
-    `<d>/logs/occurrence_table/`; and `software_versions.yml` under
-    `<d>/pipeline_info/`; nothing is written to the input folder;
+    the Part B six step logs under `<d>/logs/part_b/` and the Part C
+    `_taxonomy.log` under `<d>/logs/part_c/`; and `software_versions.yml`
+    under `<d>/pipeline_info/`; nothing is written to the input folder;
     `<d>/occurrence_table/` matches the `[S59]` whitelist and contains
     no `*.log`; `--results_folder <d>` (no `--outdir`) routes to the
     same layout with a deprecation warning.
@@ -1438,10 +1443,10 @@ from placeholder values to real taxonomic assignments.
   location as `params.fastq_folder` / `--results_folder` now resolves
   to this `[S71]` layout — Part A data files under
   `<outdir>/per_sample/`, Part B / Part C tables under
-  `<outdir>/occurrence_table/`, all step logs under the parallel
-  `<outdir>/logs/<subdir>/` tree (D15), `software_versions.yml` under
-  `<outdir>/pipeline_info/` — with `--results_folder` the deprecated
-  alias for `--outdir`.
+  `<outdir>/occurrence_table/`, all step logs under the stage-organised
+  `<outdir>/logs/part_{a,b,c}/` tree (D15/D16), `software_versions.yml`
+  under `<outdir>/pipeline_info/` — with `--results_folder` the
+  deprecated alias for `--outdir`.
 - `[S72]` numeric parameters are range-validated at workflow startup,
   before any process is wired, so an out-of-range value aborts
   immediately with a message naming the parameter rather than surfacing
@@ -1731,7 +1736,7 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
 - `[S86]` whenever Part A runs (fastq input — end-to-end **or** Part
   A-only; not the fasta-input Part B/C standalone paths), the pipeline
   publishes a per-sample read-count summary table to
-  `<outdir>/logs/occurrence_table/<basename>_read_counts.tsv`. The
+  `<outdir>/logs/part_a/<basename>_read_counts.tsv`. The
   basename is the Part B construct `<project>_<N>_samples` when
   `--project_name` is set, otherwise `<N>_samples`, where `N` is the
   number of regular (non-`_notmerged`) samples. The table is a port of
@@ -1758,6 +1763,6 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
   - **Pass when:** a unit test of `bin/build_read_counts.sh` on staged
     fixture logs reproduces the header, the per-sample rows (zeros for
     absent logs/lines), and the `Total` row; and an end-to-end fastq run
-    publishes `<outdir>/logs/occurrence_table/<basename>_read_counts.tsv`
+    publishes `<outdir>/logs/part_a/<basename>_read_counts.tsv`
     with the expected sample rows and column sums, while a fasta-input
     Part B standalone run publishes no such file.

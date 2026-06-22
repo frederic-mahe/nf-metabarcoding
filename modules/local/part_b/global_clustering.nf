@@ -11,8 +11,8 @@ process global_clustering {
     //
     // [S59]: only the log reaches the results folder; the
     // .swarms / .stats / .struct / _representatives.fas are
-    // internal intermediates. [D15]: logs go to logs/occurrence_table/.
-    publishDir path: { log_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
+    // internal intermediates. [D16]: logs go to logs/part_b/.
+    publishDir path: { log_dir('part_b') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     path global_fasta

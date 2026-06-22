@@ -12,9 +12,9 @@ process merge_substring_otus {
     // [S45]: cat the upstream vsearch search.log with the merge
     // step's stderr to produce the combined
     // <basename>_superstring_clustering.log. The merged OTU table
-    // itself is **not** published ([S46]). [D15]: logs go to
-    // logs/occurrence_table/.
-    publishDir path: { log_dir('occurrence_table') }, mode: params.publish_mode,
+    // itself is **not** published ([S46]). [D16]: logs go to
+    // logs/part_b/.
+    publishDir path: { log_dir('part_b') }, mode: params.publish_mode,
         pattern: "*_superstring_clustering.log"
 
     input:

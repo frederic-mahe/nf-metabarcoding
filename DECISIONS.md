@@ -825,7 +825,11 @@ air-gapped sites use `-profile modules`.
 **Blocks:** no new `[Sxx]` (refines the existing layout authority `[S71]`)
 **Revises on resolution:** `[S19]`, `[S04]`, `[S45]`, `[S59]`, `[S71]`, and
 Part C's `_taxonomy.log` publish location (`[S61]`/`[S50]` sintax path)
-**Status:** `resolved` — **option 2 selected (2026-06-22); spec + code in this commit series**
+**Status:** `superseded by [D16]` — the dedicated `logs/` tree stands, but
+its internal `per_sample` / `occurrence_table` (data-mirroring) sub-layout
+was replaced by the stage-based `part_a` / `part_b` / `part_c` layout
+(2026-06-22, before any release). Originally: `resolved` — option 2
+selected (2026-06-22).
 
 `[S71]` routes every published artefact under `<outdir>`, but the
 per-step **log** files sit interleaved with the data files they
@@ -869,3 +873,50 @@ Consequences for the spec:
   Part C assigned tables); a complementary guarantee is that
   `<outdir>/occurrence_table/` contains **no** `*.log`.
 - Part C's `_taxonomy.log` moves to `<outdir>/logs/occurrence_table/`.
+
+
+## D16 — Organise `<outdir>/logs/` by pipeline stage, not by data directory
+
+**Blocks:** no new `[Sxx]` (refines `[S71]`; supersedes [D15]'s sub-layout)
+**Revises on resolution:** `[S19]`, `[S04]`, `[S45]`, `[S59]`, `[S71]`,
+`[S86]`, and Part C's `_taxonomy.log` location
+**Status:** `resolved` — option 2 selected (2026-06-22); spec + code in
+this commit series
+
+[D15] created the dedicated `<outdir>/logs/` tree but named its
+sub-directories after the **data** directories they mirror —
+`logs/per_sample/` (Part A) and `logs/occurrence_table/` (Part B + Part
+C). That mirroring has three frictions: `logs/occurrence_table/` holds
+no occurrence table and commingles Part B with Part C; the `[S86]`
+read-count summary — a Part A artefact — was published into
+`logs/occurrence_table/`, so a Part A-only run created an
+`occurrence_table` log directory with no occurrence table; and there is
+no single place to see "everything one stage did".
+
+**Question:** keep the data-mirroring sub-layout ([D15]) or regroup the
+logs by the pipeline stage that produced them?
+
+1. **Status quo ([D15]).** `logs/per_sample/` + `logs/occurrence_table/`.
+2. **Stage-based layout (recommended).** Regroup as:
+   - `logs/part_a/per_sample/` — Part A per-sample step logs ([S19],
+     including `_notmerged` shadow siblings [S04]);
+   - `logs/part_a/<basename>_read_counts.tsv` — the Part A-wide
+     read-count summary ([S86]), a sibling of `per_sample/` (it is
+     project-wide, not per-sample);
+   - `logs/part_b/` — Part B's six step logs ([S45]);
+   - `logs/part_c/` — Part C's `_taxonomy.log`.
+   Only stages that actually run produce a directory, so the tree is
+   truthful about what executed.
+3. **Flat `logs/`** with stage-prefixed filenames. Rejected — loses the
+   per-sample grouping and reads worse than sub-directories.
+
+**Resolution:** option 2, snake_case (`part_a` / `part_b` / `part_c`) to
+match the repository's `modules/local/part_*` filesystem convention.
+
+Trade-off accepted: the logs tree no longer mirrors the **data** tree
+(`per_sample/`, `occurrence_table/` are unchanged — renaming those is
+`[S71]`'s much larger blast radius and out of scope), so finding a
+result's build log now goes by stage (table → Part B → `logs/part_b/`)
+rather than by matching leaf name. The data-dir/log-dir asymmetry is the
+price of the more honest, stage-centric grouping. Done now, before any
+release, so no published output path is broken twice.

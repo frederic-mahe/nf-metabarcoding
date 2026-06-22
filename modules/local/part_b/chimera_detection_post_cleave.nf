@@ -17,8 +17,8 @@ process chimera_detection_post_cleave {
     //
     // [S59]: only the log reaches the results folder; the .uchime2
     // hit table is an internal intermediate consumed by
-    // build_occurrence_table. [D15]: logs go to logs/occurrence_table/.
-    publishDir path: { log_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
+    // build_occurrence_table. [D16]: logs go to logs/part_b/.
+    publishDir path: { log_dir('part_b') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     path representatives           // pre-cleave: <basename>_1f_representatives.fas

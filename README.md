@@ -117,12 +117,14 @@ fixed layout:
 ├── per_sample/         per-sample data: .fas / .qual / .stats (Part A)
 ├── occurrence_table/   the occurrence table(s) and the
 │                       taxonomy-annotated tables (Part B + Part C)
-├── logs/               every per-step log, grouped away from the data:
-│   ├── per_sample/         Part A step logs (merging / trimming /
-│   │                       dereplicating / clustering)
-│   └── occurrence_table/   Part B step logs + Part C taxonomy log,
-│                           plus <basename>_read_counts.tsv — the
-│                           per-sample read-tracking summary (fastq runs)
+├── logs/               every per-step log, grouped by pipeline stage:
+│   ├── part_a/
+│   │   ├── per_sample/         Part A step logs (merging / trimming /
+│   │   │                       dereplicating / clustering)
+│   │   └── <basename>_read_counts.tsv  per-sample read-tracking
+│   │                           summary (fastq runs)
+│   ├── part_b/             Part B step logs
+│   └── part_c/             Part C taxonomy log
 └── pipeline_info/      software_versions.yml (tool versions) +
                         execution_{report,timeline}.html,
                         execution_trace.txt, pipeline_dag.html
@@ -146,9 +148,11 @@ read-only.
 > `occurrence_table/` sub-directory rather than at the top level — update
 > any scripts that read `<results_folder>/*.tsv` to
 > `<outdir>/occurrence_table/*.tsv`. Per-step `*.log` files also moved
-> out of the data directories into the parallel `<outdir>/logs/` tree
-> (`logs/per_sample/`, `logs/occurrence_table/`) — update any scripts
-> that read logs from `per_sample/` or `occurrence_table/`.
+> out of the data directories into a dedicated `<outdir>/logs/` tree
+> grouped by pipeline stage (`logs/part_a/per_sample/`, `logs/part_b/`,
+> `logs/part_c/`), and the read-count summary is published to
+> `logs/part_a/<basename>_read_counts.tsv` — update any scripts that
+> read logs from `per_sample/` or `occurrence_table/`.
 
 ### Input discovery
 

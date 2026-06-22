@@ -23,8 +23,8 @@ process assign_taxonomy_sintax {
     // [S59]: the raw <basename>_taxonomy_sintax.tsv is an intermediate
     // consumed by update_occurrence_table (mirroring the stampa path's
     // unpublished chunks) — it stays in the work dir, only the log is
-    // published ([D15]: under logs/occurrence_table/).
-    publishDir path: { log_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
+    // published ([D16]: under logs/part_c/).
+    publishDir path: { log_dir('part_c') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
     path representatives
