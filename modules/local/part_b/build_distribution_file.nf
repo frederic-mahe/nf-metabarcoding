@@ -31,4 +31,9 @@ process build_distribution_file {
             >> !{basename}.distr || true
     done
     '''
+
+    stub:
+    """
+    touch ${basename}.distr
+    """
 }

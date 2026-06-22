@@ -19,4 +19,9 @@ process extract_otu_fasta {
     awk 'NR > 1 {printf ">"$4";size="$2";\\n"$10"\\n"}' !{table} \
         > !{table.baseName}.fas
     '''
+
+    stub:
+    """
+    touch ${table.baseName}.fas
+    """
 }

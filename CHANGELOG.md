@@ -11,6 +11,13 @@ version here must match `manifest.version` in
 
 ### Added
 
+- Stub blocks on every tool-invoking process (`[S85]`): the whole
+  Part A→B→C pipeline now runs under `nextflow run -profile demo
+  -stub-run` with none of vsearch / swarm / cutadapt / mumu installed,
+  producing placeholder outputs in seconds. Validates the channel
+  topology without tools or real data — a fast topology-CI job and an
+  onboarding smoke check. The input-discovery / samplesheet processes are
+  exempt (pure-Python glue that bootstraps the sample channel).
 - Nextflow execution reports (`[S84]`): every run now writes
   `execution_timeline.html`, `execution_report.html`,
   `execution_trace.txt`, and `pipeline_dag.html` to

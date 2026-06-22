@@ -22,4 +22,9 @@ process extract_expected_error_values {
         sort --key=3,3n --key=1,1d --key=2,2n | \
         uniq --check-chars=${length_of_sequence_IDs} > !{sampleId}.qual
     '''
+
+    stub:
+    """
+    touch ${sampleId}.qual
+    """
 }

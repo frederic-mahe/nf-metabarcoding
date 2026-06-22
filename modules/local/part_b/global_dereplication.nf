@@ -34,4 +34,9 @@ process global_dereplication {
             --log !{basename}_dereplication.log \
             --fastaout !{basename}.fas
     '''
+
+    stub:
+    """
+    touch ${basename}.fas ${basename}_dereplication.log
+    """
 }

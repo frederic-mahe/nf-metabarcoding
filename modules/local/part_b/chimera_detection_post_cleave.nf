@@ -68,4 +68,9 @@ process chimera_detection_post_cleave {
         cat chimera_detection_post_cleave.log
     } > !{basename}_chimera_detection.log
     '''
+
+    stub:
+    """
+    touch ${basename}_1f_representatives.uchime2 ${basename}_chimera_detection.log
+    """
 }

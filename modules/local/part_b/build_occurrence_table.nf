@@ -50,4 +50,9 @@ process build_occurrence_table {
         --samples         '!{sample_ids}' \
         > !{basename}.OTU.filtered.cleaved.table
     '''
+
+    stub:
+    """
+    touch ${basename}.OTU.filtered.cleaved.table
+    """
 }

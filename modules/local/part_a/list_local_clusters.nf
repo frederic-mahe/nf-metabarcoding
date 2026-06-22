@@ -33,4 +33,9 @@ process list_local_clusters {
         !{dereplicated_fasta} | \
         filter_swarm_stats.awk > !{sampleId}.stats
     '''
+
+    stub:
+    """
+    touch ${sampleId}.stats ${sampleId}_clustering.log
+    """
 }

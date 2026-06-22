@@ -29,4 +29,9 @@ process strip_reads {
         --quiet \
         --fastqout stripped_rev
     '''
+
+    stub:
+    """
+    touch stripped_fwd stripped_rev
+    """
 }

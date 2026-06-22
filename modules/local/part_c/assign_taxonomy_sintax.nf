@@ -52,4 +52,9 @@ process assign_taxonomy_sintax {
              print amplicon, abundance, "0.0", taxonomy, "NA"
          }' raw_sintax.tsv > !{basename}_taxonomy_sintax.tsv
     '''
+
+    stub:
+    """
+    touch ${basename}_taxonomy_sintax.tsv ${basename}_taxonomy.log
+    """
 }

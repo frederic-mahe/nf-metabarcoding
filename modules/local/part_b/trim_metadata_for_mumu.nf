@@ -12,4 +12,9 @@ process trim_metadata_for_mumu {
     '''
     cut -f 4,14- !{table} > !{table.baseName}_reduced.table
     '''
+
+    stub:
+    """
+    touch ${table.baseName}_reduced.table
+    """
 }

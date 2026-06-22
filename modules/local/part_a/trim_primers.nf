@@ -47,4 +47,9 @@ process trim_primers {
             --discard-untrimmed \
             - > trimmed_fastq 2> !{sampleId}_trimming_reverse.log
     '''
+
+    stub:
+    """
+    touch trimmed_fastq ${sampleId}_trimming_forward.log ${sampleId}_trimming_reverse.log
+    """
 }

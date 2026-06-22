@@ -80,6 +80,8 @@ jobs:
         run: bash tests/check-offline-container.sh
       - name: Validate execution-report wiring
         run: bash tests/check-execution-reports.sh
+      - name: Validate stub-run topology (no tools installed)
+        run: bash tests/check-stub-run.sh
       - name: Validate demo profile wiring
         run: bash tests/check-demo-profile.sh
 

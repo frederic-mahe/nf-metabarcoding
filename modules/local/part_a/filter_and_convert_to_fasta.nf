@@ -30,4 +30,9 @@ process filter_and_convert_to_fasta {
         --fasta_width 0 \
         --fastaout - > filtered_fasta
     '''
+
+    stub:
+    """
+    touch filtered_fasta
+    """
 }

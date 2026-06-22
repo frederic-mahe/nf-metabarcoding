@@ -24,4 +24,9 @@ process dereplicate_fasta {
         --xlength \
         --fastaout - > !{sampleId}.fas
     '''
+
+    stub:
+    """
+    touch ${sampleId}.fas ${sampleId}_dereplicating.log
+    """
 }

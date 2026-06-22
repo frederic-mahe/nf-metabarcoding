@@ -26,4 +26,9 @@ process fake_taxonomic_assignment2 {
                 s/;?$/\t0.0\tNA\tNA/' \
         >> !{basename}_1f_representatives.results2 || true
     '''
+
+    stub:
+    """
+    touch ${basename}_1f_representatives.results2
+    """
 }

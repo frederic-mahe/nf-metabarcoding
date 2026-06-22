@@ -27,4 +27,9 @@ process dump_software_versions {
         printf 'python\\t%s\\n'   "\$(python3  --version 2>&1 | head -n 1)"
     } | collect_versions.py > software_versions.yml
     """
+
+    stub:
+    """
+    touch software_versions.yml
+    """
 }

@@ -33,4 +33,9 @@ process join_notmerged {
         --quiet \
         --fastqout joined_fastq
     '''
+
+    stub:
+    """
+    touch joined_fastq
+    """
 }

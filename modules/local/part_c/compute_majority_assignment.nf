@@ -28,4 +28,9 @@ process compute_majority_assignment {
         --reference_db !{reference_dataset} \
         > !{basename}_table_assigned_majority.tsv
     '''
+
+    stub:
+    """
+    touch ${basename}_table_assigned_majority.tsv
+    """
 }

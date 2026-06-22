@@ -28,4 +28,9 @@ process find_similar_sequences {
         --userout - | \
         sed -r 's/;size=[0-9]+;//g' > !{otu_fasta.baseName}.match_list
     '''
+
+    stub:
+    """
+    touch ${otu_fasta.baseName}.match_list
+    """
 }

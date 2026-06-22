@@ -14,4 +14,9 @@ process extract_fasta_sequences_from_occurrence_table {
     awk 'NR > 1 {printf ">"$4";size="$2";\\n"$10"\\n"}' !{occurrence_table} \
         > !{occurrence_table.baseName}_representatives.fas
     '''
+
+    stub:
+    """
+    touch ${occurrence_table.baseName}_representatives.fas
+    """
 }

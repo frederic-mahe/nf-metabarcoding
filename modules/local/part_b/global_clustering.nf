@@ -40,4 +40,9 @@ process global_clustering {
         --seeds ${basename}_${sfx}_representatives.fas \\
         ${global_fasta} 2> ${basename}_clustering.log
     """
+
+    stub:
+    """
+    touch ${basename}_${params.fastidious ? '1f' : '1'}.swarms ${basename}_${params.fastidious ? '1f' : '1'}.stats ${basename}_${params.fastidious ? '1f' : '1'}.struct ${basename}_${params.fastidious ? '1f' : '1'}_representatives.fas ${basename}_clustering.log
+    """
 }

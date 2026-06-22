@@ -30,4 +30,9 @@ process run_mumu {
         --new_otu_table ${new_table} \\
         --log ${basename}_post_clustering_curation.log
     """
+
+    stub:
+    """
+    touch ${reduced_table.baseName.replaceFirst(/_reduced$/, '_raw_mumu')}.table ${basename}_post_clustering_curation.log
+    """
 }

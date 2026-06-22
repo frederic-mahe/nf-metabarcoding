@@ -34,4 +34,9 @@ process chimera_detection {
         --uchimeout !{basename}_1f_representatives.uchime \
         2> !{basename}_1f_representatives.log
     '''
+
+    stub:
+    """
+    touch ${basename}_1f_representatives.uchime ${basename}_1f_representatives.log
+    """
 }

@@ -21,4 +21,9 @@ process list_all_cluster_seeds_of_size_greater_than_2 {
         awk -v s="${sample}" 'BEGIN {OFS = "\t"} {print s, $0}' "${f}"
     done > !{basename}_per_sample_OTUs.stats
     '''
+
+    stub:
+    """
+    touch ${basename}_per_sample_OTUs.stats
+    """
 }

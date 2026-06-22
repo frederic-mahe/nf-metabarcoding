@@ -45,4 +45,9 @@ process cleaving {
         ${fastidious_flag} \\
         2> ${basename}_cleaving.log
     """
+
+    stub:
+    """
+    touch ${basename}_${params.fastidious ? '1f' : '1'}.stats2 ${basename}_${params.fastidious ? '1f' : '1'}.swarms2 ${basename}_${params.fastidious ? '1f' : '1'}_representatives.fas2 ${basename}_cleaving.log
+    """
 }

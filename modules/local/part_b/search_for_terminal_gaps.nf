@@ -34,4 +34,9 @@ process search_for_terminal_gaps {
             --uc - | \
         grep "^H" > !{otu_table.baseName}.uc || true
     '''
+
+    stub:
+    """
+    touch ${otu_table.baseName}.uc search.log
+    """
 }

@@ -28,4 +28,9 @@ process rebuild_post_mumu_table {
         awk 'BEGIN {FS = OFS = "\\t"} {if (\$2 == 0) {\$2 = 1} ; print \$0}' \\
         > ${basename}_table.tsv
     """
+
+    stub:
+    """
+    touch ${basename}_table.tsv
+    """
 }

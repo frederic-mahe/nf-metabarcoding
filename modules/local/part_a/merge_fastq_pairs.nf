@@ -31,4 +31,9 @@ process merge_fastq_pairs {
         --fastqout_notmerged_fwd notmerged_fwd \
         --fastqout_notmerged_rev notmerged_rev
     '''
+
+    stub:
+    """
+    touch merged_fastq notmerged_fwd notmerged_rev ${sampleId}_merging.log
+    """
 }

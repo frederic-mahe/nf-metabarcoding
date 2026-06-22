@@ -390,6 +390,15 @@ nf-test test tests/processes/part_a/merge_fastq_pairs.nf.test
 bash tests/coverage-gate.sh
 ```
 
+To validate the whole Part A→B→C **wiring** without installing any tool
+or staging real data — handy as a first check on a new machine/cluster —
+run the pipeline in stub mode (`[S85]`); every process ships a `stub:`
+that produces placeholder outputs:
+
+```bash
+nextflow run main.nf -profile demo -stub-run   # seconds, no vsearch/swarm/cutadapt/mumu
+```
+
 See [`tests/README.md`](tests/README.md) for the TDD workflow and the
 pending-test convention.
 

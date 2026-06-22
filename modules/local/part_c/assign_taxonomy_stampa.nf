@@ -38,4 +38,9 @@ process assign_taxonomy_stampa {
 
     stampa_merge.py hits > stampa_chunk.tsv
     '''
+
+    stub:
+    """
+    touch stampa_chunk.tsv
+    """
 }

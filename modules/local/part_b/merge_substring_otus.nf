@@ -63,4 +63,9 @@ process merge_substring_otus {
     } 2> "${merge_stderr}"
     cat "${merge_stderr}" >> "${log}"
     '''
+
+    stub:
+    """
+    touch ${otu_table.baseName}.nosubstringOTUs.table ${basename}_superstring_clustering.log
+    """
 }

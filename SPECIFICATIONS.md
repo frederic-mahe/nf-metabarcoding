@@ -1684,3 +1684,23 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
     `peak_rss` / `peak_vmem`. Report *generation* itself (and following a
     run-time `--outdir`) is upstream Nextflow behaviour, exercised by the
     demo / cluster smoke runs, not unit-tested ([S00]).
+- `[S85]` every process that invokes an external tool (or consumes one's
+  output) declares a Nextflow `stub:` block that produces its declared
+  outputs, so the whole pipeline runs under `nextflow run -stub-run` with
+  none of vsearch / swarm / cutadapt / mumu installed. This validates the
+  Part A→B→C channel topology (the `.join`s, the regular/shadow branch,
+  the stampa scatter/gather) in seconds without tools or real data — the
+  fast topology-CI / onboarding smoke check. The three
+  input-discovery / samplesheet-validation processes (`discover_inputs`,
+  `discover_part_b_fasta`, `validate_samplesheet`) are **exempt**: they
+  are pure stdlib-Python glue that must run for real to bootstrap the
+  per-sample channel from the filesystem and invoke no bioinformatics
+  tool. The `stub:` block sits after the `script:` / `shell:` block (the
+  order the strict config parser requires).
+  - **Pass when:** a static gate confirms every non-exempt process
+    declares a `stub:`; and `nextflow run -profile demo -stub-run`, with
+    vsearch / swarm / cutadapt / mumu shadowed by stubs that exit
+    non-zero (so any fall-through to a real script fails), completes and
+    publishes the placeholder Part A/B/C artefacts (per-sample `.fas`,
+    the occurrence table, the `_table_assigned.tsv`, and
+    `software_versions.yml`).

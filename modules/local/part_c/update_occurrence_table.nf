@@ -23,4 +23,9 @@ process update_occurrence_table {
         --assignments !{assignments} \
         > !{basename}_table_assigned.tsv
     '''
+
+    stub:
+    """
+    touch ${basename}_table_assigned.tsv
+    """
 }
