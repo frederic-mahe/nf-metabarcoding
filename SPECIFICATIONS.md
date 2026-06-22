@@ -1032,7 +1032,12 @@ from placeholder values to real taxonomic assignments.
   When Part C runs, its `<basename>_table_assigned.tsv` ([S51]) and
   `<basename>_table_assigned_majority.tsv` ([S66]) are published into
   the same directory (they are not Part B intermediates and are not
-  covered by this whitelist). The run's `software_versions.yml`
+  covered by this whitelist). Part C's raw per-amplicon assignment
+  tables — `assign_taxonomy_sintax`'s `<basename>_taxonomy_sintax.tsv`
+  and the stampa path's chunk outputs — are **intermediates** consumed
+  by `update_occurrence_table` and stay in the work directory; only the
+  joined `_table_assigned.tsv` is published. The run's
+  `software_versions.yml`
   ([S68]) lives in the sibling `<outdir>/pipeline_info/`, **not** in
   `occurrence_table/`. All other Part B intermediates (`.qual`,
   `.distr`, `_per_sample_OTUs.stats`, the global dereplicated `.fas`,

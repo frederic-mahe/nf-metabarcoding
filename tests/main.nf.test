@@ -1754,6 +1754,15 @@ nextflow_pipeline {
             def lines = assigned.readLines()
             assert lines.size() == 2 :
                 "expected header + 1 row, got: ${lines}"
+            // [S59]/D15: the raw sintax assignments
+            // (<basename>_taxonomy_sintax.tsv) are an intermediate
+            // consumed by update_occurrence_table, not a deliverable —
+            // they stay in the work directory, mirroring the stampa
+            // path's unpublished chunks.
+            assert !file(
+                "${outputDir}/part_c_regular_sintax/occurrence_table/part_c_regular_sintax_table_taxonomy_sintax.tsv"
+            ).exists() :
+                "raw sintax assignments must not be published to occurrence_table/"
             // No _notmerged sibling was created → no shadow output.
             def shadow = file(
                 "${outputDir}/part_c_regular_sintax/occurrence_table/part_c_regular_sintax_notmerged_table_assigned.tsv"
@@ -1836,6 +1845,12 @@ nextflow_pipeline {
             // taxonomy field (col 12 of the occurrence table schema).
             assert fields[11].contains("d:Bacteria") :
                 "expected shadow taxonomy to carry sintax lineage, got: ${fields[11]}"
+            // [S59]/D15: the shadow path's raw sintax assignments are an
+            // intermediate and must not be published either.
+            assert !file(
+                "${outputDir}/part_c_shadow/occurrence_table/part_c_shadow_notmerged_table_taxonomy_sintax.tsv"
+            ).exists() :
+                "raw sintax assignments must not be published to occurrence_table/"
         }
     }
 

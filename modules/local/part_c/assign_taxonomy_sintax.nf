@@ -1,4 +1,4 @@
-include { publish_dir; log_dir } from '../functions.nf'
+include { log_dir } from '../functions.nf'
 
 
 process assign_taxonomy_sintax {
@@ -20,9 +20,10 @@ process assign_taxonomy_sintax {
     // params.taxonomy_method == 'sintax' ([S61]); the published
     // filename embeds `basename`, which carries the `_notmerged` token
     // on the shadow path.
-    // [D15]: data (.tsv) to occurrence_table/, log to
-    // logs/occurrence_table/.
-    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.tsv"
+    // [S59]: the raw <basename>_taxonomy_sintax.tsv is an intermediate
+    // consumed by update_occurrence_table (mirroring the stampa path's
+    // unpublished chunks) — it stays in the work dir, only the log is
+    // published ([D15]: under logs/occurrence_table/).
     publishDir path: { log_dir('occurrence_table') }, mode: params.publish_mode, pattern: "*.log"
 
     input:
