@@ -93,11 +93,19 @@ workflow part_A {
 
     // trim primers (skipped when --no_trimming is set)
     def trimmed_ch
+    def trim_fwd_log_ch
+    def trim_rev_log_ch
     if ( params.no_trimming ) {
         trimmed_ch = to_process
+        // no trimming logs in this mode — the read-count summary ([S86])
+        // records the F / R columns as 0.
+        trim_fwd_log_ch = Channel.empty()
+        trim_rev_log_ch = Channel.empty()
     } else {
         trim_primers(to_process)
         trimmed_ch = trim_primers.out.trimmed
+        trim_fwd_log_ch = trim_primers.out.log_forward
+        trim_rev_log_ch = trim_primers.out.log_reverse
     }
 
     // convert to fasta with the hash digest + ee ([S65]), apply
@@ -123,4 +131,11 @@ workflow part_A {
     fasta = dereplicate_fasta.out.fasta
     qual  = extract_expected_error_values.out.qual
     stats = list_local_clusters.out.stats
+    // per-step log streams feed the read-count summary ([S86]). These
+    // are bare path channels (filenames carry the sampleId and the
+    // _notmerged token); merge_fastq_pairs runs for every paired sample
+    // so merge_log is empty only when every sample is single-end.
+    merge_log    = merge_fastq_pairs.out.log
+    trim_fwd_log = trim_fwd_log_ch
+    trim_rev_log = trim_rev_log_ch
 }

@@ -54,6 +54,47 @@ nextflow_pipeline {
         }
     }
 
+    test("Part A-only run publishes a read-count summary to logs/occurrence_table") {
+        // COVERAGE: [S86]
+        // No --project_name → Part A-only. The summary still publishes,
+        // under the basename-less <N>_samples construct. The fixture
+        // folder mixes a clean paired sample (paired_merge_ok: 3 pairs
+        // all merged and trimmed), an empty sample, a single-end sample,
+        // and an unmergeable pair — exercising the zero-fill ([S86]).
+        tag "ci"
+        when {
+            params {
+                outdir         = "${outputDir}/a_readcounts"
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def logDir = file("${outputDir}/a_readcounts/logs/occurrence_table")
+            def tables = logDir.listFiles().findAll { it.name.endsWith("_read_counts.tsv") }
+            assert tables.size() == 1 :
+                "expected exactly one read-count summary, got: ${tables*.name}"
+            // [S86]: Part A-only basename has no project prefix.
+            assert tables[0].name ==~ /\d+_samples_read_counts\.tsv/ :
+                "unexpected read-count filename: ${tables[0].name}"
+            def rows = tables[0].readLines()
+            assert rows[0] == "samples\treads\tassembled\tF\tR\tpassing" :
+                "unexpected header: ${rows[0]}"
+            // a fully-populated paired sample carries its real counts ...
+            assert rows.any { it == "paired_merge_ok\t3\t3\t3\t3\t3" } :
+                "expected paired_merge_ok row 3/3/3/3/3, got: ${rows}"
+            // ... and an empty sample is all zeros, never blank.
+            assert rows.any { it == "empty\t0\t0\t0\t0\t0" } :
+                "expected empty sample row of zeros, got: ${rows}"
+            assert rows[-1].startsWith("Total\t") :
+                "last row should be the Total row, got: ${rows[-1]}"
+        }
+    }
+
     test("--help prints usage and exits without running any process") {
         // COVERAGE: [S57]
         tag "ci"
@@ -596,6 +637,13 @@ nextflow_pipeline {
             def resultDir = "${outputDir}/part_b_results/occurrence_table"
             assert file(resultDir).exists() : "results folder should be created"
 
+            // [S86]: this is a fasta-input Part B standalone run — Part A
+            // never runs, so there are no cutadapt/merging logs and no
+            // read-count summary is published.
+            assert file("${outputDir}/part_b_results/logs/occurrence_table")
+                .listFiles()*.name.findAll { it.endsWith("_read_counts.tsv") }.isEmpty() :
+                "Part B standalone must not publish a read-count summary"
+
             // [S09]/[S27]: 3 samples (S1, S2 with content + E empty);
             // S1_notmerged.fas is excluded. Project-wide artefacts use
             // the `<project>_<N>_samples` basename — N counts the
@@ -972,11 +1020,13 @@ nextflow_pipeline {
                 "Part B occurrence_table mismatch.\nexpected: ${expected.sort()}\nactual:   ${actual}"
 
             // [S45]/D15: the six step logs (regular + shadow) live under
-            // logs/occurrence_table/ and nowhere else.
+            // logs/occurrence_table/. [S86]: the read-count summary
+            // (regular basename, one per run) joins them there.
             def expectedLogs = []
             [regular, shadow].each { base ->
                 stepLogs.each { suffix -> expectedLogs << "${base}${suffix}" }
             }
+            expectedLogs << "${regular}_read_counts.tsv"
             def actualLogs = file(logDir).listFiles()*.name.toList().sort()
             assert actualLogs == expectedLogs.sort() :
                 "Part B logs/occurrence_table mismatch.\nexpected: ${expectedLogs.sort()}\nactual:   ${actualLogs}"

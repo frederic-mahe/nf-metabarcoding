@@ -1728,3 +1728,36 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
     publishes the placeholder Part A/B/C artefacts (per-sample `.fas`,
     the occurrence table, the `_table_assigned.tsv`, and
     `software_versions.yml`).
+- `[S86]` whenever Part A runs (fastq input — end-to-end **or** Part
+  A-only; not the fasta-input Part B/C standalone paths), the pipeline
+  publishes a per-sample read-count summary table to
+  `<outdir>/logs/occurrence_table/<basename>_read_counts.tsv`. The
+  basename is the Part B construct `<project>_<N>_samples` when
+  `--project_name` is set, otherwise `<N>_samples`, where `N` is the
+  number of regular (non-`_notmerged`) samples. The table is a port of
+  the legacy genotoul read-tracking summary: a tab-separated file whose
+  header is `samples	reads	assembled	F	R	passing`, one row per
+  regular sample, followed by a final `Total` row summing each numeric
+  column. The five counts per sample are extracted from that sample's
+  published Part A logs ([S19]):
+    - `reads`     — the `Pairs` count from `<sample>_merging.log`
+      (vsearch `--fastq_mergepairs`);
+    - `assembled` — the `Merged` count from `<sample>_merging.log`;
+    - `F`         — the `Reads with adapters` count from
+      `<sample>_trimming_forward.log` (cutadapt forward pass);
+    - `R`         — the `Reads with adapters` count from
+      `<sample>_trimming_reverse.log` (cutadapt reverse pass);
+    - `passing`   — the `Reads written (passing filters)` count from
+      `<sample>_trimming_reverse.log`.
+  A count whose source log is absent (single-end samples have no
+  `_merging.log`; `--no_trimming` runs have no trimming logs) or whose
+  source line is missing (cutadapt emits no summary for an empty sample)
+  is recorded as `0` — every cell is numeric, never blank. Thousands
+  separators in tool output are stripped. Shadow (`_notmerged`) samples
+  are excluded; rows are sorted by sample ID for determinism.
+  - **Pass when:** a unit test of `bin/build_read_counts.sh` on staged
+    fixture logs reproduces the header, the per-sample rows (zeros for
+    absent logs/lines), and the `Total` row; and an end-to-end fastq run
+    publishes `<outdir>/logs/occurrence_table/<basename>_read_counts.tsv`
+    with the expected sample rows and column sums, while a fasta-input
+    Part B standalone run publishes no such file.

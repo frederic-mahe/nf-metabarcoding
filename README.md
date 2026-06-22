@@ -120,7 +120,9 @@ fixed layout:
 ├── logs/               every per-step log, grouped away from the data:
 │   ├── per_sample/         Part A step logs (merging / trimming /
 │   │                       dereplicating / clustering)
-│   └── occurrence_table/   Part B step logs + Part C taxonomy log
+│   └── occurrence_table/   Part B step logs + Part C taxonomy log,
+│                           plus <basename>_read_counts.tsv — the
+│                           per-sample read-tracking summary (fastq runs)
 └── pipeline_info/      software_versions.yml (tool versions) +
                         execution_{report,timeline}.html,
                         execution_trace.txt, pipeline_dag.html
