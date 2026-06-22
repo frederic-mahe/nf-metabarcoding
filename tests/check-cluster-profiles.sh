@@ -46,7 +46,7 @@ assert_contains() {
 # Each cluster: profile name -> its resourceLimits memory ceiling (the
 # largest node, as Nextflow renders it in `-flat` output).
 declare -A CLUSTER_MEMORY=(
-    [abims]='750 GB'
+    [abims]='2 TB'
     [genotoul]='3.9 TB'
     [ifb_core]='2 TB'
     [meso]='3.7 TB'
@@ -77,6 +77,11 @@ for cluster in "${!CLUSTER_MEMORY[@]}"; do
     assert_contains "${cluster},${engine}: engine enabled" \
         "${engine}.enabled = true" "${cluster},${engine}"
 done
+
+# abims routes memory-heavy tasks to its bigmem partition (which has more
+# memory than fast/long), otherwise picks fast/long by wall-time.
+assert_contains "abims: bigmem memory routing" \
+    "task.memory > 1400.GB ? 'bigmem'" "abims"
 
 # genotoul loads its container engine from a module via beforeScript.
 assert_contains "genotoul: apptainer module beforeScript" \
