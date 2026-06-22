@@ -50,6 +50,7 @@ declare -A CLUSTER_MEMORY=(
     [genotoul]='3.4 TB'
     [ifb_core]='252 GB'
     [meso]='4 TB'
+    [saga]='2.9 TB'
 )
 
 for cluster in "${!CLUSTER_MEMORY[@]}"; do
