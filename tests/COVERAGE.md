@@ -24,7 +24,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S01]`| three-part workflow (fastq→fasta, fasta→occurrence, taxonomic assignment)  | `tests/main.nf.test`, `tests/bin/reverse_complement.bats` | done    | —          |
 | `[S02]`| each part can be run separately or all at once                             | `tests/main.nf.test`                            | done    | —          |
 | `[S03]`| paired-end or single-end, compressed (gz/bz2) or uncompressed input        | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/main.nf.test` | done | — |
-| `[S04]`| unmerged paired reads → shadow pipeline (A-padded join, no mask round-trip)| `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/join_notmerged.nf.test`, `tests/main.nf.test` | done   | —          |
+| `[S04]`| unmerged paired reads → shadow pipeline (A-padded join, no mask round-trip)| `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/join_notmerged.nf.test`, `tests/main.nf.test` | red    | D15        |
 | `[S05]`| unmerged clusters appear in occurrence table with per-sample marker        | —                                               | blocked | D01, D02   |
 
 
@@ -45,7 +45,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S16]`| expect demultiplexed fastq files                                           | —                                               | n/a     | —          |
 | `[S17]`| per-cluster minimum-read threshold (> 2 reads)                             | `tests/processes/part_a/list_local_clusters.nf.test`, `tests/main.nf.test`   | done    | —          |
 | `[S18]`| required params (forward/reverse_primer, fastq_folder) must be supplied    | `tests/main.nf.test`                            | done    | —          |
-| `[S19]`| Part A steps emit per-sample `<sampleId>_<step>.log` files                 | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/trim_primers.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_a/list_local_clusters.nf.test` | done | — |
+| `[S19]`| Part A steps emit per-sample `<sampleId>_<step>.log` files (data → `per_sample/`, logs → `logs/per_sample/`) | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/trim_primers.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_a/list_local_clusters.nf.test`, `tests/main.nf.test` | red | D15 |
 | `[S20]`| `--no_trimming` toggle skips primer trimming; mutually exclusive w/ primers| `tests/main.nf.test`                            | done    | —          |
 | `[S21]`| unpaired fastq files skip the merging step                                 | `tests/main.nf.test`                            | done    | —          |
 | `[S22]`| Part B re-cleaves global swarm clusters using per-sample sub-seed presence | `tests/python/test_cluster_cleaver.py`          | done    | —          |
@@ -71,7 +71,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S42]`| Part B `find_similar_sequences` — vsearch --usearch_global self-search; strip ;size= | `tests/processes/part_b/find_similar_sequences.nf.test` | done | — |
 | `[S43]`| Part B `run_mumu` — mumu binary (>=1.1.1) post-clustering filter                     | `tests/processes/part_b/run_mumu.nf.test` | done | — |
 | `[S44]`| Part B `rebuild_post_mumu_table` — splice old metadata onto mumu rows; renumber      | `tests/python/test_rebuild_table_after_mumu.py`, `tests/processes/part_b/rebuild_post_mumu_table.nf.test` | done | — |
-| `[S45]`| Part B publishes six step-level log files under `<basename>_<step>.log`              | `tests/main.nf.test`, `tests/processes/part_b/global_dereplication.nf.test`, `tests/processes/part_b/global_clustering.nf.test`, `tests/processes/part_b/chimera_detection_post_cleave.nf.test`, `tests/processes/part_b/cleaving.nf.test`, `tests/processes/part_b/merge_substring_otus.nf.test`, `tests/processes/part_b/run_mumu.nf.test` | done | — |
+| `[S45]`| Part B publishes six step-level log files under `logs/occurrence_table/<basename>_<step>.log` | `tests/main.nf.test`, `tests/processes/part_b/global_dereplication.nf.test`, `tests/processes/part_b/global_clustering.nf.test`, `tests/processes/part_b/chimera_detection_post_cleave.nf.test`, `tests/processes/part_b/cleaving.nf.test`, `tests/processes/part_b/merge_substring_otus.nf.test`, `tests/processes/part_b/run_mumu.nf.test` | red | D15 |
 | `[S46]`| Part B publishes final occurrence table as `<basename>_table.tsv`                    | `tests/main.nf.test`, `tests/processes/part_b/rebuild_post_mumu_table.nf.test` | done   | — |
 | `[S47]`| Part C requires `--reference_dataset` (no default)                                   | `tests/main.nf.test`                            | done    | —          |
 | `[S48]`| Part C accepts either an occurrence table or a fasta file (fasta-input branch blocked)| `tests/processes/part_c/extract_fasta_sequences_from_occurrence_table.nf.test` | done   | D04        |
@@ -85,7 +85,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S56]`| shadow Part B workflow — runs Part B as-is on A-padded shadow inputs; publishes `_notmerged` artefacts | `tests/main.nf.test` | done   | —          |
 | `[S57]`| `--help` prints a usage block describing all modes/params and exits without running any process | `tests/main.nf.test` | done | — |
 | `[S58]`| `params.publish_mode` threads through every `publishDir` directive; invalid values abort at startup | `tests/main.nf.test` | done   | —          |
-| `[S59]`| Part B `--results_folder` whitelist: table + post-mumu fasta + six step logs only                  | `tests/main.nf.test`                            | done    | —          |
+| `[S59]`| Part B `occurrence_table/` whitelist: table + post-mumu fasta only (logs → `logs/occurrence_table/`) | `tests/main.nf.test`                            | red     | D15        |
 | `[S60]`| path-typed params normalise leading `~` / `~user` at workflow startup (reference_dataset, occurrence_table, fastq_folder, fasta_folder, results_folder) | `tests/functions/normalize_path.nf.test`, `tests/main.nf.test` | done | — |
 | `[S61]`| `params.taxonomy_method` validated at startup: accepts `stampa` (default) and `sintax`; invalid value aborts before any process runs | `tests/main.nf.test` | done | — |
 | `[S62]`| Part C standalone probes for `<basename>_notmerged_table.tsv` sibling; runs `part_C_shadow` iff present, no-op otherwise | `tests/main.nf.test` | done | — |
@@ -106,7 +106,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S78]`| `--recover_unmerged` (default false) gates the whole shadow path ([S04]); off by default produces no `_notmerged` artefacts / no `part_B_shadow` | `tests/main.nf.test` | done | — |
 | `[S79]`| slurm runs warn at startup when `--dataset_size_gb` / `--reference_size_gb` are unset (fixed-fallback memory may OOM large runs); silent off-slurm | `tests/functions/resource_size_warnings.nf.test` | done | — |
 | `[S70]`| `--input` samplesheet (fastq / fasta profiles): structural validation in `bin/parse_samplesheet.py`; folder-scan fallback, mutually exclusive | `tests/python/test_parse_samplesheet.py`, `tests/main.nf.test` | done | — |
-| `[S71]`| `--outdir` single output root (`per_sample`/`occurrence_table`/`pipeline_info`); `--results_folder` deprecated alias; `--fastq_folder` input-only | `tests/functions/effective_outdir.nf.test`, `tests/main.nf.test` | done | — |
+| `[S71]`| `--outdir` single output root (data → `per_sample`/`occurrence_table`, logs → `logs/<subdir>`, `pipeline_info`); `--results_folder` deprecated alias; `--fastq_folder` input-only | `tests/functions/effective_outdir.nf.test`, `tests/main.nf.test` | red | D15 |
 | `[S72]`| numeric params range-validated at startup (fastq_encoding, threads, percentage, chimera_minsize, stripright, iddef, stampa_chunk_size, stampa_maxrejects, stampa_id, sintax_cutoff); out-of-range aborts naming the param. Declared in `nextflow_schema.json`, enforced by nf-schema `validateParameters()` | `tests/main.nf.test`, `tests/python/test_schema_params_sync.py` | done | — |
 | `[S73]`| reference dataset format sniffed at startup: `--reference_dataset` must be stampa-shaped (`>id <lineage>`), `--reference_dataset_sintax` sintax-shaped (`>id;tax=...;`); plain + gzip read, bz2 skipped; mismatch aborts naming the flag | `tests/functions/check_reference_format.nf.test`, `tests/main.nf.test` | done | — |
 | `[S74]`| primers validated at startup when trimming runs: IUPAC codes (A C G T U R Y S W K M B D H V N) + I, any case, >=3 nt; malformed aborts naming the param; quoted shell interpolation into cutadapt | `tests/functions/check_primer_format.nf.test`, `tests/main.nf.test` | done | — |

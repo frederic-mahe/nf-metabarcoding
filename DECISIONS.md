@@ -818,3 +818,54 @@ Sub-questions for the human:
 
 Until D14 lands, the Wave-online assumption from D10 stands and
 air-gapped sites use `-profile modules`.
+
+
+## D15 — Group step logs under a dedicated `<outdir>/logs/` tree
+
+**Blocks:** no new `[Sxx]` (refines the existing layout authority `[S71]`)
+**Revises on resolution:** `[S19]`, `[S04]`, `[S45]`, `[S59]`, `[S71]`, and
+Part C's `_taxonomy.log` publish location (`[S61]`/`[S50]` sintax path)
+**Status:** `resolved` — **option 2 selected (2026-06-22); spec + code in this commit series**
+
+`[S71]` routes every published artefact under `<outdir>`, but the
+per-step **log** files sit interleaved with the data files they
+describe: Part A logs land in `<outdir>/per_sample/` next to
+`<sample>.{fas,qual,stats}` (`[S19]`), and the Part B six step logs
+(`[S45]`) plus Part C's `_taxonomy.log` land in
+`<outdir>/occurrence_table/` next to the tables and FASTA. A user who
+wants only the results, or only the logs, has to filter by extension
+across two directories.
+
+**Question:** keep logs interleaved with data, or collect them under a
+single dedicated directory?
+
+1. **Status quo.** Logs stay beside the data they describe; no change.
+2. **Dedicated `<outdir>/logs/` tree mirroring the data subdirs
+   (recommended).** Step logs move to `<outdir>/logs/per_sample/`
+   (Part A) and `<outdir>/logs/occurrence_table/` (Part B/C). Data
+   files stay where they are. A second helper `log_dir('<subdir>')`
+   (sibling of `publish_dir`) keeps routing in one place. Nextflow's
+   `pipeline_info/` reports are unaffected — they are not step logs.
+3. **Flat `<outdir>/logs/`.** All logs in one directory, no
+   sub-structure. Simpler tree but mixes per-sample and global logs;
+   filenames already disambiguate them.
+
+**Resolution:** option 2 (2026-06-22, confirmed by the developer). The
+existing `per_sample` / `occurrence_table` subdir names are reused under
+`logs/` to minimise spec and test churn. This is a breaking change to
+output locations for anyone scripting against the old log paths; it is
+grouped with the other `[S71]` breaking changes in the migration note.
+
+Consequences for the spec:
+- `[S71]` gains the `<outdir>/logs/{per_sample,occurrence_table}/`
+  layer and the `log_dir('<subdir>')` helper.
+- `[S19]` / `[S04]`: Part A (and shadow) step logs move to
+  `<outdir>/logs/per_sample/`; the data files (`.fas` / `.qual` /
+  `.stats`) stay in `<outdir>/per_sample/`.
+- `[S45]`: the six Part B step logs move to
+  `<outdir>/logs/occurrence_table/`.
+- `[S59]`: the closed `<outdir>/occurrence_table/` whitelist drops the
+  six step logs (now data-only: `_table.tsv`, `_table.fas`, and the
+  Part C assigned tables); a complementary guarantee is that
+  `<outdir>/occurrence_table/` contains **no** `*.log`.
+- Part C's `_taxonomy.log` moves to `<outdir>/logs/occurrence_table/`.

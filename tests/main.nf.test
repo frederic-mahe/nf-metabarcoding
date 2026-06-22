@@ -18,17 +18,21 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            // [S19] per-step logs land in <outdir>/per_sample/
+            // [S19]/D15 per-step logs land in <outdir>/logs/per_sample/
             def folder = "${outputDir}/a_e2eok/per_sample"
+            def logFolder = "${outputDir}/a_e2eok/logs/per_sample"
             def sampleId = "paired_merge_ok"
             ["merging", "trimming_forward", "trimming_reverse", "dereplicating", "clustering"].each { step ->
-                def log = file("${folder}/${sampleId}_${step}.log")
+                def log = file("${logFolder}/${sampleId}_${step}.log")
                 assert log.exists()       : "missing ${step} log: ${log}"
                 assert log.size() > 0     : "empty ${step} log: ${log}"
+                // [S19]/D15: logs no longer sit beside the data files
+                assert !file("${folder}/${sampleId}_${step}.log").exists() :
+                    "${step} log must not remain in per_sample/"
             }
 
-            // [S01]/[S19]: per-sample artefacts (the Part A → Part B
-            // contract) also land in <outdir>/per_sample/.
+            // [S01]/[S19]: per-sample data artefacts (the Part A → Part B
+            // contract) land in <outdir>/per_sample/.
             ["fas", "qual", "stats"].each { ext ->
                 def artefact = file("${folder}/${sampleId}.${ext}")
                 assert artefact.exists() :
@@ -294,15 +298,17 @@ nextflow_pipeline {
                 assert out.contains(proc) :
                     "expected ${proc} to run on the unpaired sample, got: ${out}"
             }
-            // per-sample artefacts and the [S19] logs land in <outdir>/per_sample/
+            // [S19]/D15: per-sample data lands in <outdir>/per_sample/,
+            // logs in <outdir>/logs/per_sample/
             def folder = "${outputDir}/a_unpaired/per_sample"
+            def logFolder = "${outputDir}/a_unpaired/logs/per_sample"
             def sampleId = "unpaired_sample"
             assert file("${folder}/${sampleId}.fas").exists()         : "missing .fas"
-            assert file("${folder}/${sampleId}_trimming_forward.log").exists() : "missing forward trimming log"
-            assert file("${folder}/${sampleId}_trimming_reverse.log").exists() : "missing reverse trimming log"
-            assert file("${folder}/${sampleId}_dereplicating.log").exists() : "missing dereplicating log"
-            assert file("${folder}/${sampleId}_clustering.log").exists() : "missing clustering log"
-            assert !file("${folder}/${sampleId}_merging.log").exists() :
+            assert file("${logFolder}/${sampleId}_trimming_forward.log").exists() : "missing forward trimming log"
+            assert file("${logFolder}/${sampleId}_trimming_reverse.log").exists() : "missing reverse trimming log"
+            assert file("${logFolder}/${sampleId}_dereplicating.log").exists() : "missing dereplicating log"
+            assert file("${logFolder}/${sampleId}_clustering.log").exists() : "missing clustering log"
+            assert !file("${logFolder}/${sampleId}_merging.log").exists() :
                 "merging log should not exist for an unpaired sample"
         }
     }
@@ -355,10 +361,10 @@ nextflow_pipeline {
             assert workflow.success
             // Sample ID derives from canonical pattern row 1
             // (`_L00[1-9]_R1_00[1-9]\.<ext>`).
-            def folder = "${outputDir}/a_miseq/per_sample"
+            def logFolder = "${outputDir}/a_miseq/logs/per_sample"
             def sampleId = "SampleX_S1"
             ["merging", "trimming_forward", "trimming_reverse", "dereplicating", "clustering"].each { step ->
-                def log = file("${folder}/${sampleId}_${step}.log")
+                def log = file("${logFolder}/${sampleId}_${step}.log")
                 assert log.exists()   : "missing ${step} log: ${log}"
                 assert log.size() > 0 : "empty ${step} log: ${log}"
             }
@@ -385,10 +391,10 @@ nextflow_pipeline {
             def out = workflow.stdout.toString()
             assert out.contains("merge_fastq_pairs") :
                 "expected merge_fastq_pairs to run on the MiSeq pair, got: ${out}"
-            // Per-sample log probes
-            assert file("${outputDir}/a_comma/per_sample/SampleX_S1_merging.log").exists()
-            assert file("${outputDir}/a_comma/per_sample/unpaired_sample_dereplicating.log").exists()
-            assert !file("${outputDir}/a_comma/per_sample/unpaired_sample_merging.log").exists() :
+            // Per-sample log probes ([S19]/D15: under logs/per_sample/)
+            assert file("${outputDir}/a_comma/logs/per_sample/SampleX_S1_merging.log").exists()
+            assert file("${outputDir}/a_comma/logs/per_sample/unpaired_sample_dereplicating.log").exists()
+            assert !file("${outputDir}/a_comma/logs/per_sample/unpaired_sample_merging.log").exists() :
                 "single-end sample must not produce a merging log"
         }
     }
@@ -411,19 +417,20 @@ nextflow_pipeline {
             assert workflow.success
 
             def folder = "${outputDir}/a_notmerged/per_sample"
+            def logFolder = "${outputDir}/a_notmerged/logs/per_sample"
             def shadowId = "paired_merge_fail_notmerged"
 
-            // [S04]: shadow path has no merging step (the reads in
+            // [S04]/D15: shadow path has no merging step (the reads in
             // this branch could not be merged, by definition); the
             // remaining per-step logs (two cutadapt passes +
-            // dereplicating + clustering) land alongside the regular
-            // ones.
+            // dereplicating + clustering) land under logs/per_sample/
+            // alongside the regular ones.
             ["trimming_forward", "trimming_reverse", "dereplicating", "clustering"].each { step ->
-                def log = file("${folder}/${shadowId}_${step}.log")
+                def log = file("${logFolder}/${shadowId}_${step}.log")
                 assert log.exists()   : "missing shadow ${step} log: ${log}"
                 assert log.size() > 0 : "empty shadow ${step} log: ${log}"
             }
-            assert !file("${folder}/${shadowId}_merging.log").exists() :
+            assert !file("${logFolder}/${shadowId}_merging.log").exists() :
                 "shadow path must not publish a _merging.log"
 
             // shadow .fas exists and carries the default 8-A
@@ -594,18 +601,22 @@ nextflow_pipeline {
             // the `<project>_<N>_samples` basename — N counts the
             // empty sample too.
             def base = "${resultDir}/myproj_3_samples"
+            def logBase = "${outputDir}/part_b_results/logs/occurrence_table/myproj_3_samples"
 
-            // [S45]: six step-level log files, all named under the
-            // project-wide basename construct.
-            ["${base}_dereplication.log",
-             "${base}_clustering.log",
-             "${base}_chimera_detection.log",
-             "${base}_cleaving.log",
-             "${base}_superstring_clustering.log",
-             "${base}_post_clustering_curation.log"].each { log ->
-                def f = file(log)
-                assert f.exists() : "missing Part B step log: ${log}"
-                assert f.size() > 0 : "empty Part B step log: ${log}"
+            // [S45]/D15: six step-level log files, all named under the
+            // project-wide basename construct, published to
+            // logs/occurrence_table/ and absent from occurrence_table/.
+            ["dereplication",
+             "clustering",
+             "chimera_detection",
+             "cleaving",
+             "superstring_clustering",
+             "post_clustering_curation"].each { step ->
+                def f = file("${logBase}_${step}.log")
+                assert f.exists() : "missing Part B step log: ${f}"
+                assert f.size() > 0 : "empty Part B step log: ${f}"
+                assert !file("${base}_${step}.log").exists() :
+                    "Part B step log must not remain in occurrence_table/: ${step}"
             }
 
             // [S46]: the final occurrence table is published as
@@ -617,10 +628,11 @@ nextflow_pipeline {
             assert finalTable.text.split("\n", 2)[0].startsWith("OTU\ttotal") :
                 "unexpected header in final occurrence table"
 
-            // [S59]: every Part B intermediate (tables, .qual,
+            // [S59]/D15: every Part B intermediate (tables, .qual,
             // .distr, swarm artefacts, etc.) is kept inside the
-            // work directory; only the whitelist (table + post-mumu
-            // fasta + six logs) reaches results_folder.
+            // work directory; only the data whitelist (table + post-mumu
+            // fasta) reaches occurrence_table/ (the six step logs go to
+            // logs/occurrence_table/, checked above).
             ["${base}.OTU.filtered.cleaved.table",
              "${base}.OTU.filtered.cleaved.nosubstringOTUs.table",
              "${base}.OTU.filtered.cleaved.nosubstringOTUs_raw_mumu.table",
@@ -692,17 +704,19 @@ nextflow_pipeline {
             // _notmerged shadow sample is dropped from the Part B
             // channel).
             //
-            // [S59]: assert the published whitelist (table + post-
-            // mumu fasta + six step logs).
+            // [S59]/D15: assert the published data whitelist (table +
+            // post-mumu fasta) in occurrence_table/ and the six step
+            // logs in logs/occurrence_table/.
             def base = "${resultDir}/e2e_1_samples"
+            def logBase = "${outputDir}/e2e_results/logs/occurrence_table/e2e_1_samples"
             ["${base}_table.tsv",
              "${base}_table.fas",
-             "${base}_dereplication.log",
-             "${base}_clustering.log",
-             "${base}_chimera_detection.log",
-             "${base}_cleaving.log",
-             "${base}_superstring_clustering.log",
-             "${base}_post_clustering_curation.log"].each { artefact ->
+             "${logBase}_dereplication.log",
+             "${logBase}_clustering.log",
+             "${logBase}_chimera_detection.log",
+             "${logBase}_cleaving.log",
+             "${logBase}_superstring_clustering.log",
+             "${logBase}_post_clustering_curation.log"].each { artefact ->
                 assert file(artefact).exists() :
                     "missing Part B artefact: ${artefact}"
             }
@@ -740,14 +754,15 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def base = "${outputDir}/e2ei_results/occurrence_table/e2ei_1_samples"
+            def logBase = "${outputDir}/e2ei_results/logs/occurrence_table/e2ei_1_samples"
             ["${base}_table.tsv",
              "${base}_table.fas",
-             "${base}_dereplication.log",
-             "${base}_clustering.log",
-             "${base}_chimera_detection.log",
-             "${base}_cleaving.log",
-             "${base}_superstring_clustering.log",
-             "${base}_post_clustering_curation.log"].each { artefact ->
+             "${logBase}_dereplication.log",
+             "${logBase}_clustering.log",
+             "${logBase}_chimera_detection.log",
+             "${logBase}_cleaving.log",
+             "${logBase}_superstring_clustering.log",
+             "${logBase}_post_clustering_curation.log"].each { artefact ->
                 assert file(artefact).exists() :
                     "missing Part B artefact from --input run: ${artefact}"
             }
@@ -917,7 +932,7 @@ nextflow_pipeline {
         }
     }
 
-    test("Part B results folder holds only table + post-mumu fasta + step logs") {
+    test("Part B occurrence_table holds only table + post-mumu fasta; logs live under logs/") {
         // COVERAGE: [S59]
         tag "ci"
         when {
@@ -935,6 +950,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def resultDir = "${outputDir}/whitelist_results/occurrence_table"
+            def logDir    = "${outputDir}/whitelist_results/logs/occurrence_table"
             def regular = "whitelist_1_samples"
             def shadow  = "whitelist_1_samples_notmerged"
             def stepLogs = [
@@ -945,15 +961,25 @@ nextflow_pipeline {
                 "_superstring_clustering.log",
                 "_post_clustering_curation.log",
             ]
+            // [S59]/D15: occurrence_table/ is data-only (table + fasta).
             def expected = []
             [regular, shadow].each { base ->
                 expected << "${base}_table.tsv"
                 expected << "${base}_table.fas"
-                stepLogs.each { suffix -> expected << "${base}${suffix}" }
             }
             def actual = file(resultDir).listFiles()*.name.toList().sort()
             assert actual == expected.sort() :
-                "Part B results folder mismatch.\nexpected: ${expected.sort()}\nactual:   ${actual}"
+                "Part B occurrence_table mismatch.\nexpected: ${expected.sort()}\nactual:   ${actual}"
+
+            // [S45]/D15: the six step logs (regular + shadow) live under
+            // logs/occurrence_table/ and nowhere else.
+            def expectedLogs = []
+            [regular, shadow].each { base ->
+                stepLogs.each { suffix -> expectedLogs << "${base}${suffix}" }
+            }
+            def actualLogs = file(logDir).listFiles()*.name.toList().sort()
+            assert actualLogs == expectedLogs.sort() :
+                "Part B logs/occurrence_table mismatch.\nexpected: ${expectedLogs.sort()}\nactual:   ${actualLogs}"
 
             // [S68]/[S71]: software_versions.yml is a sibling under
             // <outdir>/pipeline_info/, not inside occurrence_table/.
@@ -1440,7 +1466,7 @@ nextflow_pipeline {
             // [S58]: with publish_mode=symlink, the published per-step
             // log should be a symbolic link (default 'link' would
             // yield a regular file with nlink > 1).
-            def log = file("${outputDir}/a_symlink/per_sample/paired_merge_ok_merging.log")
+            def log = file("${outputDir}/a_symlink/logs/per_sample/paired_merge_ok_merging.log")
             assert log.exists() : "missing published log: ${log}"
             assert java.nio.file.Files.isSymbolicLink(log.toPath()) :
                 "publish_mode=symlink should produce a symlink, got: ${log}"
@@ -2117,6 +2143,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def base = "${outputDir}/part_b_nofast/occurrence_table/nofast_3_samples"
+            def logBase = "${outputDir}/part_b_nofast/logs/occurrence_table/nofast_3_samples"
             assert file("${base}_table.tsv").exists() :
                 "Part B should publish the table under --fastidious=false"
             assert file("${base}_table.fas").exists() :
@@ -2127,7 +2154,7 @@ nextflow_pipeline {
              "_cleaving.log",
              "_superstring_clustering.log",
              "_post_clustering_curation.log"].each { suffix ->
-                def log = file("${base}${suffix}")
+                def log = file("${logBase}${suffix}")
                 assert log.exists() && log.size() > 0 :
                     "missing or empty step log: ${log}"
             }
