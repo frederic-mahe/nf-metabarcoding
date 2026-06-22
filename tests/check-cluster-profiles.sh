@@ -53,13 +53,13 @@ declare -A CLUSTER_MEMORY=(
     [saga]='6 TB'
 )
 
-# The dependency engine each cluster composes with. Most sites offer
-# singularity; Genotoul has no container engine, so its supported path is
-# conda (see conf/clusters/genotoul.config). The needle is the engine's
-# `enabled` flag in the resolved config.
+# The dependency engine each cluster composes with. The needle is the
+# engine's `enabled` flag in the resolved config. Genotoul offers
+# apptainer/singularity as MODULES (loaded by its beforeScript, asserted
+# separately below); the rest expose singularity on PATH.
 declare -A CLUSTER_ENGINE=(
     [abims]='singularity'
-    [genotoul]='conda'
+    [genotoul]='apptainer'
     [ifb_core]='singularity'
     [meso]='singularity'
     [saga]='singularity'
@@ -77,6 +77,10 @@ for cluster in "${!CLUSTER_MEMORY[@]}"; do
     assert_contains "${cluster},${engine}: engine enabled" \
         "${engine}.enabled = true" "${cluster},${engine}"
 done
+
+# genotoul loads its container engine from a module via beforeScript.
+assert_contains "genotoul: apptainer module beforeScript" \
+    "module load containers/Apptainer/1.4.1" "genotoul,apptainer"
 
 # meso derives partition + account per task from its own closures.
 assert_contains "meso: per-task partition selector" \

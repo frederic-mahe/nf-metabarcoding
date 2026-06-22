@@ -341,7 +341,7 @@ nextflow run main.nf -profile meso,singularity \
 | Profile     | Site                                  | Engine to pair        |
 |-------------|---------------------------------------|-----------------------|
 | `abims`     | ABiMS, Station Biologique de Roscoff  | `singularity`         |
-| `genotoul`  | Genotoul, INRAE Toulouse              | `conda`²              |
+| `genotoul`  | Genotoul, INRAE Toulouse              | `apptainer`²          |
 | `ifb_core`  | IFB Core cluster                      | `singularity`         |
 | `meso`      | meso, CIRAD                           | `singularity`         |
 | `saga`      | Saga, Sigma2 / NRIS (Norway)          | `singularity`¹        |
@@ -351,10 +351,12 @@ nextflow run main.nf -profile meso,singularity \
 confirm with a smoke run before a large production job. Saga also
 requires a project account: add `--slurm_account nnXXXXk`.
 
-² Genotoul has **no** container engine (no singularity/apptainer), so
-run `-profile genotoul,conda` (bioconda also covers `mumu`, which is not
-a Genotoul module). `-profile genotoul,modules` works for the rest
-(`VSEARCH`, `swarm`, `Cutadapt`).
+² Genotoul exposes apptainer/singularity as **modules**, which the
+`genotoul` profile auto-loads (via `beforeScript`) so
+`-profile genotoul,apptainer` (or `,singularity`) works directly — the
+Wave-built image also covers `mumu`. `-profile genotoul,conda` is an
+alternative; `-profile genotoul,modules` works for `VSEARCH`/`swarm`/
+`Cutadapt` but Genotoul has no `mumu` module.
 
 These configs are **vendored** in [`conf/clusters/`](conf/clusters) —
 copied into the repo and pinned, not fetched from nf-core/configs at
