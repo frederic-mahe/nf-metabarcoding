@@ -114,9 +114,13 @@ fixed layout:
 
 ```
 <outdir>/
-├── per_sample/         per-sample .fas / .qual / .stats + Part A logs
-├── occurrence_table/   the occurrence table(s), step logs, and the
+├── per_sample/         per-sample data: .fas / .qual / .stats (Part A)
+├── occurrence_table/   the occurrence table(s) and the
 │                       taxonomy-annotated tables (Part B + Part C)
+├── logs/               every per-step log, grouped away from the data:
+│   ├── per_sample/         Part A step logs (merging / trimming /
+│   │                       dereplicating / clustering)
+│   └── occurrence_table/   Part B step logs + Part C taxonomy log
 └── pipeline_info/      software_versions.yml (tool versions) +
                         execution_{report,timeline}.html,
                         execution_trace.txt, pipeline_dag.html
@@ -139,7 +143,10 @@ read-only.
 > alias** for `--outdir` (with a warning), but the files now live in the
 > `occurrence_table/` sub-directory rather than at the top level — update
 > any scripts that read `<results_folder>/*.tsv` to
-> `<outdir>/occurrence_table/*.tsv`.
+> `<outdir>/occurrence_table/*.tsv`. Per-step `*.log` files also moved
+> out of the data directories into the parallel `<outdir>/logs/` tree
+> (`logs/per_sample/`, `logs/occurrence_table/`) — update any scripts
+> that read logs from `per_sample/` or `occurrence_table/`.
 
 ### Input discovery
 
