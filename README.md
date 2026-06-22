@@ -364,9 +364,13 @@ runtime — so they work on air-gapped compute nodes (`[S83]`) and stay
 auditable. To add your own site, copy
 [`conf/clusters/_template.config`](conf/clusters/_template.config),
 fill in the values, and register it as a profile in `nextflow.config`
-(the template documents both steps). A cluster profile still composes
-with `-c site.config` below for anything site-local you want to layer on
-top (e.g. `--dataset_size_gb`, a shared image cache).
+(the template documents both steps);
+[`docs/clusters/discovering-cluster-values.md`](docs/clusters/discovering-cluster-values.md)
+is the command-by-command recipe for reading those values off a live
+cluster (and for checking the shipped ones — every nf-core-derived value
+here was stale until verified on the hardware). A cluster profile still
+composes with `-c site.config` below for anything site-local you want to
+layer on top (e.g. `--dataset_size_gb`, a shared image cache).
 
 ### Tuning for your cluster (`-c site.config`)
 
