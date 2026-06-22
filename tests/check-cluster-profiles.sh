@@ -48,7 +48,7 @@ assert_contains() {
 declare -A CLUSTER_MEMORY=(
     [abims]='750 GB'
     [genotoul]='3.9 TB'
-    [ifb_core]='252 GB'
+    [ifb_core]='2 TB'
     [meso]='3.7 TB'
     [saga]='6 TB'
 )
