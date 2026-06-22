@@ -47,22 +47,35 @@ assert_contains() {
 # largest node, as Nextflow renders it in `-flat` output).
 declare -A CLUSTER_MEMORY=(
     [abims]='750 GB'
-    [genotoul]='3.4 TB'
+    [genotoul]='3.9 TB'
     [ifb_core]='252 GB'
     [meso]='3.7 TB'
     [saga]='6 TB'
 )
 
+# The dependency engine each cluster composes with. Most sites offer
+# singularity; Genotoul has no container engine, so its supported path is
+# conda (see conf/clusters/genotoul.config). The needle is the engine's
+# `enabled` flag in the resolved config.
+declare -A CLUSTER_ENGINE=(
+    [abims]='singularity'
+    [genotoul]='conda'
+    [ifb_core]='singularity'
+    [meso]='singularity'
+    [saga]='singularity'
+)
+
 for cluster in "${!CLUSTER_MEMORY[@]}"; do
+    engine="${CLUSTER_ENGINE[$cluster]}"
     # implies slurm (includes conf/slurm.config) ...
     assert_contains "${cluster}: slurm executor" \
         "process.executor = 'slurm'" "${cluster}"
     # ... and clamps to that cluster's largest node ...
     assert_contains "${cluster}: resourceLimits memory ceiling" \
         "process.resourceLimits.memory = '${CLUSTER_MEMORY[$cluster]}'" "${cluster}"
-    # ... and composes with a container engine.
-    assert_contains "${cluster},singularity: engine enabled" \
-        "singularity.enabled = true" "${cluster},singularity"
+    # ... and composes with its dependency engine.
+    assert_contains "${cluster},${engine}: engine enabled" \
+        "${engine}.enabled = true" "${cluster},${engine}"
 done
 
 # meso derives partition + account per task from its own closures.
