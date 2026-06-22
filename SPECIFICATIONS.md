@@ -251,9 +251,8 @@ the latter case.
     fetched from nf-core/configs at runtime, because the pipeline
     supports air-gapped compute nodes (`[S83]`) and an auditable, pinned
     config is the hard-to-misuse default. The shipped set: `abims`,
-    `genotoul`, `ifb_core`, `meso`, `saga` (the `saga` values are a
-    best-effort draft awaiting confirmation on the hardware — marked
-    `TODO confirm` in the file).
+    `genotoul`, `ifb_core`, `meso`, `saga` (`saga` values are sourced
+    from the Sigma2/NRIS docs, to be confirmed by a cluster smoke run).
     `conf/clusters/_template.config` documents the knobs for adding one.
   - The profile **wiring** is checked automatically by
     `tests/check-cluster-profiles.sh` (each cluster profile resolves the

@@ -344,11 +344,11 @@ nextflow run main.nf -profile meso,singularity \
 | `genotoul`  | Genotoul, INRAE Toulouse                         |
 | `ifb_core`  | IFB Core cluster                                 |
 | `meso`      | meso, CIRAD                                       |
-| `saga`      | Saga, Sigma2 / NRIS (Norway) — values to confirm¹ |
+| `saga`      | Saga, Sigma2 / NRIS (Norway)¹                    |
 
-¹ The `saga` profile is a best-effort draft: its partition/account/node
-values are marked `TODO confirm` in `conf/clusters/saga.config` and must
-be verified against the live cluster before production use. Saga also
+¹ The `saga` profile's hardware/partition/scratch values come from the
+[Sigma2 docs](https://documentation.sigma2.no/hpc_machines/saga.html);
+confirm with a smoke run before a large production job. Saga also
 requires a project account: add `--slurm_account nnXXXXk`.
 
 These configs are **vendored** in [`conf/clusters/`](conf/clusters) —
