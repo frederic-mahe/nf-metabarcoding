@@ -73,9 +73,12 @@ for cluster in "${!CLUSTER_MEMORY[@]}"; do
     # ... and clamps to that cluster's largest node ...
     assert_contains "${cluster}: resourceLimits memory ceiling" \
         "process.resourceLimits.memory = '${CLUSTER_MEMORY[$cluster]}'" "${cluster}"
-    # ... and composes with its dependency engine.
+    # ... composes with its dependency engine ...
     assert_contains "${cluster},${engine}: engine enabled" \
         "${engine}.enabled = true" "${cluster},${engine}"
+    # ... and defaults the per-sample fan-out to slurm job arrays ([S87]).
+    assert_contains "${cluster}: job-array size default" \
+        "process.array = 50" "${cluster}"
 done
 
 # abims routes memory-heavy tasks to its bigmem partition (which has more
@@ -86,10 +89,6 @@ assert_contains "abims: bigmem memory routing" \
 # genotoul loads its container engine from a module via beforeScript.
 assert_contains "genotoul: apptainer module beforeScript" \
     "module load containers/Apptainer/1.4.1" "genotoul,apptainer"
-
-# genotoul defaults to slurm job arrays (admin-recommended; [S87]).
-assert_contains "genotoul: job-array size default" \
-    "process.array = 50" "genotoul"
 
 # meso derives partition + account per task from its own closures.
 assert_contains "meso: per-task partition selector" \
