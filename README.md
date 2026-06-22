@@ -298,7 +298,12 @@ What the `slurm` profile does:
 
 - submits every process as an sbatch job (`process.executor =
   'slurm'`); tune the queue/account/concurrency with `--slurm_queue`,
-  `--slurm_account`, `--slurm_queue_size`.
+  `--slurm_account`, `--slurm_queue_size`. For the per-sample fan-out at
+  scale, `--slurm_array_size N` submits tasks as slurm **job arrays**
+  (`sbatch --array`, up to `N` tasks per submission) instead of one job
+  each — much gentler on the scheduler, and the pattern HPC admins ask
+  for. Off by default; some cluster profiles set it (e.g. `genotoul`=50).
+  The driver also ramps submissions at `submitRateLimit` (50/min).
 - sets per-process resources by tier. `--threads` is the single knob
   for cores: it feeds `task.cpus`, which is what the tools actually
   request (`vsearch/swarm/cutadapt --threads`/`--cores`). The

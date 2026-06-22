@@ -50,6 +50,12 @@ assert_contains "slurm profile sets the resourceLimits ceiling" \
 assert_contains "slurm profile sets the submit rate limit" \
     "executor.submitRateLimit" "slurm"
 
+# [S07]: slurm job arrays are an opt-in knob (--slurm_array_size), off by
+# default so a plain `-profile slurm` keeps one job per task. null here
+# means the `array` directive is omitted at runtime.
+assert_contains "slurm profile leaves job arrays off by default" \
+    "process.array = null" "slurm"
+
 # the slurm profile composes with a dependency profile.
 assert_contains "slurm composes with conda (executor)" \
     "process.executor = 'slurm'" "slurm,conda"

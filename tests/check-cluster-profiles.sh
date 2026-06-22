@@ -87,6 +87,10 @@ assert_contains "abims: bigmem memory routing" \
 assert_contains "genotoul: apptainer module beforeScript" \
     "module load containers/Apptainer/1.4.1" "genotoul,apptainer"
 
+# genotoul defaults to slurm job arrays (admin-recommended; [S87]).
+assert_contains "genotoul: job-array size default" \
+    "process.array = 50" "genotoul"
+
 # meso derives partition + account per task from its own closures.
 assert_contains "meso: per-task partition selector" \
     "task.memory > 1400.GB ? 'bigmem-cirad-dedicated' : 'cpu-dedicated'" "meso"

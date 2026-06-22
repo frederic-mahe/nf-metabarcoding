@@ -236,6 +236,17 @@ the latter case.
     behaviour (>= 24.04), so — per `[S00]`'s "we do not re-test
     upstream tools" rule — the clamp itself is not unit-tested; the
     manual cluster smoke test confirms it.
+  - the `slurm` profile submits at most `submitRateLimit` jobs per minute
+    (default `50/1min`) and supports an **opt-in** `--slurm_array_size`:
+    when set to `N`, `process.array = N` batches up to `N` ready tasks of
+    a process into one `sbatch --array` submission instead of one sbatch
+    per task — far less scheduler load for the per-sample fan-out, and the
+    pattern HPC admins recommend at scale. Default `null` keeps one job
+    per task (unchanged behaviour); a cluster profile may set a default
+    (`genotoul` uses 50, `[S87]`).
+    - **Pass when:** `nextflow config -profile slurm` resolves
+      `process.array = null` (arrays off by default) and a non-empty
+      `executor.submitRateLimit` (`tests/check-slurm-config.sh`).
 - `[S87]` ships per-cluster *institutional* profiles so a known HPC site
   runs with no hand-written config. Each lives in
   `conf/clusters/<name>.config` and is exposed as a same-named profile in

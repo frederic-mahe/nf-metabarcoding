@@ -28,6 +28,13 @@ params {
     // Max concurrent sbatch jobs the driver keeps in flight.
     slurm_queue_size = 50
 
+    // Opt-in slurm job arrays: batch up to N ready tasks of a process
+    // into one `sbatch --array` submission (instead of one sbatch per
+    // task) — much less scheduler load for the per-sample fan-out, and
+    // the pattern HPC admins recommend at scale. Leave unset (null) for
+    // one job per task. Some shipped cluster profiles set a default.
+    slurm_array_size = 50
+
     // --- resource scaling (consumed by `-profile slurm`) ---------------
     // Approximate input / reference sizes in GB; the memory-bound steps
     // scale their RAM request off these (see nextflow.config). Leaving
