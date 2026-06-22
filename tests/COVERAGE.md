@@ -113,6 +113,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S74]`| primers validated at startup when trimming runs: IUPAC codes (A C G T U R Y S W K M B D H V N) + I, any case, >=3 nt; malformed aborts naming the param; quoted shell interpolation into cutadapt | `tests/functions/check_primer_format.nf.test`, `tests/main.nf.test` | done | — |
 | `[S75]`| site config via `-c` template (`conf/site.config.example`); `--slurm_clusterOptions` passthrough combined with `--account` | `tests/check-site-config.sh` (config resolution); submission = manual cluster smoke test | done | — |
 | `[S76]`| self-contained `demo` profile (committed `assets/demo/` dataset) runs Part A→B→C with no flags; `-profile demo,<engine>` composes | `tests/check-demo-profile.sh` (assets + config resolution); run covered by Part A→B→C `tests/main.nf.test` | done | — |
+| `[S87]`| vendored institutional cluster profiles (`conf/clusters/<name>.config`, shipped: abims/genotoul/ifb_core/meso) each imply slurm via `conf/slurm.config`, clamp `resourceLimits` to the largest node, route partition/account, compose with an engine; vendored not fetched ([S83]) | `tests/check-cluster-profiles.sh` (profile wiring); submission = manual cluster smoke test | done | — |
 
 
 ## Per-process tests

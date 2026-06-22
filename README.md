@@ -324,6 +324,37 @@ What the `slurm` profile does:
   (`stampa_chunk_size = 1000`); the `local` profile sets `0` to feed
   the whole fasta to a single `vsearch` instead.
 
+### Pre-configured clusters (`-profile <name>`)
+
+`[S87]`. If you run on a cluster the pipeline already knows about, use
+its profile instead of hand-writing slurm settings. A cluster profile
+**implies** `slurm` (you do not list `slurm` yourself) and sets that
+site's partitions, account routing, resource ceiling, and container
+bind mounts — so you just add a dependency engine:
+
+```bash
+nextflow run main.nf -profile meso,singularity \
+    --fastq_folder /scratch/me/run17 \
+    --forward_primer ... --reverse_primer ...
+```
+
+| Profile     | Site                                            |
+|-------------|-------------------------------------------------|
+| `abims`     | ABiMS, Station Biologique de Roscoff            |
+| `genotoul`  | Genotoul, INRAE Toulouse                         |
+| `ifb_core`  | IFB Core cluster                                 |
+| `meso`      | meso, CIRAD                                       |
+
+These configs are **vendored** in [`conf/clusters/`](conf/clusters) —
+copied into the repo and pinned, not fetched from nf-core/configs at
+runtime — so they work on air-gapped compute nodes (`[S83]`) and stay
+auditable. To add your own site, copy
+[`conf/clusters/_template.config`](conf/clusters/_template.config),
+fill in the values, and register it as a profile in `nextflow.config`
+(the template documents both steps). A cluster profile still composes
+with `-c site.config` below for anything site-local you want to layer on
+top (e.g. `--dataset_size_gb`, a shared image cache).
+
 ### Tuning for your cluster (`-c site.config`)
 
 `[S75]`. You should **not** edit `nextflow.config` to adapt the

@@ -236,6 +236,35 @@ the latter case.
     behaviour (>= 24.04), so — per `[S00]`'s "we do not re-test
     upstream tools" rule — the clamp itself is not unit-tested; the
     manual cluster smoke test confirms it.
+- `[S87]` ships per-cluster *institutional* profiles so a known HPC site
+  runs with no hand-written config. Each lives in
+  `conf/clusters/<name>.config` and is exposed as a same-named profile in
+  `nextflow.config`; that profile `includeConfig`s `conf/slurm.config`
+  first (so it carries the full `[S07]` executor + resource tiers) then
+  layers the site's overrides — partition/account routing, a
+  `resourceLimits` ceiling clamped to that cluster's largest node, and
+  the singularity/apptainer bind mounts + image cache. A cluster profile
+  therefore *implies* slurm: a user selects a cluster **and** a
+  dependency engine, e.g. `-profile meso,singularity` — `slurm` is never
+  listed.
+  - Configs are **vendored** (copied into the repo and pinned), not
+    fetched from nf-core/configs at runtime, because the pipeline
+    supports air-gapped compute nodes (`[S83]`) and an auditable, pinned
+    config is the hard-to-misuse default. The shipped set: `abims`,
+    `genotoul`, `ifb_core`, `meso` (`saga` is planned, pending
+    confirmation of its site-specific values).
+    `conf/clusters/_template.config` documents the knobs for adding one.
+  - The profile **wiring** is checked automatically by
+    `tests/check-cluster-profiles.sh` (each cluster profile resolves the
+    slurm executor + its `resourceLimits` ceiling via `nextflow config`,
+    and composes with an engine profile). Per `[S00]`, actual submission
+    on each cluster stays a manual smoke test — the partition/account
+    *values* can only be confirmed on the hardware.
+  - **Pass when:** `nextflow config -profile <cluster>` resolves
+    `process.executor = 'slurm'` and the cluster's `resourceLimits`
+    ceiling for each shipped cluster; `-profile <cluster>,singularity`
+    additionally resolves `singularity.enabled = true`; and a plain
+    `nextflow run` (no profile) does not set the slurm executor.
 - `[S79]` under `-profile slurm`, the memory-bound steps scale their RAM
   request off `--dataset_size_gb` (the dataset-bound steps) and
   `--reference_size_gb` (the taxonomic-assignment steps), falling back to
