@@ -49,7 +49,7 @@ declare -A CLUSTER_MEMORY=(
     [abims]='750 GB'
     [genotoul]='3.4 TB'
     [ifb_core]='252 GB'
-    [meso]='4 TB'
+    [meso]='3.7 TB'
     [saga]='6 TB'
 )
 
@@ -67,7 +67,7 @@ done
 
 # meso derives partition + account per task from its own closures.
 assert_contains "meso: per-task partition selector" \
-    "task.memory > 1536.GB ? 'bigmem-cirad-dedicated' : 'cpu-dedicated'" "meso"
+    "task.memory > 1400.GB ? 'bigmem-cirad-dedicated' : 'cpu-dedicated'" "meso"
 assert_contains "meso: per-task account routing" \
     "dedicated-cpu@cirad-normal" "meso"
 
