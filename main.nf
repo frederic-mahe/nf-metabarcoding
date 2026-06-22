@@ -2,7 +2,6 @@
 
 include { normalize_path; validate_params; samplesheet_profile; check_primer_format; resource_size_warnings } from './modules/local/functions.nf'
 include { part_A } from './subworkflows/local/part_a.nf'
-include { summarize_read_counts } from './modules/local/part_a/summarize_read_counts.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
 include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_fasta.nf'
 include { validate_samplesheet } from './modules/local/validate_samplesheet.nf'
@@ -294,26 +293,6 @@ workflow {
     }
 
     part_A()
-
-    // [S86]: per-sample read-count summary. Runs on every fastq path
-    // (Part A-only and end-to-end) — the fasta/occurrence_table modes
-    // returned above, so they never reach here. Shadow (_notmerged)
-    // samples are excluded; the basename uses the Part B construct when
-    // --project_name is set, otherwise <N>_samples.
-    def rc_ids = part_A.out.fasta
-        .filter { id, _f -> !id.endsWith("_notmerged") }
-        .map { id, _f -> id }
-    def rc_ids_file = rc_ids.collectFile(name: 'sample_ids.txt', newLine: true, sort: true)
-    def rc_logs = part_A.out.merge_log
-        .mix(part_A.out.trim_fwd_log)
-        .mix(part_A.out.trim_rev_log)
-        .filter { logfile -> !logfile.name.contains("_notmerged") }
-        .collect()
-        .ifEmpty([])
-    def rc_basename = rc_ids.count().map { n ->
-        params.project_name ? "${params.project_name}_${n}_samples" : "${n}_samples"
-    }
-    summarize_read_counts(rc_ids_file, rc_logs, rc_basename)
 
     // ----- Part A → Part B handoff ([S27]/[S56]) -----
     // When --project_name is set, Part B runs on the Part A outputs

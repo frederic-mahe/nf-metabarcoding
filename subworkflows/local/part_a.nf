@@ -7,6 +7,7 @@ include { filter_and_convert_to_fasta }     from '../../modules/local/part_a/fil
 include { extract_expected_error_values }   from '../../modules/local/part_a/extract_expected_error_values.nf'
 include { dereplicate_fasta }               from '../../modules/local/part_a/dereplicate_fasta.nf'
 include { list_local_clusters }             from '../../modules/local/part_a/list_local_clusters.nf'
+include { summarize_read_counts }           from '../../modules/local/part_a/summarize_read_counts.nf'
 include { validate_samplesheet }            from '../../modules/local/validate_samplesheet.nf'
 include { normalize_path; hash_relabel_flag; hash_id_length } from '../../modules/local/functions.nf'
 
@@ -123,6 +124,28 @@ workflow part_A {
     dereplicate_fasta(filter_and_convert_to_fasta.out.fasta)
 
     list_local_clusters(dereplicate_fasta.out.fasta)
+
+    // [S86]: per-sample read-count summary. Runs on every fastq path
+    // (Part A-only and end-to-end); non-fastq modes never invoke part_A,
+    // so it only ever runs on a fastq path. Called here, inside part_A,
+    // so it shows up as `part_A:summarize_read_counts` alongside the
+    // other Part A steps. Shadow (_notmerged) samples are excluded; the
+    // basename uses the Part B construct when --project_name is set,
+    // otherwise <N>_samples.
+    def rc_ids = dereplicate_fasta.out.fasta
+        .filter { id, _f -> !id.endsWith("_notmerged") }
+        .map { id, _f -> id }
+    def rc_ids_file = rc_ids.collectFile(name: 'sample_ids.txt', newLine: true, sort: true)
+    def rc_logs = merge_fastq_pairs.out.log
+        .mix(trim_fwd_log_ch)
+        .mix(trim_rev_log_ch)
+        .filter { logfile -> !logfile.name.contains("_notmerged") }
+        .collect()
+        .ifEmpty([])
+    def rc_basename = rc_ids.count().map { n ->
+        params.project_name ? "${params.project_name}_${n}_samples" : "${n}_samples"
+    }
+    summarize_read_counts(rc_ids_file, rc_logs, rc_basename)
 
     emit:
     // (sampleId, path) tuples — shadow samples carry a _notmerged
