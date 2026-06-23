@@ -42,11 +42,37 @@ assert_contains() {
     echo "OK: ${desc}"
 }
 
+# Like assert_contains but matches an extended regex (grep -E), for values
+# whose `-flat` rendering differs across Nextflow versions. resourceLimits
+# renders as a single map line on 25.10.x
+# (`process.resourceLimits = [cpus:16, memory:'128 GB', time:'10d']`) but as
+# expanded dotted keys on 26.x (`process.resourceLimits.cpus = 16`); a regex
+# matches both, so the same check passes on every supported Nextflow.
+#   assert_matches <desc> <regex> <profile>
+assert_matches() {
+    local desc="$1"
+    local pattern="$2"
+    local profile="$3"
+    local flat
+    if ! flat="$(nextflow config main.nf -flat -profile "${profile}" 2>&1)"; then
+        echo "FAIL: ${desc}: config did not resolve"
+        echo "${flat}"
+        fail=1
+        return
+    fi
+    if ! grep -qE -- "${pattern}" <<<"${flat}"; then
+        echo "FAIL: ${desc}: no match for /${pattern}/"
+        fail=1
+        return
+    fi
+    echo "OK: ${desc}"
+}
+
 # the slurm profile wires the slurm executor and the resourceLimits cap.
 assert_contains "slurm profile sets the slurm executor" \
     "process.executor = 'slurm'" "slurm"
-assert_contains "slurm profile sets the resourceLimits ceiling" \
-    "process.resourceLimits.cpus" "slurm"
+assert_matches "slurm profile sets the resourceLimits ceiling" \
+    "resourceLimits.*cpus" "slurm"
 assert_contains "slurm profile sets the submit rate limit" \
     "executor.submitRateLimit" "slurm"
 
