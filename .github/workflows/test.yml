@@ -53,11 +53,21 @@ jobs:
         run: bash tests/coverage-gate.sh
 
   config-checks:
-    # [S08]/[S75]: assert the container profiles and the site-config
-    # override mechanism resolve correctly. Config resolution only — no
-    # engine, no container build, and no scheduler are exercised here
-    # (those stay manual cluster smoke tests), so no tool setup is
-    # needed, just Nextflow.
+    # [S08]/[S75]/[S87]: assert the container profiles, the site-config
+    # override mechanism and the institutional cluster profiles resolve
+    # correctly. Config resolution only — no engine, no container build,
+    # and no scheduler are exercised here (those stay manual cluster smoke
+    # tests), so no tool setup is needed, just Nextflow.
+    #
+    # Run on a PINNED 25.10.x as well as the latest stable: a cluster
+    # config that ships a block-form `singularity { }` scope silently
+    # loses `singularity.enabled` on Nextflow 25.10.x (the version most of
+    # our sites run) but not on 26.x, so a single-(latest-)version check
+    # would miss that regression. [S87]
+    strategy:
+      fail-fast: false
+      matrix:
+        nxf_ver: ['25.10.2', 'latest-stable']
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -68,6 +78,8 @@ jobs:
           java-version: '17'
       - name: Set up Nextflow
         uses: nf-core/setup-nextflow@v3
+        with:
+          version: ${{ matrix.nxf_ver }}
       - name: Validate container profile wiring
         run: bash tests/check-container-profiles.sh
       - name: Validate site-config override wiring

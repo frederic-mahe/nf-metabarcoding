@@ -43,6 +43,32 @@ assert_contains() {
     echo "OK: ${desc}"
 }
 
+# Like assert_contains but matches an extended regex (grep -E), for values
+# whose `-flat` rendering differs across Nextflow versions. resourceLimits
+# renders as a single map line on 25.10.x
+# (`resourceLimits = [cpus:64, memory:'2 TB', time:'7d']`) but as expanded
+# dotted keys on 26.x (`resourceLimits.memory = '2 TB'`); a regex matches
+# both, so the same check passes on every supported Nextflow.
+#   assert_matches <desc> <regex> <profile>
+assert_matches() {
+    local desc="$1"
+    local pattern="$2"
+    local profile="$3"
+    local flat
+    if ! flat="$(nextflow config main.nf -flat -profile "${profile}" 2>&1)"; then
+        echo "FAIL: ${desc}: config did not resolve"
+        echo "${flat}"
+        fail=1
+        return
+    fi
+    if ! grep -qE -- "${pattern}" <<<"${flat}"; then
+        echo "FAIL: ${desc}: no match for /${pattern}/"
+        fail=1
+        return
+    fi
+    echo "OK: ${desc}"
+}
+
 # Each cluster: profile name -> its resourceLimits memory ceiling (the
 # largest node, as Nextflow renders it in `-flat` output).
 declare -A CLUSTER_MEMORY=(
@@ -71,8 +97,8 @@ for cluster in "${!CLUSTER_MEMORY[@]}"; do
     assert_contains "${cluster}: slurm executor" \
         "process.executor = 'slurm'" "${cluster}"
     # ... and clamps to that cluster's largest node ...
-    assert_contains "${cluster}: resourceLimits memory ceiling" \
-        "process.resourceLimits.memory = '${CLUSTER_MEMORY[$cluster]}'" "${cluster}"
+    assert_matches "${cluster}: resourceLimits memory ceiling" \
+        "resourceLimits.*'${CLUSTER_MEMORY[$cluster]}'" "${cluster}"
     # ... composes with its dependency engine ...
     assert_contains "${cluster},${engine}: engine enabled" \
         "${engine}.enabled = true" "${cluster},${engine}"
