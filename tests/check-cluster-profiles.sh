@@ -50,7 +50,7 @@ declare -A CLUSTER_MEMORY=(
     [genotoul]='3.9 TB'
     [ifb_core]='2 TB'
     [meso]='3.7 TB'
-    [saga]='6 TB'
+    [saga]='5.9 TB'
 )
 
 # The dependency engine each cluster composes with. The needle is the
