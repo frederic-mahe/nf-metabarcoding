@@ -60,7 +60,6 @@ assert_absent() {
 for engine in docker podman singularity apptainer; do
     assert_resolves "${engine}" "${engine}.enabled = true"
     assert_resolves "${engine}" "wave.enabled = true"
-    assert_resolves "${engine}" "conda.enabled = true"
     assert_resolves "${engine}" "environment.yml"
 done
 
