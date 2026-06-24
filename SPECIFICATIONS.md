@@ -889,15 +889,24 @@ from placeholder values to real taxonomic assignments.
        `collectFile(sort: { ... })` operator, which publishes
        the merged `<basename>_taxonomy_stampa.tsv` directly to
        the results folder. No separate merge process.
+     4. each chunk's `vsearch.log` is emitted alongside its
+        `stampa_chunk.tsv` slice and the slices are gathered
+        (via `collectFile`) into a single `<basename>_taxonomy.log`
+        published to `<outdir>/logs/part_c/` ([S59]/D16), the stampa
+        counterpart of the sintax path's `--log` artefact. No
+        separate merge process.
   - **Pass when:** the scatter-gather smoke tests in
     `tests/main.nf.test` (one with `params.stampa_chunk_size=1`
     that forces a split, one with `=0` for the no-split branch)
     publish the expected `<basename>_taxonomy_stampa.tsv` sorted
     by abundance desc then amplicon asc; the per-chunk process
     test in `tests/processes/part_c/assign_taxonomy_stampa.nf.test`
-    confirms one chunk's vsearch + `bin/stampa_merge.py` wiring;
-    and LCA correctness is pinned at the helper level by
-    `tests/python/test_stampa_merge.py`.
+    confirms one chunk's vsearch + `bin/stampa_merge.py` wiring and
+    that it emits a `vsearch.log`; the subworkflow test in
+    `tests/subworkflows/part_c.nf.test` confirms the stampa path
+    gathers the per-chunk logs into a published
+    `logs/part_c/<basename>_taxonomy.log`; and LCA correctness is
+    pinned at the helper level by `tests/python/test_stampa_merge.py`.
 - `[S50]` Part C's **shadow path** runs `vsearch --sintax`
   against `--reference_dataset_sintax` ([S64]) on the shadow
   occurrence table `<basename>_notmerged_table.tsv` produced by
@@ -1069,15 +1078,18 @@ from placeholder values to real taxonomic assignments.
        `>amplicon;size=total;`).
   The directory contains **no** `*.log`: the six canonical `[S45]` step
   logs are published to `<outdir>/logs/part_b/` and Part C's
-  `_taxonomy.log` to `<outdir>/logs/part_c/` instead (D16).
+  `<basename>_taxonomy.log` to `<outdir>/logs/part_c/` instead (D16).
+  Both Part C paths publish that log: the sintax path from vsearch's
+  `--log`, and the stampa path by gathering its per-chunk `vsearch.log`
+  slices into the single `<basename>_taxonomy.log` (D16).
   When Part C runs, its `<basename>_table_assigned.tsv` ([S51]) and
   `<basename>_table_assigned_majority.tsv` ([S66]) are published into
   the same directory (they are not Part B intermediates and are not
   covered by this whitelist). Part C's raw per-amplicon assignment
   tables — `assign_taxonomy_sintax`'s `<basename>_taxonomy_sintax.tsv`
-  and the stampa path's chunk outputs — are **intermediates** consumed
-  by `update_occurrence_table` and stay in the work directory; only the
-  joined `_table_assigned.tsv` is published. The run's
+  and the stampa path's chunk TSVs (`stampa_chunk.tsv`) — are
+  **intermediates** consumed by `update_occurrence_table` and stay in
+  the work directory; only the joined `_table_assigned.tsv` is published. The run's
   `software_versions.yml`
   ([S68]) lives in the sibling `<outdir>/pipeline_info/`, **not** in
   `occurrence_table/`. All other Part B intermediates (`.qual`,
@@ -1438,8 +1450,10 @@ from placeholder values to real taxonomic assignments.
       read-count summary ([S86]), a sibling of `per_sample/`.
     - `<outdir>/logs/part_b/` — Part B's six step logs ([S45]), regular
       and `_notmerged` shadow siblings together.
-    - `<outdir>/logs/part_c/` — Part C's `_taxonomy.log`, regular and
-      `_notmerged` shadow siblings together.
+    - `<outdir>/logs/part_c/` — Part C's `<basename>_taxonomy.log`
+      (sintax `--log`, or the stampa path's gathered per-chunk
+      `vsearch.log` slices), regular and `_notmerged` shadow siblings
+      together.
     - `<outdir>/pipeline_info/` — `software_versions.yml` ([S68]); a
       sibling of `occurrence_table/`, **not** inside it. Nextflow's own
       execution reports (timeline / report / trace / dag) also live

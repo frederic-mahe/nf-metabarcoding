@@ -128,4 +128,39 @@ nextflow_process {
                 "expected the single ref to be the top hit, got: ${rows[0]}"
         }
     }
+
+    test("emits the per-chunk vsearch.log for gathering into the Part C log") {
+        // COVERAGE: [S49]
+        // [S49]/[S59]/D16: each chunk's vsearch run writes a vsearch.log
+        // that the stampa subworkflow gathers into the published
+        // logs/part_c/<basename>_taxonomy.log. Pin the per-chunk emit
+        // here; the gather + publish location is covered at the
+        // subworkflow level (tests/subworkflows/part_c.nf.test).
+        tag "ci"
+        when {
+            params {
+                threads = 1
+                iddef   = 1
+            }
+            process {
+                """
+                def reps = workDir.resolve("reps.fas")
+                reps.text = '>amp1;size=10;\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>refA Kingdom|Phylum|Class\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n'
+                input[0] = file(reps.toString())
+                input[1] = file(ref.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def vlog = process.out.log.get(0)
+            assert vlog.endsWith("vsearch.log") :
+                "expected the chunk's vsearch.log, got: ${vlog}"
+            // vsearch always prints its banner to the log, so it is non-empty
+            assert path(vlog).readLines().size() > 0 :
+                "vsearch.log should not be empty"
+        }
+    }
 }

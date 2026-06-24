@@ -15,6 +15,11 @@ process assign_taxonomy_stampa {
 
     output:
     path "stampa_chunk.tsv", emit: taxonomy
+    // [S49]/[S59]/D16: the per-chunk vsearch log is gathered by the
+    // subworkflow into the published logs/part_c/<basename>_taxonomy.log
+    // (the stampa counterpart of the sintax path's --log). Not published
+    // here: a fixed-name per-chunk file would collide across the scatter.
+    path "vsearch.log",      emit: log
 
     shell:
     '''
@@ -41,6 +46,6 @@ process assign_taxonomy_stampa {
 
     stub:
     """
-    touch stampa_chunk.tsv
+    touch stampa_chunk.tsv vsearch.log
     """
 }

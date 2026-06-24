@@ -10,7 +10,7 @@ include { assign_taxonomy_stampa }                         from '../../modules/l
 include { assign_taxonomy_sintax }                         from '../../modules/local/part_c/assign_taxonomy_sintax.nf'
 include { update_occurrence_table }                        from '../../modules/local/part_c/update_occurrence_table.nf'
 include { compute_majority_assignment }                    from '../../modules/local/part_c/compute_majority_assignment.nf'
-include { normalize_path; publish_dir }                    from '../../modules/local/functions.nf'
+include { normalize_path; publish_dir; log_dir }            from '../../modules/local/functions.nf'
 
 
 workflow part_C {
@@ -74,6 +74,18 @@ workflow part_C {
             : reps_ch
 
         assign_taxonomy_stampa(chunks, reference)
+
+        // [S49]/[S59]/D16: gather each chunk's vsearch.log into the
+        // single published <basename>_taxonomy.log under logs/part_c/,
+        // the stampa counterpart of the sintax path's --log artefact.
+        // Empty input (no chunks) → nothing gathered, no log published,
+        // matching the "only stages that run produce output" contract.
+        assign_taxonomy_stampa.out.log
+            .combine(basename)
+            .collectFile(storeDir: log_dir('part_c')) { chunk_log, bn ->
+                ["${bn}_taxonomy.log", chunk_log.text]
+            }
+
         def merged = assign_taxonomy_stampa.out.taxonomy
             .combine(basename)
             .collectFile(

@@ -1,0 +1,59 @@
+nextflow_workflow {
+
+    name "part_C subworkflow"
+    script "subworkflows/local/part_c.nf"
+    workflow "part_C"
+
+    test("stampa path gathers per-chunk vsearch logs into a published logs/part_c/<basename>_taxonomy.log") {
+        // COVERAGE: [S49]
+        // [S49]/[S59]/D16: the stampa path emits a vsearch.log per chunk
+        // and the subworkflow gathers them (collectFile) into a single
+        // <basename>_taxonomy.log published under <outdir>/logs/part_c/ —
+        // the stampa counterpart of the sintax path's --log artefact.
+        // stampa_chunk_size=1 forces a split so more than one chunk log
+        // is gathered into the single published file.
+        tag "ci"
+        when {
+            params {
+                threads           = 1
+                iddef             = 1
+                results_folder    = "${outputDir}/part_c_log"
+                reference_dataset = "${outputDir}/part_c_log_ref.fas"
+                stampa_chunk_size = 1   // force one chunk per record
+            }
+            workflow {
+                """
+                input[0] = file("${outputDir}/subwf_stampa_table.tsv")
+                input[1] = Channel.value("subwf_stampa")
+                """
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_log_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA Kingdom|Phylum|Class\n" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            )
+            def tab = file("${outputDir}/subwf_stampa_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t5\tNA\tamp1\t32\t5\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t5\n" +
+                "2\t20\tNA\tamp2\t32\t20\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t20\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def plog = file(
+                "${outputDir}/part_c_log/logs/part_c/subwf_stampa_taxonomy.log"
+            )
+            assert plog.exists() :
+                "stampa path should publish logs/part_c/<basename>_taxonomy.log"
+            assert plog.readLines().size() > 0 :
+                "gathered taxonomy log should not be empty"
+        }
+    }
+}

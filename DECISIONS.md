@@ -904,7 +904,9 @@ logs by the pipeline stage that produced them?
      read-count summary ([S86]), a sibling of `per_sample/` (it is
      project-wide, not per-sample);
    - `logs/part_b/` — Part B's six step logs ([S45]);
-   - `logs/part_c/` — Part C's `_taxonomy.log`.
+   - `logs/part_c/` — Part C's `<basename>_taxonomy.log` (the sintax
+     path's vsearch `--log`, or the stampa path's per-chunk
+     `vsearch.log` slices gathered into one file).
    Only stages that actually run produce a directory, so the tree is
    truthful about what executed.
 3. **Flat `logs/`** with stage-prefixed filenames. Rejected — loses the
