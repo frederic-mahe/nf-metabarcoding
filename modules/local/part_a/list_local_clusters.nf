@@ -7,7 +7,8 @@ include { publish_dir; log_dir } from '../functions.nf'
 // - list_per_sample_clusters
 
 process list_local_clusters {
-    // retain only clusters with more than 2 reads
+    // retain only clusters with more than params.min_cluster_size
+    // reads (default 2)
     // (do not use the fastidious option here)
     // [D16]: data (.stats) to per_sample/, log to logs/part_a/per_sample/.
     publishDir path: { publish_dir('per_sample') }, mode: params.publish_mode, pattern: "*.stats"

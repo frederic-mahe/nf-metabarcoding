@@ -25,7 +25,7 @@ process trim_primers {
 
     reverse_primer_revcomp=$(reverse_complement.sh "!{params.reverse_primer}")
 
-    MIN_F=$(awk -v l=!{params.forward_primer.length()} -v f=!{params.primer_overlap_fraction} 'BEGIN { printf "%d", l * f }')  # match is >= 2/3 of primer length
+    MIN_F=$(awk -v l=!{params.forward_primer.length()} -v f=!{params.primer_overlap_fraction} 'BEGIN { printf "%d", l * f }')  # match is >= primer_overlap_fraction of primer length (default 2/3)
     MIN_R=$(awk -v l=!{params.reverse_primer.length()} -v f=!{params.primer_overlap_fraction} 'BEGIN { printf "%d", l * f }')
     # The two passes run concurrently through the pipe, so naming
     # task.cpus on each would request twice the reservation. Split the
