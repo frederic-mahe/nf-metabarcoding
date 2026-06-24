@@ -7,10 +7,11 @@
 
 include { extract_fasta_sequences_from_occurrence_table } from '../../modules/local/part_c/extract_fasta_sequences_from_occurrence_table.nf'
 include { assign_taxonomy_stampa }                         from '../../modules/local/part_c/assign_taxonomy_stampa.nf'
+include { sort_taxonomy }                                  from '../../modules/local/part_c/sort_taxonomy.nf'
 include { assign_taxonomy_sintax }                         from '../../modules/local/part_c/assign_taxonomy_sintax.nf'
 include { update_occurrence_table }                        from '../../modules/local/part_c/update_occurrence_table.nf'
 include { compute_majority_assignment }                    from '../../modules/local/part_c/compute_majority_assignment.nf'
-include { normalize_path; publish_dir; log_dir }            from '../../modules/local/functions.nf'
+include { normalize_path; log_dir }                          from '../../modules/local/functions.nf'
 
 
 workflow part_C {
@@ -55,19 +56,6 @@ workflow part_C {
         // assign_taxonomy_stampa in parallel, then concatenate +
         // sort the slices via collectFile.
         //
-        // Each chunk's TSV is paired with the basename value
-        // channel via `combine` so the collectFile closure can
-        // build "${basename}_taxonomy_stampa.tsv" per-item
-        // (basename can't be interpolated into collectFile's
-        // `name:` String at workflow-build time).
-        //
-        // Note on the sort closure: collectFile sorts in JVM heap,
-        // which is fine for nf-metabarcoding's representative
-        // counts (typically < a few million OTUs). If a real run
-        // ever hits the OOM line, swap this for an external
-        // `sort_taxonomy` process running `LC_ALL=C sort -k2,2nr
-        // -k1,1d` on an unsorted collectFile output. See Plan B
-        // (2026-05-19) for the fallback writeup.
         def reps_ch = extract_fasta_sequences_from_occurrence_table.out.fasta
         def chunks = (params.stampa_chunk_size > 0)
             ? reps_ch.splitFasta(by: params.stampa_chunk_size, file: true)
@@ -86,29 +74,22 @@ workflow part_C {
                 ["${bn}_taxonomy.log", chunk_log.text]
             }
 
-        def merged = assign_taxonomy_stampa.out.taxonomy
-            .combine(basename)
-            .collectFile(
-                storeDir: publish_dir('occurrence_table'),
-                sort: { line ->
-                    // -k2,2nr -k1,1d == abundance desc, amplicon asc.
-                    // collectFile's sort closure takes one argument
-                    // (a line) and must return a Comparable key.
-                    // ArrayLists aren't Comparable on the JVM side,
-                    // so we build a single String key: width-13 inverted
-                    // abundance (so descending becomes ascending under
-                    // lexicographic ordering), then a tab, then the
-                    // amplicon name (already ascending).
-                    def f = line.tokenize('\t')
-                    String.format(
-                        "%013d\t%s",
-                        9999999999999L - (f[1] as Long),
-                        f[0],
-                    )
-                },
-            ) { chunk_tsv, bn ->
-                ["${bn}_taxonomy_stampa.tsv", chunk_tsv.text]
-            }
+        // Gather the per-chunk slices into a single (unsorted) file,
+        // then stabilise the order in the sort_taxonomy process.
+        //
+        // collectFile cannot do the sorting itself: its `sort:` closure
+        // orders whole entries (chunks), not the lines inside a chunk,
+        // so it only sorted correctly in the degenerate
+        // one-record-per-chunk case and left multi-record chunks (the
+        // default and the `local`/`demo` profiles) in vsearch's
+        // thread-dependent order. Here collectFile only concatenates;
+        // sort_taxonomy applies `LC_ALL=C sort -k2,2nr -k1,1d`
+        // (abundance desc, amplicon asc) and publishes the result.
+        def gathered = assign_taxonomy_stampa.out.taxonomy
+            .collectFile(name: 'taxonomy_stampa.unsorted.tsv')
+
+        sort_taxonomy(gathered, basename)
+        def merged = sort_taxonomy.out.taxonomy
 
         // [S51] empty-input contract: when the occurrence table has no
         // rows, the extracted representatives fasta is empty,

@@ -883,12 +883,16 @@ from placeholder values to real taxonomic assignments.
        `amplicon\tabundance\tidentity\ttaxonomy\treferences`
        (same shape as `fake_taxonomic_assignment`'s `[S33]`
        output).
-    3. the per-chunk slices are concatenated and sorted (by
-       abundance desc, amplicon asc — i.e. legacy
-       `sort -k2,2nr -k1,1d`) via Nextflow's
-       `collectFile(sort: { ... })` operator, which publishes
-       the merged `<basename>_taxonomy_stampa.tsv` directly to
-       the results folder. No separate merge process.
+    3. the per-chunk slices are concatenated (via Nextflow's
+       `collectFile`) and then sorted by the `sort_taxonomy`
+       process running `LC_ALL=C sort -k2,2nr -k1,1d` (abundance
+       desc, amplicon asc — the legacy stampa order), which
+       publishes the merged `<basename>_taxonomy_stampa.tsv` to
+       the results folder. The sort is a real process rather than
+       `collectFile`'s `sort:` closure because that closure orders
+       whole entries (chunks), not the lines inside a chunk, and so
+       cannot stabilise vsearch's thread-dependent within-chunk
+       order.
      4. each chunk's `vsearch.log` is emitted alongside its
         `stampa_chunk.tsv` slice and the slices are gathered
         (via `collectFile`) into a single `<basename>_taxonomy.log`

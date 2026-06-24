@@ -56,4 +56,128 @@ nextflow_workflow {
                 "gathered taxonomy log should not be empty"
         }
     }
+
+    test("stampa path sorts the gathered _taxonomy_stampa.tsv by abundance desc then amplicon asc across chunks") {
+        // COVERAGE: [S49]
+        // [S49]: vsearch emits each chunk's hits in a thread-dependent
+        // order and collectFile gathers the per-chunk slices in a
+        // non-deterministic order, so the final <basename>_taxonomy_stampa.tsv
+        // must be stabilised by the collectFile(sort:) closure
+        // (LC_ALL=C sort -k2,2nr -k1,1d). stampa_chunk_size=1 forces one
+        // chunk per record so the gather order is exercised; the input rows
+        // are deliberately scrambled and two share an abundance so the
+        // alphabetical secondary key is exercised too.
+        tag "ci"
+        when {
+            params {
+                threads           = 1
+                iddef             = 1
+                results_folder    = "${outputDir}/part_c_sort"
+                reference_dataset = "${outputDir}/part_c_sort_ref.fas"
+                stampa_chunk_size = 1   // force one chunk per record
+            }
+            workflow {
+                """
+                input[0] = file("${outputDir}/subwf_sort_table.tsv")
+                input[1] = Channel.value("subwf_sort")
+                """
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_sort_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA Kingdom|Phylum|Class\n" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            )
+            // Rows are scrambled (ampB, ampC, ampA, ampD) and ampA/ampB
+            // share abundance 10. Expected sorted order:
+            //   ampC(50), ampA(10), ampB(10), ampD(5)
+            def seq = "ACGTACGTACGTACGTACGTACGTACGTACGT"
+            def tab = file("${outputDir}/subwf_sort_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tampB\t32\t10\tN\t1\t0.001\t${seq}\t0.0\tNA\tNA\t10\n" +
+                "2\t50\tNA\tampC\t32\t50\tN\t1\t0.001\t${seq}\t0.0\tNA\tNA\t50\n" +
+                "3\t10\tNA\tampA\t32\t10\tN\t1\t0.001\t${seq}\t0.0\tNA\tNA\t10\n" +
+                "4\t5\tNA\tampD\t32\t5\tN\t1\t0.001\t${seq}\t0.0\tNA\tNA\t5\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def out = file(
+                "${outputDir}/part_c_sort/occurrence_table/subwf_sort_taxonomy_stampa.tsv"
+            )
+            assert out.exists() :
+                "stampa path should publish occurrence_table/<basename>_taxonomy_stampa.tsv"
+            def rows = out.readLines().findAll { it.trim() }
+            def names = rows.collect { it.tokenize('\t')[0] }
+            def abundances = rows.collect { it.tokenize('\t')[1] as Long }
+            assert names == ['ampC', 'ampA', 'ampB', 'ampD'] :
+                "amplicons must be ordered by abundance desc then name asc, got ${names}"
+            assert abundances == [50L, 10L, 10L, 5L] :
+                "abundances must be non-increasing, got ${abundances}"
+        }
+    }
+
+    test("stampa path sorts a single multi-record chunk deterministically under multithreading") {
+        // COVERAGE: [S49]
+        // [S49]: with stampa_chunk_size=0 every representative goes through
+        // one vsearch invocation, whose --threads emits the per-query hit
+        // blocks in a thread-scheduling-dependent order. The single chunk
+        // still passes through collectFile(sort:), so the published TSV must
+        // be deterministic regardless of thread count. threads=4 makes the
+        // unsorted order non-deterministic; the assertion below pins the
+        // stabilised result.
+        tag "ci"
+        when {
+            params {
+                threads           = 4
+                iddef             = 1
+                results_folder    = "${outputDir}/part_c_sort1"
+                reference_dataset = "${outputDir}/part_c_sort1_ref.fas"
+                stampa_chunk_size = 0   // no split: one chunk, many records
+            }
+            workflow {
+                """
+                input[0] = file("${outputDir}/subwf_sort1_table.tsv")
+                input[1] = Channel.value("subwf_sort1")
+                """
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_sort1_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA Kingdom|Phylum|Class\n" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            )
+            def seq = "ACGTACGTACGTACGTACGTACGTACGTACGT"
+            def tab = file("${outputDir}/subwf_sort1_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tampB\t32\t10\tN\t1\t0.001\t${seq}\t0.0\tNA\tNA\t10\n" +
+                "2\t50\tNA\tampC\t32\t50\tN\t1\t0.001\t${seq}\t0.0\tNA\tNA\t50\n" +
+                "3\t10\tNA\tampA\t32\t10\tN\t1\t0.001\t${seq}\t0.0\tNA\tNA\t10\n" +
+                "4\t5\tNA\tampD\t32\t5\tN\t1\t0.001\t${seq}\t0.0\tNA\tNA\t5\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def out = file(
+                "${outputDir}/part_c_sort1/occurrence_table/subwf_sort1_taxonomy_stampa.tsv"
+            )
+            assert out.exists() :
+                "stampa path should publish occurrence_table/<basename>_taxonomy_stampa.tsv"
+            def rows = out.readLines().findAll { it.trim() }
+            def names = rows.collect { it.tokenize('\t')[0] }
+            def abundances = rows.collect { it.tokenize('\t')[1] as Long }
+            assert names == ['ampC', 'ampA', 'ampB', 'ampD'] :
+                "amplicons must be ordered by abundance desc then name asc, got ${names}"
+            assert abundances == [50L, 10L, 10L, 5L] :
+                "abundances must be non-increasing, got ${abundances}"
+        }
+    }
 }

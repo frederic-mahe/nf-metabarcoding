@@ -75,7 +75,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S46]`| Part B publishes final occurrence table as `<basename>_table.tsv`                    | `tests/main.nf.test`, `tests/processes/part_b/rebuild_post_mumu_table.nf.test` | done   | — |
 | `[S47]`| Part C requires `--reference_dataset` (no default)                                   | `tests/main.nf.test`                            | done    | —          |
 | `[S48]`| Part C accepts either an occurrence table or a fasta file (fasta-input branch blocked)| `tests/processes/part_c/extract_fasta_sequences_from_occurrence_table.nf.test` | done   | D04        |
-| `[S49]`| Part C stampa primary path — splitFasta + per-chunk `vsearch --usearch_global` + `bin/stampa_merge.py` + `collectFile(sort:)`; per-chunk `vsearch.log` gathered into a published `logs/part_c/<basename>_taxonomy.log` | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`, `tests/subworkflows/part_c.nf.test`, `tests/main.nf.test`, `tests/python/test_stampa_merge.py` | done | — |
+| `[S49]`| Part C stampa primary path — splitFasta + per-chunk `vsearch --usearch_global` + `bin/stampa_merge.py` + gather (`collectFile`) + `sort_taxonomy` (`LC_ALL=C sort -k2,2nr -k1,1d`); per-chunk `vsearch.log` gathered into a published `logs/part_c/<basename>_taxonomy.log` | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`, `tests/subworkflows/part_c.nf.test`, `tests/main.nf.test`, `tests/python/test_stampa_merge.py` | done | — |
 | `[S50]`| Part C sintax shadow path — `part_C_shadow` runs `vsearch --sintax` on `<basename>_notmerged_table.tsv` and publishes `<basename>_notmerged_table_assigned.tsv` | `tests/processes/part_c/assign_taxonomy_sintax.nf.test`, `tests/main.nf.test` | done   | —          |
 | `[S51]`| Part C `update_occurrence_table` — splice taxonomy back onto the occurrence table   | `tests/processes/part_c/update_occurrence_table.nf.test` | done   | D04        |
 | `[S52]`| **Retired** (was: Part A U/u → T/t normalisation; dropped with the A-padding redesign — see `[S04]`, `[S63]`) | —                                | retired | —          |
@@ -149,6 +149,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `rebuild_post_mumu_table`       | `tests/processes/part_b/rebuild_post_mumu_table.nf.test`      | S44, S46     | done   |
 | `extract_fasta_sequences_from_occurrence_table` | `tests/processes/part_c/extract_fasta_sequences_from_occurrence_table.nf.test` | S48 | done   |
 | `assign_taxonomy_stampa`        | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`       | S49          | done   |
+| `sort_taxonomy`                 | `tests/processes/part_c/sort_taxonomy.nf.test`               | S49          | done   |
 | `assign_taxonomy_sintax`        | `tests/processes/part_c/assign_taxonomy_sintax.nf.test`       | S50          | done   |
 | `update_occurrence_table`       | `tests/processes/part_c/update_occurrence_table.nf.test`      | S51          | done   |
 | `compute_majority_assignment`   | `tests/processes/part_c/compute_majority_assignment.nf.test`  | S66          | done   |

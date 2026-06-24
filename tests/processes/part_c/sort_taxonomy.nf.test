@@ -1,0 +1,76 @@
+nextflow_process {
+
+    name "sort_taxonomy"
+    script "modules/local/part_c/sort_taxonomy.nf"
+    process "sort_taxonomy"
+
+    test("sorts the gathered assignments by abundance desc then amplicon asc") {
+        // COVERAGE: [S49]
+        // [S49]: the gathered stampa slices arrive in vsearch's
+        // thread-dependent order; sort_taxonomy must impose the legacy
+        // stampa order (LC_ALL=C sort -k2,2nr -k1,1d == abundance desc,
+        // amplicon asc) and publish <basename>_taxonomy_stampa.tsv. The
+        // input rows are scrambled and ampA/ampB share abundance 10 so
+        // the alphabetical secondary key is exercised.
+        tag "ci"
+        when {
+            process {
+                """
+                def t = workDir.resolve("taxonomy_stampa.unsorted.tsv")
+                t.text = '''ampB\\t10\\t99.0\\tBacteria|Firmicutes\\trefA
+ampC\\t50\\t99.0\\tBacteria|Firmicutes\\trefA
+ampA\\t10\\t99.0\\tBacteria|Firmicutes\\trefA
+ampD\\t5\\t99.0\\tBacteria|Firmicutes\\trefA
+'''
+                input[0] = file(t.toString())
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def out = process.out.taxonomy.get(0)
+            assert out.endsWith("proj_3_samples_taxonomy_stampa.tsv") :
+                "expected <basename>_taxonomy_stampa.tsv, got: ${out}"
+            def rows = path(out).readLines().findAll { it.trim() }
+            def names = rows.collect { it.split("\t", -1)[0] }
+            def abundances = rows.collect { it.split("\t", -1)[1] as Long }
+            assert names == ['ampC', 'ampA', 'ampB', 'ampD'] :
+                "abundance desc then amplicon asc expected, got ${names}"
+            assert abundances == [50L, 10L, 10L, 5L] :
+                "abundances must be non-increasing, got ${abundances}"
+        }
+    }
+
+    test("treats columns as tab-separated so spaces inside taxonomy do not shift the sort key") {
+        // COVERAGE: [S49]
+        // [S49]: the slices are tab-delimited but the taxonomy column can
+        // contain spaces (e.g. species binomials). The sort must key on
+        // the tab-delimited abundance field (column 2), not on a
+        // whitespace-split field, so `sort -t '\t'` is required. Two rows
+        // share a space-bearing taxonomy and differ only in abundance:
+        // a whitespace-delimited sort would key on the wrong column and
+        // mis-order them.
+        tag "ci"
+        when {
+            process {
+                """
+                def t = workDir.resolve("taxonomy_stampa.unsorted.tsv")
+                t.text = '''ampLow\\t2\\t99.0\\tBacteria|Genus species\\trefA
+ampHigh\\t40\\t99.0\\tBacteria|Genus species\\trefA
+'''
+                input[0] = file(t.toString())
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def out = process.out.taxonomy.get(0)
+            def rows = path(out).readLines().findAll { it.trim() }
+            def names = rows.collect { it.split("\t", -1)[0] }
+            assert names == ['ampHigh', 'ampLow'] :
+                "abundance must be read from the tab-delimited column 2, got ${names}"
+        }
+    }
+}
