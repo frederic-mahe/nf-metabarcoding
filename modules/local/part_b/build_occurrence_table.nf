@@ -48,6 +48,9 @@ process build_occurrence_table {
         --assignments     <(cat !{assignments_2} !{assignments}) \
         --distribution    !{distribution} \
         --samples         '!{sample_ids}' \
+        --max-ee          !{params.max_ee} \
+        --min-abundance   !{params.min_abundance} \
+        --min-spread      !{params.min_spread} \
         > !{basename}.OTU.filtered.cleaved.table
     '''
 

@@ -84,6 +84,40 @@ nextflow_process {
         }
     }
 
+    test("min_cluster_size lowers the read threshold below the default") {
+        // COVERAGE: [S17]
+        // The paired_merge_ok fixture collapses into singleton clusters
+        // (total = 1 read each), so the default `> 2` filter (the test
+        // above) leaves the output empty. Setting --min_cluster_size 0
+        // switches the filter to `> 0`, which keeps those singletons.
+        // A stale hard-coded `> 2` would still drop them, so a non-empty
+        // output here — with surviving rows at total <= 2 — is a
+        // necessary witness that the param reached filter_swarm_stats.awk.
+        tag "ci"
+        when {
+            params {
+                forward_primer   = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer   = "ACTTTCGTTCTTGATYRA"
+                fastq_folder     = "tests/data"
+                min_cluster_size = 0
+            }
+            process {
+                """
+                input[0] = dereplicate_fasta.out.fasta
+                """
+            }
+        }
+        then {
+            assert process.success
+            def stats = path(process.out.stats.get(0)[1]).readLines()
+                .findAll { !it.trim().isEmpty() }
+            assert !stats.isEmpty() :
+                "[S17] --min_cluster_size 0 should keep the singleton clusters the default > 2 drops"
+            assert stats.any { (it.split("\t")[1] as int) <= 2 } :
+                "[S17] expected a surviving row with total <= 2 under --min_cluster_size 0, got: ${stats}"
+        }
+    }
+
     test("emits a per-sample clustering log") {
         // COVERAGE: [S19]
         tag "ci"

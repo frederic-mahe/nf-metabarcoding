@@ -922,3 +922,31 @@ result's build log now goes by stage (table → Part B → `logs/part_b/`)
 rather than by matching leaf name. The data-dir/log-dir asymmetry is the
 price of the more honest, stage-centric grouping. Done now, before any
 release, so no published output path is broken twice.
+
+
+## D17 — Which hard-coded threshold values stay fixed (not exposed)
+
+**Blocks:** no new `[Sxx]` (records the boundary of the parameter
+surface added for `[S17]`, `[S35]`, `[S42]`, `[S88]`–`[S90]`)
+**Status:** `resolved` — fixed-constant list confirmed (2026-06-24)
+
+Exposing the tunable thresholds (`[S88]`–`[S90]`, plus `[S17]`/`[S35]`/
+`[S42]` promotions) raised the question of where to stop. The following
+values were reviewed and deliberately **left hard-coded** because they
+are structural to the method rather than knobs a user would tune:
+
+1. **swarm `--differences 1`** (`global_clustering`,
+   `list_local_clusters`). `d = 1` *is* the ASV definition this pipeline
+   implements; changing it changes the method, not a threshold.
+2. **vsearch `--id 1.0`** in `search_for_terminal_gaps`. The step detects
+   sequences identical modulo terminal gaps — only `1.0` is meaningful.
+3. **vsearch `--fastq_maxns 0`** in `filter_and_convert_to_fasta`. "Any
+   ambiguous base drops the read" is intrinsic to exact ASVs (`[S65]`).
+4. **vsearch sentinels** `--maxaccepts 0`, `--fasta_width 0`,
+   `--rowlen 0`, and `--differences`/`--iddef` defaults that are not
+   abundance/identity thresholds. These select "no limit" / "unwrapped"
+   behaviour, not a tunable cutoff.
+
+**Resolution:** keep 1–4 fixed. If a future use-case needs one of them,
+re-open this decision and promote it the same way (`params` default +
+schema range + `[Sxx]` + test) rather than editing the module in place.

@@ -72,6 +72,32 @@
                     "default": false,
                     "description": "Skip cutadapt primer trimming."
                 },
+                "primer_error_rate": {
+                    "type": "number",
+                    "default": 0.1,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "cutadapt --error-rate for both primer-search passes (only consulted when trimming runs)."
+                },
+                "primer_overlap_fraction": {
+                    "type": "number",
+                    "default": 0.667,
+                    "exclusiveMinimum": 0,
+                    "maximum": 1,
+                    "description": "Minimum primer overlap for cutadapt --overlap, as a fraction of primer length (MIN = int(length * fraction)). 0.667 reproduces the legacy 2/3 rule."
+                },
+                "fastq_minlen": {
+                    "type": "integer",
+                    "default": 32,
+                    "minimum": 1,
+                    "description": "vsearch --fastq_minlen applied during the per-sample fasta conversion: reads shorter than this are dropped."
+                },
+                "min_cluster_size": {
+                    "type": "integer",
+                    "default": 2,
+                    "minimum": 0,
+                    "description": "Per-cluster minimum-read threshold: per-sample swarm clusters with this many reads or fewer are dropped."
+                },
                 "recover_unmerged": {
                     "type": "boolean",
                     "default": false,
@@ -119,6 +145,44 @@
                     "exclusiveMinimum": 0,
                     "maximum": 1,
                     "description": "Cleaving threshold: a sub-seed candidate must appear as a per-sample cluster seed in at least this fraction of samples; real in (0, 1]."
+                },
+                "similar_id": {
+                    "type": "number",
+                    "default": 0.84,
+                    "exclusiveMinimum": 0,
+                    "maximum": 1,
+                    "description": "vsearch --id for the find_similar_sequences self-search (lulu/mumu match list)."
+                },
+                "similar_query_cov": {
+                    "type": "number",
+                    "default": 0.9,
+                    "exclusiveMinimum": 0,
+                    "maximum": 1,
+                    "description": "vsearch --query_cov for the find_similar_sequences self-search."
+                },
+                "similar_maxhits": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1,
+                    "description": "vsearch --maxhits for the find_similar_sequences self-search."
+                },
+                "max_ee": {
+                    "type": "number",
+                    "default": 0.0002,
+                    "minimum": 0,
+                    "description": "Occurrence-table filter: keep clusters with ee/length <= max_ee."
+                },
+                "min_abundance": {
+                    "type": "integer",
+                    "default": 3,
+                    "minimum": 1,
+                    "description": "Occurrence-table filter: a cluster passes if abundance >= min_abundance (OR spread >= min_spread)."
+                },
+                "min_spread": {
+                    "type": "integer",
+                    "default": 2,
+                    "minimum": 1,
+                    "description": "Occurrence-table filter: a cluster passes if spread >= min_spread (OR abundance >= min_abundance)."
                 }
             }
         },

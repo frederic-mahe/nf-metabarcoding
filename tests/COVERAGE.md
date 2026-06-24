@@ -43,7 +43,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S14]`| collision policy for same-named samples: refuse (sample IDs must be unique) | `tests/python/test_discover_fastq.py`, `tests/python/test_discover_fasta.py` | done    | —          |
 | `[S15]`| export single occurrence table *or* two-part (long + metadata) table       | `tests/main.nf.test`                            | TODO    | —          |
 | `[S16]`| expect demultiplexed fastq files                                           | —                                               | n/a     | —          |
-| `[S17]`| per-cluster minimum-read threshold (> 2 reads)                             | `tests/processes/part_a/list_local_clusters.nf.test`, `tests/main.nf.test`   | done    | —          |
+| `[S17]`| per-cluster minimum-read threshold `--min_cluster_size` (default > 2 reads) | `tests/processes/part_a/list_local_clusters.nf.test`, `tests/bin/filter_swarm_stats.bats`, `tests/main.nf.test`   | done    | —          |
 | `[S18]`| required params (forward/reverse_primer, fastq_folder) must be supplied    | `tests/main.nf.test`                            | done    | —          |
 | `[S19]`| Part A steps emit per-sample `<sampleId>_<step>.log` files (data → `per_sample/`, logs → `logs/part_a/per_sample/`) | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/trim_primers.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_a/list_local_clusters.nf.test`, `tests/main.nf.test` | done | D15, D16 |
 | `[S20]`| `--no_trimming` toggle skips primer trimming; mutually exclusive w/ primers| `tests/main.nf.test`                            | done    | —          |
@@ -108,12 +108,15 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S79]`| slurm runs warn at startup when `--dataset_size_gb` / `--reference_size_gb` are unset (fixed-fallback memory may OOM large runs); silent off-slurm | `tests/functions/resource_size_warnings.nf.test` | done | — |
 | `[S70]`| `--input` samplesheet (fastq / fasta profiles): structural validation in `bin/parse_samplesheet.py`; folder-scan fallback, mutually exclusive | `tests/python/test_parse_samplesheet.py`, `tests/main.nf.test` | done | — |
 | `[S71]`| `--outdir` single output root (data → `per_sample`/`occurrence_table`, logs → `logs/part_{a,b,c}`, `pipeline_info`); `--results_folder` deprecated alias; `--fastq_folder` input-only | `tests/functions/effective_outdir.nf.test`, `tests/main.nf.test` | done | D15, D16 |
-| `[S72]`| numeric params range-validated at startup (fastq_encoding, threads, percentage, chimera_minsize, stripright, iddef, stampa_chunk_size, stampa_maxrejects, stampa_id, sintax_cutoff); out-of-range aborts naming the param. Declared in `nextflow_schema.json`, enforced by nf-schema `validateParameters()` | `tests/main.nf.test`, `tests/python/test_schema_params_sync.py` | done | — |
+| `[S72]`| numeric params range-validated at startup (fastq_encoding, threads, percentage, chimera_minsize, stripright, iddef, stampa_chunk_size, stampa_maxrejects, stampa_id, sintax_cutoff, primer_error_rate, primer_overlap_fraction, fastq_minlen, min_cluster_size, similar_id, similar_query_cov, similar_maxhits, max_ee, min_abundance, min_spread); out-of-range aborts naming the param. Declared in `nextflow_schema.json`, enforced by nf-schema `validateParameters()` | `tests/main.nf.test`, `tests/python/test_schema_params_sync.py` | done | — |
 | `[S73]`| reference dataset format sniffed at startup: `--reference_dataset` must be stampa-shaped (`>id <lineage>`), `--reference_dataset_sintax` sintax-shaped (`>id;tax=...;`); plain + gzip read, bz2 skipped; mismatch aborts naming the flag | `tests/functions/check_reference_format.nf.test`, `tests/main.nf.test` | done | — |
 | `[S74]`| primers validated at startup when trimming runs: IUPAC codes (A C G T U R Y S W K M B D H V N) + I, any case, >=3 nt; malformed aborts naming the param; quoted shell interpolation into cutadapt | `tests/functions/check_primer_format.nf.test`, `tests/main.nf.test` | done | — |
 | `[S75]`| site config via `-c` template (`conf/site.config.example`); `--slurm_clusterOptions` passthrough combined with `--account` | `tests/check-site-config.sh` (config resolution); submission = manual cluster smoke test | done | — |
 | `[S76]`| self-contained `demo` profile (committed `assets/demo/` dataset) runs Part A→B→C with no flags; `-profile demo,<engine>` composes | `tests/check-demo-profile.sh` (assets + config resolution); run covered by Part A→B→C `tests/main.nf.test` | done | — |
 | `[S87]`| vendored institutional cluster profiles (`conf/clusters/<name>.config`, shipped: abims/genotoul/ifb_core/meso/saga) each imply slurm via `conf/slurm.config`, clamp `resourceLimits` to the largest node, route partition/account, compose with an engine; vendored not fetched ([S83]); genotoul defaults job arrays on (`process.array=50`) + module-loaded container engine | `tests/check-cluster-profiles.sh` (profile wiring); submission = manual cluster smoke test | done | — |
+| `[S88]`| `--primer_error_rate` (default 0.1) → cutadapt `--error-rate` in both `trim_primers` passes | `tests/processes/part_a/trim_primers.nf.test` | done | — |
+| `[S89]`| `--primer_overlap_fraction` (default 0.667) → cutadapt `--overlap` = int(primer_length × fraction) in `trim_primers` | `tests/processes/part_a/trim_primers.nf.test` | done | — |
+| `[S90]`| `--fastq_minlen` (default 32) → vsearch `--fastq_minlen` in `filter_and_convert_to_fasta` | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test` | done | — |
 
 
 ## Per-process tests
@@ -121,8 +124,8 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | Process in `main.nf`            | Test file                                              | Covers       | Status |
 |---------------------------------|--------------------------------------------------------|--------------|--------|
 | `merge_fastq_pairs`             | `tests/processes/part_a/merge_fastq_pairs.nf.test`            | S01, S03, S04, S54 | done   |
-| `trim_primers`                  | `tests/processes/part_a/trim_primers.nf.test`                 | S01, S19     | done   |
-| `filter_and_convert_to_fasta`   | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`  | S01, S55, S65 | done  |
+| `trim_primers`                  | `tests/processes/part_a/trim_primers.nf.test`                 | S01, S19, S88, S89 | done   |
+| `filter_and_convert_to_fasta`   | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`  | S01, S55, S65, S90 | done  |
 | `extract_expected_error_values` | `tests/processes/part_a/extract_expected_error_values.nf.test`| S01, S65     | done   |
 | `dereplicate_fasta`             | `tests/processes/part_a/dereplicate_fasta.nf.test`            | S01, S19, S55| done   |
 | `list_local_clusters`           | `tests/processes/part_a/list_local_clusters.nf.test`          | S17, S19     | done   |

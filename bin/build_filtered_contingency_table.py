@@ -32,8 +32,12 @@ import sys
 from typing import Iterator, Optional
 
 
-# Filter constants.
+# Filter defaults (the legacy values). Each is overridable from the
+# command line (--max-ee / --min-abundance / --min-spread) so the
+# occurrence-table filter is tunable from the workflow ([S35]).
 MAX_EE: float = 0.0002
+MIN_ABUNDANCE: int = 3
+MIN_SPREAD: int = 2
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
@@ -75,6 +79,21 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
                              "still need a zero column — [S09]). "
                              "Union-merged with the samples seen in "
                              "the distribution file.")
+    parser.add_argument("--max-ee",
+                        type=float,
+                        default=MAX_EE,
+                        help="keep clusters with ee/length <= this "
+                             f"(default: {MAX_EE})")
+    parser.add_argument("--min-abundance",
+                        type=int,
+                        default=MIN_ABUNDANCE,
+                        help="a cluster passes if abundance >= this "
+                             f"(OR --min-spread; default: {MIN_ABUNDANCE})")
+    parser.add_argument("--min-spread",
+                        type=int,
+                        default=MIN_SPREAD,
+                        help="a cluster passes if spread >= this "
+                             f"(OR --min-abundance; default: {MIN_SPREAD})")
     return parser.parse_args(argv)
 
 
@@ -262,6 +281,9 @@ def iter_rows(
     quality: dict[str, float],
     uchime: dict[str, str],
     stampa: dict[str, tuple[str, str, str]],
+    max_ee: float = MAX_EE,
+    min_abundance: int = MIN_ABUNDANCE,
+    min_spread: int = MIN_SPREAD,
 ) -> Iterator[tuple[object, ...]]:
     """Yield one output row per cluster that passes the filter.
 
@@ -290,8 +312,8 @@ def iter_rows(
 
         if (
             chimera_status == "N"
-            and high_quality <= MAX_EE
-            and (mass >= 3 or spread >= 2)
+            and high_quality <= max_ee
+            and (mass >= min_abundance or spread >= min_spread)
         ):
             yield (
                 i, mass, cloud,
@@ -344,6 +366,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         iter_rows(
             representatives, sorted_stats, seeds, seeds2samples,
             samples, quality, uchime, stampa,
+            max_ee=args.max_ee,
+            min_abundance=args.min_abundance,
+            min_spread=args.min_spread,
         ),
     )
     return 0

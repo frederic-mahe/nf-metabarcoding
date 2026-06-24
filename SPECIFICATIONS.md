@@ -401,9 +401,18 @@ the latter case.
 - `[S16]` expects demultiplexed fastq files
   - **Pass when:** documented in README; demultiplexing is out of
     scope (could be added later as a subworkflow)
-- `[S17]` per-cluster minimum-read threshold defaults to > 2 reads
-  - **Pass when:** `list_local_clusters` emits no row with
-    `reads <= 2` on a fixture that contains a singleton cluster
+- `[S17]` per-cluster minimum-read threshold: `list_local_clusters`
+  keeps only swarm clusters with strictly more than
+  `--min_cluster_size` reads (default `2`, the legacy `> 2 reads`
+  rule). The threshold reaches `filter_swarm_stats.awk` via
+  `-v min_cluster_size=`; the awk script defaults to `2` when the
+  variable is unset so it stays usable standalone. Validated as an
+  integer `>= 0` by the schema.
+  - **Pass when:** (a) with the default, `list_local_clusters` emits
+    no row with `reads <= 2` on a fixture that contains a singleton
+    cluster; (b) raising `--min_cluster_size` additionally drops the
+    rows at or below the new threshold (a stale hard-coded `> 2`
+    would keep them).
 - `[S18]` required parameters (`forward_primer`, `reverse_primer`,
   `fastq_folder`) have no default and must be supplied via CLI or
   project config; the workflow aborts at startup with a message
@@ -444,8 +453,8 @@ the latter case.
     `reverse_primer` must be empty (not set on the CLI or in the
     config). The minimum-length and max-N filters that the trimming
     step used to enforce are taken over by
-    `filter_and_convert_to_fasta` (vsearch `--fastq_minlen 32`,
-    `--fastq_maxns <caller-supplied>`).
+    `filter_and_convert_to_fasta` (vsearch `--fastq_minlen
+    <--fastq_minlen, default 32>` per `[S90]`, `--fastq_maxns 0`).
   - when `--no_trimming` is `false` (the default),
     `forward_primer` and `reverse_primer` are required (see
     `[S18]`).
@@ -454,6 +463,30 @@ the latter case.
     (b) running with `--no_trimming true` together with a non-empty
     `forward_primer` or `reverse_primer` exits non-zero and the
     error names the conflicting parameter.
+- `[S88]` `trim_primers` passes `--error-rate <--primer_error_rate>`
+  to both cutadapt passes (default `0.1`, cutadapt's own default).
+  Validated as a real in `[0, 1]` by the schema. Only consulted when
+  trimming runs.
+  - **Pass when:** running `trim_primers` with a non-default
+    `--primer_error_rate` echoes that value on cutadapt's
+    `Command line parameters:` line in the per-sample forward
+    trimming log.
+- `[S89]` `trim_primers` sets cutadapt `--overlap` per primer to
+  `int(primer_length * --primer_overlap_fraction)` (default `0.667`,
+  reproducing the legacy `2/3` rule for the primer lengths seen in
+  practice). Validated as a real in `(0, 1]` by the schema. Only
+  consulted when trimming runs.
+  - **Pass when:** running `trim_primers` with a non-default
+    `--primer_overlap_fraction` echoes the computed `--overlap N` on
+    cutadapt's `Command line parameters:` line in the per-sample
+    forward trimming log.
+- `[S90]` `filter_and_convert_to_fasta` passes `--fastq_minlen
+  <--fastq_minlen>` to vsearch (default `32`, the legacy value):
+  reads shorter than this (after trimming) are dropped before the
+  fasta conversion. Validated as an integer `>= 1` by the schema.
+  - **Pass when:** raising `--fastq_minlen` above every read length
+    in a fixture yields an empty filtered fasta, while the default
+    keeps the reads (a stale hard-coded `32` would keep them).
 - `[S21]` Part A collects every fastq file in the listed directories
   (`[S10]`/`[S11]`); a file whose R1 basename does not match any
   canonical pattern row nor the user-provided `--fastq_pattern`, or
@@ -673,9 +706,13 @@ the latter case.
   `[S28]` output), taxonomic assignments, and the sequence ↔
   sample distribution (`build_distribution_file`'s `[S29]` output)
   into a single occurrence table. Rows are filtered: a cluster is
-  kept iff `chimera == "N" && ee/length <= 0.0002 && (abundance >= 3
-  || spread >= 2)`. Sample columns appear in sorted order; empty
-  samples (`[S09]`) contribute a zero-filled column.
+  kept iff `chimera == "N" && ee/length <= --max_ee && (abundance >=
+  --min_abundance || spread >= --min_spread)`. The three thresholds
+  reach the script via `--max-ee` / `--min-abundance` / `--min-spread`
+  and default to the legacy `0.0002` / `3` / `2` (`--max_ee` a real
+  `>= 0`, `--min_abundance` and `--min_spread` integers `>= 1`).
+  Sample columns appear in sorted order; empty samples (`[S09]`)
+  contribute a zero-filled column.
   - **Pass when:** golden-file characterization tests for
     `bin/build_filtered_contingency_table.py` reproduce its byte-exact
     stdout on a fixture covering: (a) a cluster passing every
@@ -737,12 +774,17 @@ the latter case.
     and the sample columns preserved verbatim from column 2 onward.
 - `[S42]` Part B's `find_similar_sequences` runs
   `vsearch --usearch_global` self-search on the OTU FASTA with the
-  legacy lulu-recommended parameters (`--id 0.84 --iddef 1
-  --maxaccepts 0 --query_cov 0.9 --maxhits 10
-  --userfields query+target+id`). The output is the userout stream
-  with the `;size=N;` annotation stripped from every column.
-  - **Pass when:** the output is a 3-column TSV
-    (`query\ttarget\tid`); no `;size=` annotations remain.
+  legacy lulu-recommended parameters (`--id <--similar_id> --iddef 1
+  --maxaccepts 0 --query_cov <--similar_query_cov> --maxhits
+  <--similar_maxhits> --userfields query+target+id`). The three
+  exposed thresholds default to `0.84` / `0.9` / `10` (`--similar_id`
+  and `--similar_query_cov` reals in `(0, 1]`, `--similar_maxhits` an
+  integer `>= 1`). The output is the userout stream with the
+  `;size=N;` annotation stripped from every column.
+  - **Pass when:** (a) the output is a 3-column TSV
+    (`query\ttarget\tid`) with no `;size=` annotations; (b) tightening
+    `--similar_id` to `1.0` drops the partial-identity matches the
+    default `0.84` keeps.
 - `[S43]` Part B's `run_mumu` invokes the `mumu` binary
   (`>= 1.1.1`) with `--otu_table`, `--match_list`,
   `--new_otu_table`, and `--log`. The cleaned-up intermediate

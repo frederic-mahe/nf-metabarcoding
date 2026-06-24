@@ -101,4 +101,39 @@ nextflow_process {
                 "expected non-empty reverse trimming log"
         }
     }
+
+    test("primer_error_rate and primer_overlap_fraction reach cutadapt") {
+        // COVERAGE: [S88]
+        // COVERAGE: [S89]
+        // cutadapt echoes its argv on the `Command line parameters:`
+        // line of the report it writes to stderr (the forward log). A
+        // non-default --primer_error_rate must surface verbatim there,
+        // and --primer_overlap_fraction must surface as the computed
+        // --overlap = int(forward_primer_length * fraction). The forward
+        // primer is 20 nt, so fraction 0.5 → --overlap 10 (the default
+        // 0.667 would echo --overlap 13). A stale hard-coded 0.1 / 2/3
+        // would echo the old values, so both witnesses are necessary.
+        tag "ci"
+        when {
+            params {
+                forward_primer          = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer          = "ACTTTCGTTCTTGATYRA"
+                primer_error_rate       = 0.2
+                primer_overlap_fraction = 0.5
+            }
+            process {
+                """
+                input[0] = merge_fastq_pairs.out.merged
+                """
+            }
+        }
+        then {
+            assert process.success
+            def fwdLog = path(process.out.log_forward.get(0)).text
+            assert fwdLog.contains("--error-rate 0.2") :
+                "expected --error-rate 0.2 on cutadapt's command line, got:\n${fwdLog}"
+            assert fwdLog.contains("--overlap 10") :
+                "expected --overlap 10 (int(20 * 0.5)) on cutadapt's command line, got:\n${fwdLog}"
+        }
+    }
 }

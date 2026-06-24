@@ -21,12 +21,12 @@ process trim_primers {
     #!/bin/bash
     set -euo pipefail
 
-    readonly ERROR_RATE=0.1
+    readonly ERROR_RATE=!{params.primer_error_rate}
 
     reverse_primer_revcomp=$(reverse_complement.sh "!{params.reverse_primer}")
 
-    MIN_F=$(( !{params.forward_primer.length()} * 2 / 3 ))  # match is >= 2/3 of primer length
-    MIN_R=$(( !{params.reverse_primer.length()} * 2 / 3 ))
+    MIN_F=$(awk -v l=!{params.forward_primer.length()} -v f=!{params.primer_overlap_fraction} 'BEGIN { printf "%d", l * f }')  # match is >= 2/3 of primer length
+    MIN_R=$(awk -v l=!{params.reverse_primer.length()} -v f=!{params.primer_overlap_fraction} 'BEGIN { printf "%d", l * f }')
     # The two passes run concurrently through the pipe, so naming
     # task.cpus on each would request twice the reservation. Split the
     # budget instead: the forward pass searches both orientations

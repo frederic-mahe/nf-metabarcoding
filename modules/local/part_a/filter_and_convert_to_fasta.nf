@@ -16,7 +16,7 @@ process filter_and_convert_to_fasta {
     '''
     #!/bin/bash
 
-    readonly MIN_LENGTH=32
+    readonly MIN_LENGTH=!{params.fastq_minlen}
 
     vsearch \
         --fastq_filter !{trimmed_fastq} \

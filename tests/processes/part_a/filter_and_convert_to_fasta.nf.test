@@ -133,4 +133,38 @@ nextflow_process {
         }
     }
 
+    test("params.fastq_minlen threads through to vsearch --fastq_minlen") {
+        // COVERAGE: [S90]
+        // The fixture's trimmed reads are ~60 nt. Raising fastq_minlen
+        // above that length pushes every read below the threshold, so
+        // vsearch drops them all and the filtered fasta comes back
+        // empty — even though the same fixture under the default 32
+        // keeps the reads (the tests above demonstrate that implicitly
+        // via the populated fasta). A stale hard-coded --fastq_minlen 32
+        // would still let the ~60 nt reads through and leave a non-empty
+        // fasta, so the empty output is a sufficient witness that the
+        // param reached vsearch.
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_minlen   = 1000
+            }
+            process {
+                """
+                input[0] = trim_primers.out.trimmed
+                input[1] = "--relabel_sha1"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.fasta.get(0)[1]).readLines()
+                .findAll { !it.trim().isEmpty() }
+            assert lines.isEmpty() :
+                "expected an empty fasta when fastq_minlen exceeds every read length, got ${lines.size()} lines"
+        }
+    }
+
 }

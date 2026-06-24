@@ -18,12 +18,12 @@ process find_similar_sequences {
         --db !{otu_fasta} \
         --self \
         --threads !{task.cpus} \
-        --id 0.84 \
+        --id !{params.similar_id} \
         --iddef 1 \
         --userfields query+target+id \
         --maxaccepts 0 \
-        --query_cov 0.9 \
-        --maxhits 10 \
+        --query_cov !{params.similar_query_cov} \
+        --maxhits !{params.similar_maxhits} \
         --quiet \
         --userout - | \
         sed -r 's/;size=[0-9]+;//g' > !{otu_fasta.baseName}.match_list

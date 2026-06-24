@@ -33,7 +33,7 @@ process list_local_clusters {
         --output-file /dev/null \
         --statistics-file - \
         !{dereplicated_fasta} | \
-        filter_swarm_stats.awk > !{sampleId}.stats
+        filter_swarm_stats.awk -v min_cluster_size=!{params.min_cluster_size} > !{sampleId}.stats
     '''
 
     stub:

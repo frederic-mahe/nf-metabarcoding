@@ -104,3 +104,61 @@ def test_samples_flag_adds_zero_columns_for_empty_samples() -> None:
                 f"injected sample {name} must be 0 on every row, got "
                 f"'{cols[idx]}' in row: {row}"
             )
+
+
+def _amplicons(stdout: str) -> list[str]:
+    """Return the amplicon (seed) column of every data row."""
+    lines = stdout.splitlines()
+    return [row.split("\t")[3] for row in lines[1:]]
+
+
+def test_min_abundance_drops_abundance_only_survivors() -> None:
+    """[S35]: --min-abundance raises the abundance arm of the filter.
+
+    In the golden fixture, ee01 survives by ``total >= 3`` alone
+    (spread = 1); ff01 survives by ``spread >= 2`` alone (total = 2).
+    Raising --min-abundance to 11 pushes ee01's total (10) below the
+    bar, so ee01 drops while ff01 (spread arm) and aa01 stay. A stale
+    hard-coded ``>= 3`` would keep ee01.
+    """
+    amplicons = _amplicons(_run(["--min-abundance", "11"]).stdout)
+    seeds = {a[:4] for a in amplicons}
+    assert "ee01" not in seeds, (
+        f"ee01 (total 10) should drop under --min-abundance 11, got {seeds}"
+    )
+    assert {"aa01", "ff01"} <= seeds, (
+        f"aa01 and ff01 should survive --min-abundance 11, got {seeds}"
+    )
+
+
+def test_min_spread_drops_spread_only_survivors() -> None:
+    """[S35]: --min-spread raises the spread arm of the filter.
+
+    ff01 survives by ``spread >= 2`` alone (total = 2 < default 3).
+    Raising --min-spread to 3 pushes ff01's spread (2) below the bar,
+    so ff01 drops while aa01 and ee01 (abundance arm) stay. A stale
+    hard-coded ``>= 2`` would keep ff01.
+    """
+    amplicons = _amplicons(_run(["--min-spread", "3"]).stdout)
+    seeds = {a[:4] for a in amplicons}
+    assert "ff01" not in seeds, (
+        f"ff01 (spread 2) should drop under --min-spread 3, got {seeds}"
+    )
+    assert {"aa01", "ee01"} <= seeds, (
+        f"aa01 and ee01 should survive --min-spread 3, got {seeds}"
+    )
+
+
+def test_max_ee_filters_every_row_when_zero() -> None:
+    """[S35]: --max-ee tightens the quality arm of the filter.
+
+    Every surviving fixture cluster has ee/length = 1e-05 > 0, so
+    --max-ee 0 fails the ``ee/length <= max_ee`` test for all of them
+    and the output is the header alone. A stale hard-coded 0.0002 would
+    keep all three rows.
+    """
+    lines = _run(["--max-ee", "0"]).stdout.splitlines()
+    assert len(lines) == 1, (
+        f"expected header only under --max-ee 0, got {len(lines)} lines: "
+        f"{lines}"
+    )

@@ -93,4 +93,39 @@ ACGAACTAACGAACGTAGGGAGGAACGTAGCTACGAAGGTACGTACGAACAT
             }
         }
     }
+
+    test("similar_id raises the self-search identity cutoff") {
+        // COVERAGE: [S42]
+        // amp1/amp2 differ by a single 3' base (~98% identity), so the
+        // default --similar_id 0.84 pairs them. Setting --similar_id 1.0
+        // demands a perfect match, which they do not have, so the match
+        // list comes back empty. A stale hard-coded --id 0.84 would
+        // still pair them, so the empty output witnesses that the param
+        // reached vsearch.
+        tag "ci"
+        when {
+            params {
+                threads    = 1
+                similar_id = 1.0
+            }
+            process {
+                """
+                def f = workDir.resolve("otus.fas")
+                f.text = '''>amp1;size=10;
+ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
+>amp2;size=5;
+ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGA
+'''
+                input[0] = file(f.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.matches.get(0)).readLines()
+                .findAll { !it.trim().isEmpty() }
+            assert lines.isEmpty() :
+                "expected an empty match list under --similar_id 1.0 (amp1/amp2 are only ~98% identical), got: ${lines}"
+        }
+    }
 }
