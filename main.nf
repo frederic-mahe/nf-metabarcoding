@@ -5,17 +5,17 @@ include { part_A } from './subworkflows/local/part_a.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
 include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_fasta.nf'
 include { validate_samplesheet } from './modules/local/validate_samplesheet.nf'
-include { part_C; part_C_shadow } from './subworkflows/local/part_c.nf'
+include { part_C; part_C_fasta; part_C_shadow } from './subworkflows/local/part_c.nf'
 include { dump_software_versions } from './modules/local/dump_software_versions.nf'
 include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 
 
 workflow part_c {
-    // Standalone Part C ([S47]/[S48]): the user provides
+    // Standalone table-input Part C ([S47]/[S48]): the user provides
     // --occurrence_table (Part B's <basename>_table.tsv) and a
     // reference whose format matches --taxonomy_method ([S47]/[S64]).
-    // The fasta-input branch is blocked on D04 and is not exposed by
-    // this skeleton.
+    // The fasta-input variant is the sibling `part_c_fasta` entry,
+    // reached via --representatives_fasta.
     if ( params.taxonomy_method == 'sintax' ) {
         assert params.reference_dataset_sintax :
             "--reference_dataset_sintax must be set when --taxonomy_method=sintax"
@@ -24,8 +24,7 @@ workflow part_c {
             "--reference_dataset must be set when --taxonomy_method=stampa"
     }
     assert params.occurrence_table :
-        "--occurrence_table must be set when running Part C standalone " +
-        "(fasta input is blocked on DECISIONS.md D04)"
+        "--occurrence_table must be set when running table-input Part C standalone"
 
     // [S71]/D08: no startup mkdirs — publishDir materialises
     // <outdir>/<subdir> on first publish (no parse-time filesystem I/O).
@@ -58,6 +57,31 @@ workflow part_c {
         def shadow_basename_ch = Channel.value("${derived_basename}_notmerged")
         part_C_shadow(shadow_table_ch, shadow_basename_ch)
     }
+}
+
+
+workflow part_c_fasta {
+    // Standalone fasta-input Part C ([S48]): the user provides
+    // --representatives_fasta (a representatives FASTA, header
+    // `<amplicon>;size=<abundance>;`) and a reference whose format
+    // matches --taxonomy_method ([S47]/[S64]). The occurrence-table
+    // extraction and join are skipped; the deliverable is the
+    // standalone <basename>_taxonomy_<method>.tsv. The basename is
+    // derived from the fasta filename. No shadow path runs in this
+    // mode (there is no _notmerged sibling concept for a bare fasta).
+    if ( params.taxonomy_method == 'sintax' ) {
+        assert params.reference_dataset_sintax :
+            "--reference_dataset_sintax must be set when --taxonomy_method=sintax"
+    } else {
+        assert params.reference_dataset :
+            "--reference_dataset must be set when --taxonomy_method=stampa"
+    }
+
+    def fasta_path = file(normalize_path(params.representatives_fasta))
+    def basename_ch = Channel.value(fasta_path.baseName)
+    def fasta_ch    = Channel.fromPath(normalize_path(params.representatives_fasta))
+
+    part_C_fasta(fasta_ch, basename_ch)
 }
 
 
@@ -191,9 +215,10 @@ workflow {
             nf-metabarcoding — swarm-based metabarcoding pipeline
 
             Usage:
-              nextflow run main.nf --fastq_folder PATH      [Part A → B [→ C]]
-              nextflow run main.nf --fasta_folder PATH      [Part B standalone]
-              nextflow run main.nf --occurrence_table PATH  [Part C standalone]
+              nextflow run main.nf --fastq_folder PATH         [Part A → B [→ C]]
+              nextflow run main.nf --fasta_folder PATH         [Part B standalone]
+              nextflow run main.nf --occurrence_table PATH     [Part C standalone]
+              nextflow run main.nf --representatives_fasta PATH [Part C, fasta input]
 
             """.stripIndent()
         print paramsHelp(
@@ -254,6 +279,15 @@ workflow {
     // mode also requires --reference_dataset and --results_folder.
     if ( params.occurrence_table ) {
         part_c()
+        return
+    }
+
+    // [S48]: --representatives_fasta switches the pipeline into
+    // fasta-input Part C mode (Parts A and B do not run; no
+    // occurrence-table join). Requires the reference matching
+    // --taxonomy_method; the deliverable is <basename>_taxonomy_<method>.tsv.
+    if ( params.representatives_fasta ) {
+        part_c_fasta()
         return
     }
 

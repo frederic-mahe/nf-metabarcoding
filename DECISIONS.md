@@ -108,7 +108,7 @@ Sub-decisions:
 ## D04 — Part C input mode and output policy
 
 **Blocks:** `[S48]`
-**Status:** `partial` — sub-question 2 resolved, sub-question 1 still open
+**Status:** `resolved` — sub-question 2 (2026-05-19), sub-question 1 (2026-06-30)
 
 **Resolution of sub-question 2 (2026-05-19):** Part C publishes its
 updated table as a **sibling file** named
@@ -121,45 +121,32 @@ suffix signals that the `identity` / `taxonomy` / `references`
 columns have been populated with real assignments. `[S51]` reflects
 this output policy and is no longer blocked by D04.
 
-Sub-question 1 (the CLI flag toggling between table-input and
-fasta-input modes) is still open and continues to block `[S48]`.
+**Resolution of sub-question 1 (2026-06-30):** a dedicated
+`--representatives_fasta /path/to/representatives.fas` flag selects
+fasta input. It is mutually exclusive with `--occurrence_table` and the
+other input-mode selectors ([S02]); `--fasta_folder` is **not** reused
+(it is a Part B directory input with a different cardinality and role).
+When `--representatives_fasta` is set, Part C skips the occurrence-table
+extraction and the join, running the assignment selected by
+`--taxonomy_method` directly on the supplied fasta.
 
-Two sub-questions still need a human answer before Part C can move
-beyond skeleton:
+**Fasta-input output policy:** with no occurrence table to splice onto,
+fasta-input Part C does **not** synthesise a table. Its sole deliverable
+is the standalone `<basename>_taxonomy_<method>.tsv` that the assignment
+step already publishes (the same artefact the table-input path emits
+alongside `_table_assigned.tsv`): the 5-column, headered
+`_taxonomy_stampa.tsv` for stampa, or the 4-column `_taxonomy_sintax.tsv`
+for sintax. `<basename>` is derived from the fasta filename.
+`--majority_assignment` is rejected in this mode (no table to compute a
+per-OTU majority on). `[S48]` reflects this and is no longer blocked.
 
-1. **Which CLI flag toggles between table-input and fasta-input
-   modes?** Two candidates:
-    - `--occurrence_table /path/to/table.tsv` to consume Part B's
-      `_table.tsv` and extract a fasta on the fly (via
-      `extract_fasta_sequences_from_occurrence_table`); else
-      `--fasta_input /path/to/representatives.fas` for a
-      stand-alone fasta input. The two flags are mutually
-      exclusive.
-    - reuse the existing `--fasta_folder` for the fasta-input
-      case; introduce a single `--occurrence_table` flag for the
-      table-input case.
-
-2. **How should Part C publish its result when the input is a
-   fasta file?** With no occurrence table to splice back onto, the
-   options are:
-    - emit a stand-alone TSV with just the taxonomy columns
-      (`amplicon\tabundance\tidentity\ttaxonomy\treferences`) —
-      same shape as the legacy `*.results` file;
-    - synthesise a minimal occurrence table from the fasta
-      headers (no per-sample columns) so the output shape is
-      identical to the table-input case;
-    - fail at startup with a message asking the user to provide
-      an occurrence table.
-
-   A separate but related question: when Part B and Part C run
-   end-to-end, should Part C **overwrite** Part B's `_table.tsv`
-   in place, or publish a sibling file (e.g.
-   `<basename>_taxonomy.tsv`) so the unannotated Part B output is
-   preserved alongside the annotated one?
-
-Until D04 lands, the Part C `[Sxx]` tests stay tagged `pending` and
-the workflow stub exposes no user-visible CLI surface for the
-ambiguous parts.
+For the record, the original sub-question-1 flag candidates were a
+dedicated mutually-exclusive flag (the option taken, named
+`--representatives_fasta`) versus reusing `--fasta_folder`; and the
+original fasta-output candidates were a legacy `*.results`-shaped TSV, a
+synthesised minimal occurrence table, or a hard startup failure — all
+superseded by the `_taxonomy_<method>.tsv` policy once the per-method
+standalone tables landed.
 
 
 ## D05 — Two-table occurrence output (`--split-occurrence-table`)

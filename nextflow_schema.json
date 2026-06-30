@@ -27,6 +27,10 @@
                     "type": "string",
                     "description": "Part B's <basename>_table.tsv; runs Part C standalone."
                 },
+                "representatives_fasta": {
+                    "type": "string",
+                    "description": "Representatives FASTA (header <amplicon>;size=<abundance>;); runs fasta-input Part C, publishing <basename>_taxonomy_<method>.tsv with no occurrence-table join."
+                },
                 "outdir": {
                     "type": "string",
                     "description": "Single root for all published outputs (<outdir>/{per_sample,occurrence_table,pipeline_info}/). Defaults to --results_folder, then 'results'."

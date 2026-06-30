@@ -40,20 +40,22 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
     table (Part B), and a taxonomy-annotated occurrence table (Part C)
 - `[S02]` each part can be run separately, or all at once. The
   entry point is selected implicitly by which input param is set
-  (no explicit `--only=` flag): `--occurrence_table` runs Part C
-  standalone (and the shadow path when its preconditions hold, see
-  [S62]); `--fasta_folder` (or an `--input` samplesheet in the fasta
-  profile, [S70]) runs Part B standalone (with Part C chained on when
-  `--reference_dataset` is set); `--fastq_folder` (or an `--input`
-  samplesheet in the fastq profile) runs Part A end-to-end (with
-  Part B / Part C chained on when `--project_name` /
+  (no explicit `--only=` flag): `--occurrence_table` runs table-input
+  Part C standalone (and the shadow path when its preconditions hold,
+  see [S62]); `--representatives_fasta` runs fasta-input Part C
+  standalone ([S48]); `--fasta_folder` (or an `--input` samplesheet in
+  the fasta profile, [S70]) runs Part B standalone (with Part C chained
+  on when `--reference_dataset` is set); `--fastq_folder` (or an
+  `--input` samplesheet in the fastq profile) runs Part A end-to-end
+  (with Part B / Part C chained on when `--project_name` /
   `--reference_dataset` are set).
-  The four input-mode selectors `--occurrence_table` / `--input` /
-  `--fasta_folder` / `--fastq_folder` are **mutually exclusive**:
-  setting more than one aborts at startup with a message listing the
-  ones that were set, rather than silently picking one and ignoring the
-  rest. (This supersedes the earlier "first match wins" dispatch and
-  subsumes the `--input`-vs-folder exclusivity of [S70].)
+  The five input-mode selectors `--occurrence_table` /
+  `--representatives_fasta` / `--input` / `--fasta_folder` /
+  `--fastq_folder` are **mutually exclusive**: setting more than one
+  aborts at startup with a message listing the ones that were set,
+  rather than silently picking one and ignoring the rest. (This
+  supersedes the earlier "first match wins" dispatch and subsumes the
+  `--input`-vs-folder exclusivity of [S70].)
   - **Pass when:** running with only `--fastq_folder` set invokes
     every Part A process and no Part B / Part C process; the existing
     Part B standalone (`--fasta_folder`) and Part C standalone
@@ -885,18 +887,38 @@ from placeholder values to real taxonomic assignments.
     exits non-zero and stderr names `reference_dataset_sintax`;
     supplying the matching flag lets the workflow proceed.
 - `[S48]` Part C accepts either an occurrence table (the
-  `[S46]` `_table.tsv`) or a fasta file as its primary input.
-  When given an occurrence table, the process
-  `extract_fasta_sequences_from_occurrence_table` reads column 4
-  (amplicon ID), column 2 (abundance), and column 10 (sequence)
-  and emits a fasta of representatives with header
-  `<amplicon>;size=<abundance>;`. When given a fasta, the
-  extraction step is skipped.
-  - **Blocked by:** [`DECISIONS.md`](DECISIONS.md) D04 — which CLI
-    flag toggles between the two modes (`--occurrence_table` vs
-    `--fasta_input`), and how the updated table is reconstructed
-    when the input is a fasta (no occurrence table to splice back
-    onto).
+  `[S46]` `_table.tsv`, via `--occurrence_table`) or a representatives
+  fasta (via `--representatives_fasta`) as its primary input; the two
+  flags are mutually exclusive ([S02]).
+  - **Table input** (`--occurrence_table`): the process
+    `extract_fasta_sequences_from_occurrence_table` reads column 4
+    (amplicon ID), column 2 (abundance), and column 10 (sequence)
+    and emits a fasta of representatives with header
+    `<amplicon>;size=<abundance>;`; the assignment is then spliced
+    back onto the table as `<basename>_table_assigned.tsv` ([S51]).
+  - **Fasta input** (`--representatives_fasta`): the extraction step
+    and the occurrence-table join are skipped. The supplied fasta is
+    fed straight to the assignment selected by `--taxonomy_method`
+    ([S61]), and the sole deliverable is the standalone
+    `<basename>_taxonomy_<method>.tsv` that the assignment step
+    publishes ([S49]/[S61]) — `_taxonomy_stampa.tsv` (5-column,
+    header) for stampa, the 4-column `_taxonomy_sintax.tsv` for
+    sintax. No `_table_assigned.tsv` is produced. `<basename>` is
+    derived from the fasta filename (extension stripped). The shadow
+    path ([S50]) does not run in this mode, and `--majority_assignment`
+    is rejected at startup ([S66]: no occurrence table to compute a
+    per-OTU majority on). Both methods require the reference matching
+    `--taxonomy_method` ([S47]/[S64]).
+  - **Pass when:** a `--representatives_fasta` run with
+    `--reference_dataset` (stampa) publishes
+    `<basename>_taxonomy_stampa.tsv` and **no**
+    `<basename>_table_assigned.tsv`; the same run with
+    `--taxonomy_method=sintax` + `--reference_dataset_sintax`
+    publishes the 4-column `<basename>_taxonomy_sintax.tsv`; setting
+    both `--representatives_fasta` and `--occurrence_table` aborts at
+    startup naming the input-mode selectors; combining
+    `--representatives_fasta` with `--majority_assignment` aborts at
+    startup naming `majority_assignment`.
 - `[S49]` Part C's primary taxonomic-assignment path is a port of
   the legacy `stampa.sh` / `stampa_merge.py` pipeline, expressed
   as a Nextflow scatter-gather:

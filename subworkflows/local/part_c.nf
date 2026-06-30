@@ -1,9 +1,14 @@
 // ============================================================================
 // Part C — taxonomic assignment (stampa re-implementation)
 // ============================================================================
-// Skeleton phase: the processes are wired but the test coverage is
-// tagged `pending` because D04 still needs to land before the
-// stand-alone CLI / output policy is finalised.
+// `part_C_assign` is the shared assignment core: given a representatives
+// FASTA it runs the method selected by --taxonomy_method (stampa
+// scatter-gather or sintax) and publishes the standalone
+// <basename>_taxonomy_<method>.tsv. `part_C` wraps it with the
+// occurrence-table extraction and join for table input ([S46]→[S51]);
+// `part_C_fasta` runs the assignment alone for fasta input ([S48]).
+// `part_C_shadow` is the sintax-only shadow path ([S50]) and keeps its
+// own wiring (it ignores --taxonomy_method).
 
 include { extract_fasta_sequences_from_occurrence_table } from '../../modules/local/part_c/extract_fasta_sequences_from_occurrence_table.nf'
 include { assign_taxonomy_stampa }                         from '../../modules/local/part_c/assign_taxonomy_stampa.nf'
@@ -14,13 +19,20 @@ include { compute_majority_assignment }                    from '../../modules/l
 include { normalize_path; log_dir }                          from '../../modules/local/functions.nf'
 
 
-workflow part_C {
-    // Re-usable Part C wiring shared by the standalone workflow and
-    // the Part B → Part C end-to-end path.
+workflow part_C_assign {
+    // Shared taxonomic-assignment core for the regular Part C paths:
+    // given a representatives FASTA, run the method selected by
+    // --taxonomy_method ([S61]) and publish the standalone
+    // <basename>_taxonomy_<method>.tsv. Called by `part_C` (table
+    // input, which then splices the result back onto the occurrence
+    // table) and by `part_C_fasta` ([S48] fasta input, which keeps the
+    // standalone table as its only deliverable). The shadow path does
+    // NOT use this helper: it is sintax-only regardless of
+    // --taxonomy_method, so it keeps its own wiring.
 
     take:
-    occurrence_table   // value channel: Path to <basename>_table.tsv
-    basename           // value channel: <project>_<N>_samples
+    representatives   // channel: representatives FASTA (one file)
+    basename          // value channel: <basename>
 
     main:
     // [S47]/[S64]: pick the reference matching the assignment method.
@@ -32,23 +44,14 @@ workflow part_C {
         ? file(normalize_path(params.reference_dataset_sintax))
         : file(normalize_path(params.reference_dataset))
 
-    // [S48]: extract a representatives FASTA from the occurrence
-    // table. (The fasta-input branch promised by [S48] is blocked
-    // on D04 and is not wired in this skeleton.)
-    extract_fasta_sequences_from_occurrence_table(occurrence_table)
-
+    def assignments
     if ( params.taxonomy_method == 'sintax' ) {
-        // [S50]: shadow path.
-        assign_taxonomy_sintax(
-            extract_fasta_sequences_from_occurrence_table.out.fasta,
-            reference,
-            basename,
-        )
-        update_occurrence_table(
-            occurrence_table,
-            assign_taxonomy_sintax.out.taxonomy,
-            basename,
-        )
+        // [S50]/[S61]: vsearch --sintax. Emits the canonical 5-column
+        // assignments intermediate (consumed by the table-input join)
+        // and publishes the standalone 4-column
+        // <basename>_taxonomy_sintax.tsv.
+        assign_taxonomy_sintax(representatives, reference, basename)
+        assignments = assign_taxonomy_sintax.out.taxonomy
     } else {
         // [S49]: stampa scatter-gather. Split the representatives
         // fasta into chunks (or pass it through unchanged when
@@ -56,10 +59,9 @@ workflow part_C {
         // assign_taxonomy_stampa in parallel, then concatenate +
         // sort the slices via collectFile.
         //
-        def reps_ch = extract_fasta_sequences_from_occurrence_table.out.fasta
         def chunks = (params.stampa_chunk_size > 0)
-            ? reps_ch.splitFasta(by: params.stampa_chunk_size, file: true)
-            : reps_ch
+            ? representatives.splitFasta(by: params.stampa_chunk_size, file: true)
+            : representatives
 
         assign_taxonomy_stampa(chunks, reference)
 
@@ -89,42 +91,93 @@ workflow part_C {
             .collectFile(name: 'taxonomy_stampa.unsorted.tsv')
 
         sort_taxonomy(gathered, basename)
-        def merged = sort_taxonomy.out.taxonomy
+        assignments = sort_taxonomy.out.taxonomy
+    }
 
-        // [S51] empty-input contract: when the occurrence table has no
-        // rows, the extracted representatives fasta is empty,
-        // splitFasta emits zero chunks, and `merged` never fires —
-        // which would leave update_occurrence_table dangling. Fall
-        // back to an empty assignments file so update_occurrence_table
-        // still runs and publishes a header-only
-        // <basename>_table_assigned.tsv.
-        def empty_assignments = file("${workflow.workDir}/empty_assignments.tsv")
-        empty_assignments.text = ""
+    emit:
+    // Canonical per-amplicon assignments channel: the stampa
+    // <basename>_taxonomy_stampa.tsv (5-column, header) or the sintax
+    // <basename>_assignments_sintax.tsv intermediate. Empty (stampa,
+    // empty input → zero chunks) when there is nothing to assign;
+    // table-input callers fall back to an empty file ([S51]).
+    taxonomy = assignments
+}
 
-        update_occurrence_table(
-            occurrence_table,
-            merged.ifEmpty(empty_assignments),
+
+workflow part_C {
+    // Table-input Part C ([S46]→[S51]): extract a representatives FASTA
+    // from the occurrence table, assign taxonomy via the shared
+    // `part_C_assign` helper, then splice the assignment back onto the
+    // table. Shared by the standalone Part C workflow and the
+    // Part B → Part C end-to-end path.
+
+    take:
+    occurrence_table   // value channel: Path to <basename>_table.tsv
+    basename           // value channel: <project>_<N>_samples
+
+    main:
+    // [S48]: extract a representatives FASTA from the occurrence table.
+    extract_fasta_sequences_from_occurrence_table(occurrence_table)
+
+    part_C_assign(
+        extract_fasta_sequences_from_occurrence_table.out.fasta,
+        basename,
+    )
+
+    // [S51] empty-input contract: when the occurrence table has no
+    // rows, the extracted representatives fasta is empty, the stampa
+    // scatter emits zero chunks, and `part_C_assign` emits nothing —
+    // which would leave update_occurrence_table dangling. Fall back to
+    // an empty assignments file so update_occurrence_table still runs
+    // and publishes a header-only <basename>_table_assigned.tsv. (The
+    // sintax branch always emits a file, so ifEmpty is a no-op there.)
+    def empty_assignments = file("${workflow.workDir}/empty_assignments.tsv")
+    empty_assignments.text = ""
+
+    update_occurrence_table(
+        occurrence_table,
+        part_C_assign.out.taxonomy.ifEmpty(empty_assignments),
+        basename,
+    )
+
+    // [S66]: opt-in majority-rule assignment, run on the freshly
+    // assigned table. Stampa branch only — the startup assert ([S66])
+    // guarantees majority is never combined with sintax, so the
+    // stampa-formatted --reference_dataset is the right reference.
+    if ( params.majority_assignment ) {
+        def reference = file(normalize_path(params.reference_dataset))
+        compute_majority_assignment(
+            update_occurrence_table.out.table,
+            reference,
             basename,
         )
-
-        // [S66]: opt-in majority-rule assignment, run on the freshly
-        // assigned table. Stampa branch only — the startup assert
-        // ([S66]) guarantees we never reach here under sintax, and the
-        // shadow path never calls part_C. `reference` is the
-        // stampa-formatted --reference_dataset resolved above.
-        if ( params.majority_assignment ) {
-            compute_majority_assignment(
-                update_occurrence_table.out.table,
-                reference,
-                basename,
-            )
-        }
     }
 
     emit:
     // [S51] annotated occurrence table — sibling of Part B's
     // <basename>_table.tsv, named <basename>_table_assigned.tsv.
     table = update_occurrence_table.out.table
+}
+
+
+workflow part_C_fasta {
+    // [S48] fasta-input Part C: the user supplies a representatives
+    // FASTA via --representatives_fasta instead of an occurrence table.
+    // The extraction and the occurrence-table join are skipped; the
+    // sole deliverable is the standalone <basename>_taxonomy_<method>.tsv
+    // published by the assignment process (sort_taxonomy for stampa,
+    // assign_taxonomy_sintax for sintax). No <basename>_table_assigned.tsv
+    // is produced — there is no table to splice onto.
+
+    take:
+    representatives   // value channel: Path to the representatives FASTA
+    basename          // value channel: <basename>
+
+    main:
+    part_C_assign(representatives, basename)
+
+    emit:
+    taxonomy = part_C_assign.out.taxonomy
 }
 
 

@@ -277,15 +277,17 @@ def validate_params() {
     // (fastq_folder / primers / reference datasets) stay inline in the
     // entry workflow because they depend on the selected run mode.
 
-    // [S02]/[S70]: the four input-mode selectors are mutually exclusive.
-    // Setting more than one is ambiguous (the dispatcher would silently
-    // pick one and drop the rest), so abort up-front naming the ones that
-    // were set. Subsumes the earlier --input-vs-folder check ([S70]).
+    // [S02]/[S70]/[S48]: the five input-mode selectors are mutually
+    // exclusive. Setting more than one is ambiguous (the dispatcher would
+    // silently pick one and drop the rest), so abort up-front naming the
+    // ones that were set. Subsumes the earlier --input-vs-folder check
+    // ([S70]).
     def mode_selectors = [
-        occurrence_table: params.occurrence_table,
-        input           : params.input,
-        fasta_folder    : params.fasta_folder,
-        fastq_folder    : params.fastq_folder,
+        occurrence_table   : params.occurrence_table,
+        representatives_fasta: params.representatives_fasta,
+        input              : params.input,
+        fasta_folder       : params.fasta_folder,
+        fastq_folder       : params.fastq_folder,
     ]
     def selectors_set
     selectors_set = mode_selectors
@@ -293,8 +295,8 @@ def validate_params() {
         .collect { name, _value -> "--${name}" }
     assert selectors_set.size() <= 1 :
         "the input-mode selectors are mutually exclusive; set at most one " +
-        "of --occurrence_table / --input / --fasta_folder / --fastq_folder, " +
-        "got: ${selectors_set}"
+        "of --occurrence_table / --representatives_fasta / --input / " +
+        "--fasta_folder / --fastq_folder, got: ${selectors_set}"
 
     // [S71]: --results_folder is a deprecated alias for --outdir. Warn
     // once at startup when it is the active output root.
@@ -322,6 +324,16 @@ def validate_params() {
     assert !(params.majority_assignment && params.taxonomy_method == 'sintax') :
         "--majority_assignment requires --taxonomy_method=stampa " +
         "(sintax leaves the references column unpopulated)"
+
+    // [S48]/[S66]: majority assignment recomputes a per-OTU taxonomy from
+    // the assigned occurrence table. Fasta-input Part C
+    // (--representatives_fasta) produces no occurrence table, so there is
+    // nothing to compute a majority on. Fail fast rather than silently
+    // ignore the flag.
+    assert !(params.majority_assignment && params.representatives_fasta) :
+        "--majority_assignment cannot be combined with --representatives_fasta " +
+        "(fasta-input Part C produces no occurrence table to compute a " +
+        "per-OTU majority on)"
 
     // [S73]: sniff the header of each supplied reference so a swapped /
     // mis-formatted file aborts now rather than producing empty or wrong

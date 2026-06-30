@@ -1204,6 +1204,138 @@ nextflow_pipeline {
         }
     }
 
+    test("Part C fasta input runs the stampa path and publishes only _taxonomy_stampa.tsv") {
+        // COVERAGE: [S48]
+        // [S48] fasta input: --representatives_fasta feeds a
+        // representatives FASTA straight to the stampa assignment,
+        // skipping the occurrence-table extraction and the join. The
+        // sole deliverable is the standalone <basename>_taxonomy_stampa.tsv;
+        // no <basename>_table_assigned.tsv is produced. The basename is
+        // derived from the fasta filename (extension stripped).
+        tag "ci"
+        when {
+            params {
+                threads               = 1
+                results_folder        = "${outputDir}/part_c_fasta_stampa"
+                reference_dataset     = "${outputDir}/part_c_fasta_stampa_ref.fas"
+                representatives_fasta = "${outputDir}/part_c_fasta_stampa_reps.fas"
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/part_c_fasta_stampa_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = ">refA Kingdom|Phylum|Class\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            def reps = file("${outputDir}/part_c_fasta_stampa_reps.fas")
+            reps.text = ">amp1;size=10;\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+        }
+        then {
+            assert workflow.success
+            // basename = fasta filename minus extension:
+            // part_c_fasta_stampa_reps.fas → part_c_fasta_stampa_reps
+            def tax = file(
+                "${outputDir}/part_c_fasta_stampa/occurrence_table/part_c_fasta_stampa_reps_taxonomy_stampa.tsv"
+            )
+            assert tax.exists() :
+                "fasta-input stampa should publish <basename>_taxonomy_stampa.tsv"
+            def lines = tax.readLines().findAll { it.trim() }
+            assert lines[0] == "amplicon\tabundance\tidentity\ttaxonomy\treferences" :
+                "the standalone stampa table must carry the [S46] header, got: ${lines[0]}"
+            assert lines.size() == 2 :
+                "expected header + one amplicon row, got: ${lines}"
+            assert lines[1].split("\t", -1)[0] == "amp1" :
+                "expected the amp1 row, got: ${lines[1]}"
+            // No occurrence-table join in fasta mode.
+            assert !file(
+                "${outputDir}/part_c_fasta_stampa/occurrence_table/part_c_fasta_stampa_reps_table_assigned.tsv"
+            ).exists() :
+                "fasta-input Part C must not produce a _table_assigned.tsv"
+        }
+    }
+
+    test("Part C fasta input runs the sintax path and publishes the 4-column _taxonomy_sintax.tsv") {
+        // COVERAGE: [S48], [S61]
+        // Fasta input with --taxonomy_method=sintax publishes the
+        // standalone 4-column <basename>_taxonomy_sintax.tsv and, like
+        // the stampa case, no _table_assigned.tsv.
+        tag "ci"
+        when {
+            params {
+                threads                  = 1
+                taxonomy_method          = "sintax"
+                results_folder           = "${outputDir}/part_c_fasta_sintax"
+                reference_dataset_sintax = "${outputDir}/part_c_fasta_sintax_ref.fas"
+                representatives_fasta    = "${outputDir}/part_c_fasta_sintax_reps.fas"
+                sintax_cutoff            = 0.5
+            }
+        }
+        setup {
+            def SEQ = "ACGGAATTCAGTATTCGATGCAATCAGTAGCATGCAGTTAATCGATGCATTAGCATGCAGTCATGCAATCGAGCATTAGC"
+            def ref = file("${outputDir}/part_c_fasta_sintax_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = ">refA;tax=d:Bacteria,p:Proteobacteria;\n${SEQ}\n"
+            def reps = file("${outputDir}/part_c_fasta_sintax_reps.fas")
+            reps.text = ">amp1;size=10;\n${SEQ}\n"
+        }
+        then {
+            assert workflow.success
+            def tax = file(
+                "${outputDir}/part_c_fasta_sintax/occurrence_table/part_c_fasta_sintax_reps_taxonomy_sintax.tsv"
+            )
+            assert tax.exists() :
+                "fasta-input sintax should publish <basename>_taxonomy_sintax.tsv"
+            assert tax.readLines()[0] == "query\ttaxonomy\tstrand\tcutoff_taxonomy" :
+                "the standalone sintax table must carry the 4-column header, got: ${tax.readLines()[0]}"
+            assert !file(
+                "${outputDir}/part_c_fasta_sintax/occurrence_table/part_c_fasta_sintax_reps_table_assigned.tsv"
+            ).exists() :
+                "fasta-input Part C must not produce a _table_assigned.tsv"
+        }
+    }
+
+    test("--representatives_fasta together with --occurrence_table aborts at startup") {
+        // COVERAGE: [S02], [S48]
+        // The input-mode selectors are mutually exclusive: setting both
+        // the table and the fasta selector aborts before any process.
+        tag "ci"
+        when {
+            params {
+                threads               = 1
+                representatives_fasta = "${outputDir}/clash_reps.fas"
+                occurrence_table      = "${outputDir}/clash_table.tsv"
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("mutually exclusive") :
+                "expected a mutual-exclusivity abort, got: ${msg}"
+            assert msg.contains("--representatives_fasta") && msg.contains("--occurrence_table") :
+                "abort message should name both selectors, got: ${msg}"
+        }
+    }
+
+    test("--representatives_fasta with --majority_assignment aborts at startup") {
+        // COVERAGE: [S48], [S66]
+        // Fasta-input Part C produces no occurrence table, so the
+        // per-OTU majority step has nothing to run on — the combination
+        // is rejected before any process.
+        tag "ci"
+        when {
+            params {
+                threads               = 1
+                majority_assignment   = true
+                reference_dataset     = "${outputDir}/maj_ref.fas"
+                representatives_fasta = "${outputDir}/maj_reps.fas"
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("majority_assignment") :
+                "expected an abort naming majority_assignment, got: ${msg}"
+        }
+    }
+
     test("Part C standalone with --majority_assignment publishes the majority table") {
         // COVERAGE: [S66]
         // [S66]: the opt-in majority step runs after
