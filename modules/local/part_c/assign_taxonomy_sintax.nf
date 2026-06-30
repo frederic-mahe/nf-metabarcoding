@@ -57,6 +57,7 @@ process assign_taxonomy_sintax {
     vsearch \
         --sintax !{representatives} \
         --threads !{task.cpus} \
+        --randseed !{params.sintax_randseed} \
         --db !{reference_dataset} \
         --dbmask none \
         --sintax_cutoff !{params.sintax_cutoff} \

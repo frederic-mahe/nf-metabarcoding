@@ -242,6 +242,12 @@
                     "maximum": 1,
                     "description": "vsearch --sintax_cutoff threshold; used by the shadow path and by --taxonomy_method=sintax on the regular path."
                 },
+                "sintax_randseed": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "description": "vsearch --sintax --randseed; 0 (default) uses a random data source (non-reproducible), a non-zero value seeds the PRNG for reproducible sintax classification."
+                },
                 "majority_assignment": {
                     "type": "boolean",
                     "default": false,

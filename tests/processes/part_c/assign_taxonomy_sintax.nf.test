@@ -167,4 +167,41 @@ nextflow_process {
                 "empty sintax col 2 → taxonomy must be NA, got: ${fields[3]}"
         }
     }
+
+    test("params.sintax_randseed threads through to vsearch --randseed") {
+        // COVERAGE: [S91]
+        // [S91] wires params.sintax_randseed to vsearch's --randseed so a
+        // non-zero value makes the sintax bootstrap reproducible. Like
+        // sintax_cutoff, the wiring is observable through vsearch's own
+        // --log echo of the full command line — the seed does not change
+        // this fixture's single confident assignment, only run-to-run
+        // determinism. A dropped param or a hard-coded seed would leave a
+        // different value in the log and fail this assertion.
+        tag "ci"
+        when {
+            params {
+                threads         = 1
+                sintax_cutoff   = 0.9
+                sintax_randseed = 42   // non-default sentinel
+            }
+            process {
+                """
+                def SEQ = 'ACGGAATTCAGTATTCGATGCAATCAGTAGCATGCAGTTAATCGATGCATTAGCATGCAGTCATGCAATCGAGCATTAGC'
+                def reps = workDir.resolve("reps.fas")
+                reps.text = '>amp1;size=10;\\n' + SEQ + '\\n'
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>refA;tax=d:Bacteria,p:Proteobacteria;\\n' + SEQ + '\\n'
+                input[0] = file(reps.toString())
+                input[1] = file(ref.toString())
+                input[2] = "proj_1_samples_notmerged"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def log = path(process.out.log.get(0)).text
+            assert log.contains("--randseed 42") :
+                "expected vsearch log to echo --randseed 42 from params, got:\n${log}"
+        }
+    }
 }

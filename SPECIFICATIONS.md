@@ -1017,6 +1017,20 @@ from placeholder values to real taxonomic assignments.
     shadow path) under `--results_folder`; the shadow assigned
     table's `taxonomy` column carries the bootstrap-annotated
     lineage from vsearch's tabbed output.
+- `[S91]` `assign_taxonomy_sintax` passes `--randseed
+  <--sintax_randseed>` to `vsearch --sintax` (default `0`, vsearch's
+  "use a random data source" sentinel — i.e. non-reproducible, the
+  legacy behaviour). A non-zero value seeds vsearch's PRNG so the
+  bootstrap classification is reproducible across runs. The same param
+  feeds both the regular Part C sintax path
+  (`--taxonomy_method=sintax`) and the shadow path (`[S50]`), since
+  both share the one `assign_taxonomy_sintax` process. Validated as an
+  integer `>= 0` by the schema (`[S72]`). Full thread-count-independent
+  reproducibility additionally depends on the vsearch version; the flag
+  is accepted by the pinned vsearch and is forward-compatible config.
+  - **Pass when:** a non-default `--sintax_randseed` value is echoed by
+    vsearch as `--randseed <value>` in the process `--log` (a dropped
+    param or a hard-coded seed would leave the default in the log).
 - `[S51]` Part C's `update_occurrence_table` splices the
   taxonomic assignment back onto the `[S46]` occurrence table by
   amplicon ID, overwriting the `identity`, `taxonomy`, and
@@ -1624,6 +1638,8 @@ from placeholder values to real taxonomic assignments.
     - `stampa_id` — real in `[0, 1]` (vsearch `--id`, `[S49]`)
     - `sintax_cutoff` — real in `[0, 1]` (vsearch `--sintax_cutoff`,
       `[S50]`)
+    - `sintax_randseed` — integer `>= 0` (`0` = random-data-source
+      sentinel, vsearch `--randseed`, `[S91]`)
   - **Pass when:** for each parameter above, a representative
     out-of-range value aborts the run before any process executes with
     stderr naming the offending parameter; the default configuration
