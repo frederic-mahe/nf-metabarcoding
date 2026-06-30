@@ -9,8 +9,15 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-30
+
 ### Added
 
+- `--sintax_randseed` (`[S91]`, default `0`): seeds vsearch's PRNG for
+  the sintax classifier so the bootstrap classification is reproducible
+  across runs. The default `0` is vsearch's "use a random data source"
+  sentinel, preserving the previous non-deterministic behaviour. Shared
+  by the regular Part C sintax path and the shadow path.
 - Stub blocks on every tool-invoking process (`[S85]`): the whole
   Part A→B→C pipeline now runs under `nextflow run -profile demo
   -stub-run` with none of vsearch / swarm / cutadapt / mumu installed,
@@ -50,6 +57,12 @@ version here must match `manifest.version` in
 
 ### Changed
 
+- `run_mumu` now passes `--minimum_relative_cooccurrence` explicitly,
+  coupled to the cleaving threshold `--percentage` (`[S43]` / `[S22]`)
+  as `1 - percentage`. The default cleaving `0.05` yields `0.95` —
+  mumu's own default — so behaviour at the default is unchanged, but the
+  threshold now tracks `--percentage` and no longer silently inherits a
+  future change to mumu's built-in default.
 - **`cleanup` now defaults to `false`** (`[S82]`, was `true`). A
   successful run keeps its per-task `work/` directories, so `-resume`
   works across separate invocations and a run stays inspectable. Clean
