@@ -278,6 +278,24 @@ the latter case.
     ceiling for each shipped cluster; `-profile <cluster>,singularity`
     additionally resolves `singularity.enabled = true`; and a plain
     `nextflow run` (no profile) does not set the slurm executor.
+- `[S92]` a cluster profile may mark the slurm account as **mandatory**
+  by setting `params.require_slurm_account = true`. On a site where every
+  job must be charged to a project (e.g. ABiMS for the projects that
+  enforce it), submitting without `-A` is rejected by the scheduler, so
+  the workflow fails fast: when `require_slurm_account` is set and
+  `--slurm_account` is empty/null, it aborts at startup naming the flag
+  rather than letting every `sbatch` bounce mid-run. The flag defaults to
+  `false`, so the generic `-profile slurm` and any cluster that leaves it
+  unset keep `--slurm_account` optional ([S75]); the `abims` profile sets
+  it `true`. The pure helper
+  `slurm_account_requirement_error(require_account, slurm_account)`
+  returns the error message (or `null` when the requirement is satisfied
+  or not in force); the entry workflow throws when it is non-null.
+  - **Pass when:** `slurm_account_requirement_error` unit tests show a
+    non-null message naming `--slurm_account` when the requirement is on
+    and the account is unset/blank, and `null` when the account is given
+    or the requirement is off; and `nextflow config -profile abims`
+    resolves `params.require_slurm_account = true`.
 - `[S79]` under `-profile slurm`, the memory-bound steps scale their RAM
   request off `--dataset_size_gb` (the dataset-bound steps) and
   `--reference_size_gb` (the taxonomic-assignment steps), falling back to

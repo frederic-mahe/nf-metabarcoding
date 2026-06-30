@@ -381,3 +381,25 @@ def resource_size_warnings(profile, dataset_size_gb, reference_size_gb, boolean 
     }
     return warnings
 }
+
+
+def slurm_account_requirement_error(require_account, slurm_account) {
+    // [S92]: a cluster profile may set params.require_slurm_account=true
+    // when the site rejects jobs that are not charged to a project (the
+    // abims profile does). Return an error message naming --slurm_account
+    // when the requirement is in force but no account is set, so the run
+    // aborts at startup instead of letting every sbatch bounce mid-run;
+    // return null when the requirement is off or the account is supplied.
+    // Pure (no params / no `workflow` access) so it is unit-testable; the
+    // entry workflow reads params.require_slurm_account + params.slurm_account
+    // and throws whatever this returns.
+    if ( !require_account ) {
+        return null
+    }
+    if ( slurm_account && slurm_account.toString().trim() ) {
+        return null
+    }
+    return "--slurm_account is required on this cluster (the active profile " +
+        "sets require_slurm_account): pass your project, e.g. " +
+        "--slurm_account jedi_meta."
+}

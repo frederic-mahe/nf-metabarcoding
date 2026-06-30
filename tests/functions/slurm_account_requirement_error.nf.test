@@ -1,0 +1,68 @@
+nextflow_function {
+
+    name "slurm_account_requirement_error"
+    script "modules/local/functions.nf"
+    function "slurm_account_requirement_error"
+
+    // [S92]: a cluster profile may make --slurm_account mandatory by
+    // setting params.require_slurm_account=true (the abims profile does).
+    // slurm_account_requirement_error is the pure core: it returns an
+    // error message naming the flag when the requirement is in force but
+    // the account is unset/blank, and null otherwise. The entry workflow
+    // reads params.require_slurm_account + params.slurm_account and throws
+    // when the result is non-null. Inputs: (require_account, slurm_account).
+
+    test("requirement on + account unset returns a message naming the flag") {
+        // COVERAGE: [S92]
+        tag "ci"
+        when { function { """
+            input[0] = true
+            input[1] = null
+        """ } }
+        then {
+            assert function.success
+            assert function.result != null
+            assert function.result.contains('--slurm_account')
+        }
+    }
+
+    test("requirement on + account blank/whitespace returns a message") {
+        // COVERAGE: [S92]
+        tag "ci"
+        when { function { """
+            input[0] = true
+            input[1] = '   '
+        """ } }
+        then {
+            assert function.success
+            assert function.result != null
+            assert function.result.contains('--slurm_account')
+        }
+    }
+
+    test("requirement on + account given is satisfied (null)") {
+        // COVERAGE: [S92]
+        tag "ci"
+        when { function { """
+            input[0] = true
+            input[1] = 'jedi_meta'
+        """ } }
+        then {
+            assert function.success
+            assert function.result == null
+        }
+    }
+
+    test("requirement off is silent regardless of the account") {
+        // COVERAGE: [S92]
+        tag "ci"
+        when { function { """
+            input[0] = false
+            input[1] = null
+        """ } }
+        then {
+            assert function.success
+            assert function.result == null
+        }
+    }
+}

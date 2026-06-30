@@ -112,6 +112,11 @@ done
 assert_contains "abims: bigmem memory routing" \
     "task.memory > 1400.GB ? 'bigmem'" "abims"
 
+# [S92]: abims charges every job to a project, so its profile requires
+# --slurm_account (the entry workflow aborts at startup when it is unset).
+assert_contains "abims: requires --slurm_account" \
+    "params.require_slurm_account = true" "abims"
+
 # genotoul loads its container engine from a module via beforeScript.
 assert_contains "genotoul: apptainer module beforeScript" \
     "module load containers/Apptainer/1.4.1" "genotoul,apptainer"

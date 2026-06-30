@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-include { normalize_path; validate_params; samplesheet_profile; check_primer_format; resource_size_warnings } from './modules/local/functions.nf'
+include { normalize_path; validate_params; samplesheet_profile; check_primer_format; resource_size_warnings; slurm_account_requirement_error } from './modules/local/functions.nf'
 include { part_A } from './subworkflows/local/part_a.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
 include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_fasta.nf'
@@ -247,6 +247,18 @@ workflow {
     // primers / reference) stay inline below because they depend on the
     // selected run mode.
     validate_params()
+
+    // [S92]: a cluster profile may require --slurm_account
+    // (params.require_slurm_account, set by e.g. the abims profile whose
+    // site charges every job to a project). Abort at startup when the
+    // requirement is in force but no account is supplied, rather than
+    // letting every sbatch be rejected mid-run. Silent when the flag is
+    // off (the default) or an account is given.
+    def slurm_account_error = slurm_account_requirement_error(
+        params.require_slurm_account,
+        params.slurm_account
+    )
+    assert slurm_account_error == null : slurm_account_error
 
     // [S79]: under -profile slurm, warn (don't abort) when the dataset /
     // reference size hints are unset so a forgotten --dataset_size_gb
