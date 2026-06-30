@@ -23,10 +23,12 @@ tests/data/**/*.fq.gz
 # pipeline artefacts left in tests/data by workflow-level nf-test runs
 tests/data/*.log
 tests/data/*.fas
+tests/data/*.fas2
 tests/data/*.qual
 tests/data/*.stats
 tests/data/**/*.log
 tests/data/**/*.fas
+tests/data/**/*.fas2
 tests/data/**/*.qual
 tests/data/**/*.stats
 .nf-test.log
