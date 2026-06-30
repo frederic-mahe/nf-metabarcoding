@@ -1208,7 +1208,7 @@ nextflow_pipeline {
         // COVERAGE: [S66]
         // [S66]: the opt-in majority step runs after
         // update_occurrence_table on the regular path and publishes an
-        // independent <basename>_table_assigned_majority.tsv alongside
+        // independent <basename>_taxonomy_stampa_majority.tsv alongside
         // the assigned table. The reference accession in the
         // `references` column resolves against the stampa reference so
         // the majority vote produces a real lineage.
@@ -1249,10 +1249,10 @@ nextflow_pipeline {
             assert assigned.exists() :
                 "Part C should still publish <basename>_table_assigned.tsv"
             def majority = file(
-                "${outputDir}/part_c_majority/occurrence_table/part_c_majority_table_assigned_majority.tsv"
+                "${outputDir}/part_c_majority/occurrence_table/part_c_majority_taxonomy_stampa_majority.tsv"
             )
             assert majority.exists() :
-                "--majority_assignment should publish <basename>_table_assigned_majority.tsv"
+                "--majority_assignment should publish <basename>_taxonomy_stampa_majority.tsv"
             def lines = majority.readLines()
             assert lines[0] == "OTU\tamplicon\ttaxonomy_majority"
             assert lines.size() == 2  // header + 1 OTU
@@ -1292,7 +1292,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
             def majority = file(
-                "${outputDir}/part_c_no_majority/occurrence_table/part_c_no_majority_table_assigned_majority.tsv"
+                "${outputDir}/part_c_no_majority/occurrence_table/part_c_no_majority_taxonomy_stampa_majority.tsv"
             )
             assert !majority.exists() :
                 "majority table must not be published when --majority_assignment is unset"
@@ -1371,7 +1371,10 @@ nextflow_pipeline {
             )
             assert merged.exists() :
                 "collectFile should publish <basename>_taxonomy_stampa.tsv"
-            def rows = merged.readLines()
+            def merged_lines = merged.readLines()
+            assert merged_lines[0] == "amplicon\tabundance\tidentity\ttaxonomy\treferences" :
+                "published _taxonomy_stampa.tsv must start with the [S46] header, got: ${merged_lines[0]}"
+            def rows = merged_lines.drop(1)
             assert rows.size() == 3 :
                 "expected exactly one row per input amplicon, got: ${rows}"
             // Rows must be sorted by abundance desc, amplicon asc:
@@ -1435,7 +1438,10 @@ nextflow_pipeline {
             )
             assert merged.exists() :
                 "collectFile should publish <basename>_taxonomy_stampa.tsv even without split"
-            def rows = merged.readLines()
+            def merged_lines = merged.readLines()
+            assert merged_lines[0] == "amplicon\tabundance\tidentity\ttaxonomy\treferences" :
+                "published _taxonomy_stampa.tsv must start with the [S46] header, got: ${merged_lines[0]}"
+            def rows = merged_lines.drop(1)
             assert rows.size() == 2
             // Sort still applies: amp1 (7) before amp2 (3).
             def amplicons = rows.collect { it.split("\t", -1)[0] }
@@ -1813,15 +1819,22 @@ nextflow_pipeline {
             def lines = assigned.readLines()
             assert lines.size() == 2 :
                 "expected header + 1 row, got: ${lines}"
-            // [S59]/D15: the raw sintax assignments
-            // (<basename>_taxonomy_sintax.tsv) are an intermediate
-            // consumed by update_occurrence_table, not a deliverable —
-            // they stay in the work directory, mirroring the stampa
-            // path's unpublished chunks.
+            // [S61]: the regular sintax path publishes the standalone
+            // <basename>_taxonomy_sintax.tsv — vsearch's verbatim
+            // 4-column --tabbedout under a header. The canonical 5-column
+            // join table <basename>_assignments_sintax.tsv stays an
+            // unpublished intermediate (mirroring the stampa chunks).
+            def sintax_table = file(
+                "${outputDir}/part_c_regular_sintax/occurrence_table/part_c_regular_sintax_taxonomy_sintax.tsv"
+            )
+            assert sintax_table.exists() :
+                "regular sintax path should publish <basename>_taxonomy_sintax.tsv"
+            assert sintax_table.readLines()[0] == "query\ttaxonomy\tstrand\tcutoff_taxonomy" :
+                "published sintax table must carry the 4-column header, got: ${sintax_table.readLines()[0]}"
             assert !file(
-                "${outputDir}/part_c_regular_sintax/occurrence_table/part_c_regular_sintax_table_taxonomy_sintax.tsv"
+                "${outputDir}/part_c_regular_sintax/occurrence_table/part_c_regular_sintax_assignments_sintax.tsv"
             ).exists() :
-                "raw sintax assignments must not be published to occurrence_table/"
+                "the canonical sintax join intermediate must stay in the work dir"
             // No _notmerged sibling was created → no shadow output.
             def shadow = file(
                 "${outputDir}/part_c_regular_sintax/occurrence_table/part_c_regular_sintax_notmerged_table_assigned.tsv"
@@ -1904,12 +1917,18 @@ nextflow_pipeline {
             // taxonomy field (col 12 of the occurrence table schema).
             assert fields[11].contains("d:Bacteria") :
                 "expected shadow taxonomy to carry sintax lineage, got: ${fields[11]}"
-            // [S59]/D15: the shadow path's raw sintax assignments are an
-            // intermediate and must not be published either.
+            // [S50]/[S61]: the shadow path never publishes the standalone
+            // sintax table — its `_notmerged` basename is dropped by the
+            // process's saveAs closure. Neither the published 4-column
+            // file nor the canonical join intermediate may appear.
             assert !file(
-                "${outputDir}/part_c_shadow/occurrence_table/part_c_shadow_notmerged_table_taxonomy_sintax.tsv"
+                "${outputDir}/part_c_shadow/occurrence_table/part_c_shadow_notmerged_taxonomy_sintax.tsv"
             ).exists() :
-                "raw sintax assignments must not be published to occurrence_table/"
+                "shadow path must not publish <basename>_notmerged_taxonomy_sintax.tsv"
+            assert !file(
+                "${outputDir}/part_c_shadow/occurrence_table/part_c_shadow_notmerged_assignments_sintax.tsv"
+            ).exists() :
+                "the canonical sintax join intermediate must stay in the work dir"
         }
     }
 

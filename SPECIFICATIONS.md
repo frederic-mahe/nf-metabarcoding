@@ -930,7 +930,11 @@ from placeholder values to real taxonomic assignments.
        process running `LC_ALL=C sort -k2,2nr -k1,1d` (abundance
        desc, amplicon asc — the legacy stampa order), which
        publishes the merged `<basename>_taxonomy_stampa.tsv` to
-       the results folder. The sort is a real process rather than
+       the results folder. That published table carries a header
+       row with the `[S46]` column names
+       (`amplicon\tabundance\tidentity\ttaxonomy\treferences`); the
+       per-chunk `stampa_chunk.tsv` slices stay headerless. The sort
+       is a real process rather than
        `collectFile`'s `sort:` closure because that closure orders
        whole entries (chunks), not the lines inside a chunk, and so
        cannot stabilise vsearch's thread-dependent within-chunk
@@ -995,6 +999,12 @@ from placeholder values to real taxonomic assignments.
   taxonomic assignment back onto the `[S46]` occurrence table by
   amplicon ID, overwriting the `identity`, `taxonomy`, and
   `references` columns. Rows are neither added nor removed. The
+  assignments TSV it reads may carry a header row (the stampa
+  `[S49]` `_taxonomy_stampa.tsv` does; the sintax
+  `_assignments_sintax.tsv` intermediate and the empty-input
+  fallback do not): a leading row whose first field is the literal
+  `amplicon` column name is skipped, so the join is correct whether
+  or not a header is present. The
   output filename is `<project>_<N>_samples_table_assigned.tsv`
   — a sibling of Part B's `<project>_<N>_samples_table.tsv`,
   **not** an overwrite (see [`DECISIONS.md`](DECISIONS.md) D04
@@ -1128,14 +1138,28 @@ from placeholder values to real taxonomic assignments.
   Both Part C paths publish that log: the sintax path from vsearch's
   `--log`, and the stampa path by gathering its per-chunk `vsearch.log`
   slices into the single `<basename>_taxonomy.log` (D16).
-  When Part C runs, its `<basename>_table_assigned.tsv` ([S51]) and
-  `<basename>_table_assigned_majority.tsv` ([S66]) are published into
+  When Part C runs, these additional data artefacts are published into
   the same directory (they are not Part B intermediates and are not
-  covered by this whitelist). Part C's raw per-amplicon assignment
-  tables — `assign_taxonomy_sintax`'s `<basename>_taxonomy_sintax.tsv`
-  and the stampa path's chunk TSVs (`stampa_chunk.tsv`) — are
-  **intermediates** consumed by `update_occurrence_table` and stay in
-  the work directory; only the joined `_table_assigned.tsv` is published. The run's
+  covered by the Part B whitelist above):
+    - `<basename>_table_assigned.tsv` — the joined occurrence table
+      ([S51]); on the shadow path its sibling
+      `<basename>_notmerged_table_assigned.tsv` ([S50]);
+    - the standalone taxonomy table, named per assignment method
+      `<basename>_taxonomy_<method>.tsv`: `_taxonomy_stampa.tsv` on the
+      stampa path ([S49]) and `_taxonomy_sintax.tsv` on the regular
+      sintax path ([S61], vsearch's verbatim 4-column `--tabbedout`
+      with a header). The standalone sintax table is published **only**
+      when the user explicitly selects `--taxonomy_method=sintax`;
+      the shadow path ([S50]) never publishes it (its `_notmerged`
+      basename is dropped by the process's `saveAs` closure);
+    - `<basename>_taxonomy_stampa_majority.tsv` ([S66]) when
+      `--majority_assignment` is set.
+  Part C's per-amplicon **intermediates** stay in the work directory
+  and are not published: the stampa path's chunk TSVs
+  (`stampa_chunk.tsv`) and the sintax path's canonical 5-column join
+  table `<basename>_assignments_sintax.tsv` (the file
+  `update_occurrence_table` consumes — distinct from the published
+  4-column `_taxonomy_sintax.tsv`). The run's
   `software_versions.yml`
   ([S68]) lives in the sibling `<outdir>/pipeline_info/`, **not** in
   `occurrence_table/`. All other Part B intermediates (`.qual`,
@@ -1181,16 +1205,26 @@ from placeholder values to real taxonomic assignments.
   [S49] scatter-gather, consumes `--reference_dataset`) and
   `'sintax'` (use `vsearch --sintax` on the regular table with
   the same reshape rules as [S50]; consumes
-  `--reference_dataset_sintax` — see [S64]). The shadow path
-  always uses sintax regardless of this flag and reads
-  `--reference_dataset_sintax`. The value is validated at workflow
-  startup; an unknown method aborts with a clear message before
-  any process runs.
+  `--reference_dataset_sintax` — see [S64]). On the regular sintax
+  path (and **only** there, never the shadow path) the standalone
+  taxonomy table `<basename>_taxonomy_sintax.tsv` is published — the
+  sintax counterpart of stampa's `<basename>_taxonomy_stampa.tsv`
+  ([S49]). It carries vsearch's verbatim 4-column `--tabbedout`
+  layout under a header row
+  (`query\ttaxonomy\tstrand\tcutoff_taxonomy`, the manpage column
+  order), not the canonical 5-column join format — that format lives
+  in the unpublished `<basename>_assignments_sintax.tsv` intermediate
+  ([S59]). The shadow path always uses sintax regardless of this flag
+  and reads `--reference_dataset_sintax`. The value is validated at
+  workflow startup; an unknown method aborts with a clear message
+  before any process runs.
   - **Pass when:** `--taxonomy_method bogus` aborts the workflow
     with an error naming `taxonomy_method`; `--taxonomy_method
     sintax` with `--reference_dataset_sintax` set runs the
-    regular path through `assign_taxonomy_sintax` and still
-    publishes `<basename>_table_assigned.tsv`;
+    regular path through `assign_taxonomy_sintax`, publishes
+    `<basename>_table_assigned.tsv`, and also publishes a
+    `<basename>_taxonomy_sintax.tsv` whose first line is the
+    `query\ttaxonomy\tstrand\tcutoff_taxonomy` header;
     `--taxonomy_method sintax` without
     `--reference_dataset_sintax` aborts with a clear message.
 - `[S62]` In Part C **standalone mode** (`--occurrence_table
@@ -1315,7 +1349,7 @@ from placeholder values to real taxonomic assignments.
   `bin/majority_assignment.py` on the regular assigned table
   (`<basename>_table_assigned.tsv`, [S51]) plus the stampa-formatted
   `--reference_dataset` ([S47]), and publishes an **independent** table
-  `<basename>_table_assigned_majority.tsv` under `--results_folder`
+  `<basename>_taxonomy_stampa_majority.tsv` under `--results_folder`
   (a sibling of [S51]'s output — the assigned table is not modified).
   The new table has three columns,
   `OTU\tamplicon\ttaxonomy_majority`, one row per OTU. For each OTU the
@@ -1346,7 +1380,7 @@ from placeholder values to real taxonomic assignments.
     (`NA` fill), and (e) a `No_hit` row; the same output is produced
     from a plain, a `.gz`, and a `.bz2` reference. A Part C run with
     `--majority_assignment true` (stampa) publishes
-    `<basename>_table_assigned_majority.tsv` alongside
+    `<basename>_taxonomy_stampa_majority.tsv` alongside
     `<basename>_table_assigned.tsv`; the same run without the flag
     publishes no majority table; running with
     `--majority_assignment true --taxonomy_method sintax` aborts at
@@ -1485,8 +1519,9 @@ from placeholder values to real taxonomic assignments.
       ([S19]): `<sample>.{fas,qual,stats}`.
     - `<outdir>/occurrence_table/` — Part B **data** ([S46] / [S59]:
       `<basename>_table.tsv`, `<basename>_table.fas`) and Part C
-      ([S51] / [S66]: `<basename>_table_assigned.tsv`,
-      `<basename>_table_assigned_majority.tsv`), regular and
+      ([S51] / [S61] / [S66]: `<basename>_table_assigned.tsv`,
+      `<basename>_taxonomy_<method>.tsv`,
+      `<basename>_taxonomy_stampa_majority.tsv`), regular and
       `_notmerged` shadow siblings together.
     - `<outdir>/logs/part_a/per_sample/` — Part A's per-step **logs**
       ([S19]): `_merging` / `_trimming_forward` / `_trimming_reverse` /

@@ -5,12 +5,17 @@ nextflow_process {
     process "assign_taxonomy_sintax"
 
     test("reshapes vsearch --sintax output: column 2 (bootstrap lineage) becomes taxonomy") {
-        // COVERAGE: [S50]
-        // [S50] revised (2026-05-21): the shadow path lifts vsearch's
+        // COVERAGE: [S50], [S61]
+        // [S50] revised (2026-05-21): the path lifts vsearch's
         // tabbed-output column 2 (lineage with bootstrap, e.g.
         // `d:Bacteria(1.00),p:Proteobacteria(0.95)`) into the
         // canonical assignments TSV's `taxonomy` column. `identity`
         // and `references` stay at placeholder values (`0.0` / `NA`).
+        // That canonical 5-column file is the unpublished
+        // `<basename>_assignments_sintax.tsv` intermediate consumed by
+        // update_occurrence_table; the process additionally emits the
+        // published `<basename>_taxonomy_sintax.tsv` carrying vsearch's
+        // verbatim 4-column --tabbedout under a header ([S61]).
         //
         // The fixture uses an 80-nt non-periodic sequence: sintax
         // samples 8-mers and needs enough unique kmers to bootstrap a
@@ -38,8 +43,8 @@ nextflow_process {
         then {
             assert process.success
             def assignments = process.out.taxonomy.get(0)
-            assert assignments.endsWith("proj_1_samples_notmerged_taxonomy_sintax.tsv") :
-                "expected <basename>_taxonomy_sintax.tsv, got: ${assignments}"
+            assert assignments.endsWith("proj_1_samples_notmerged_assignments_sintax.tsv") :
+                "expected the canonical <basename>_assignments_sintax.tsv intermediate, got: ${assignments}"
             def log = process.out.log.get(0)
             assert log.endsWith("proj_1_samples_notmerged_taxonomy.log") :
                 "expected <basename>_taxonomy.log, got: ${log}"
@@ -64,6 +69,24 @@ nextflow_process {
                 "expected bootstrap parens in taxonomy, got: ${fields[3]}"
             assert fields[4] == "NA" :
                 "expected references placeholder NA, got: ${fields[4]}"
+
+            // [S61]: the published standalone table keeps vsearch's
+            // verbatim 4-column --tabbedout layout under a header row.
+            def published = process.out.published.get(0)
+            assert published.endsWith("proj_1_samples_notmerged_taxonomy_sintax.tsv") :
+                "expected the published <basename>_taxonomy_sintax.tsv, got: ${published}"
+            def plines = path(published).readLines().findAll { it.trim() }
+            assert plines[0] == "query\ttaxonomy\tstrand\tcutoff_taxonomy" :
+                "expected the manpage-derived 4-column header, got: ${plines[0]}"
+            assert plines.size() == 2 :
+                "expected header + one query row, got: ${plines}"
+            def pfields = plines[1].split("\t", -1)
+            assert pfields.size() == 4 :
+                "expected vsearch's 4-column --tabbedout, got: ${plines[1]}"
+            assert pfields[0].startsWith("amp1;size=10;") :
+                "col 1 must be vsearch's verbatim query label, got: ${pfields[0]}"
+            assert pfields[1].contains("d:Bacteria") :
+                "col 2 must carry the bootstrap-annotated lineage, got: ${pfields[1]}"
         }
     }
 

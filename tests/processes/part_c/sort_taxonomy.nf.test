@@ -32,7 +32,10 @@ ampD\\t5\\t99.0\\tBacteria|Firmicutes\\trefA
             def out = process.out.taxonomy.get(0)
             assert out.endsWith("proj_3_samples_taxonomy_stampa.tsv") :
                 "expected <basename>_taxonomy_stampa.tsv, got: ${out}"
-            def rows = path(out).readLines().findAll { it.trim() }
+            def lines = path(out).readLines().findAll { it.trim() }
+            assert lines[0] == "amplicon\tabundance\tidentity\ttaxonomy\treferences" :
+                "expected the [S46] column-name header row, got: ${lines[0]}"
+            def rows = lines.drop(1)
             def names = rows.collect { it.split("\t", -1)[0] }
             def abundances = rows.collect { it.split("\t", -1)[1] as Long }
             assert names == ['ampC', 'ampA', 'ampB', 'ampD'] :
@@ -67,7 +70,7 @@ ampHigh\\t40\\t99.0\\tBacteria|Genus species\\trefA
         then {
             assert process.success
             def out = process.out.taxonomy.get(0)
-            def rows = path(out).readLines().findAll { it.trim() }
+            def rows = path(out).readLines().findAll { it.trim() }.drop(1)
             def names = rows.collect { it.split("\t", -1)[0] }
             assert names == ['ampHigh', 'ampLow'] :
                 "abundance must be read from the tab-delimited column 2, got ${names}"

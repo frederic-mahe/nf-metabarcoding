@@ -1,4 +1,4 @@
-include { log_dir } from '../functions.nf'
+include { publish_dir; log_dir } from '../functions.nf'
 
 
 process assign_taxonomy_sintax {
@@ -16,15 +16,31 @@ process assign_taxonomy_sintax {
     // ([S33]/[S46]) — sintax does not produce a percent identity, and
     // there is no single "reference accession" to record.
     //
-    // The process is also used by the regular path when
-    // params.taxonomy_method == 'sintax' ([S61]); the published
-    // filename embeds `basename`, which carries the `_notmerged` token
-    // on the shadow path.
-    // [S59]: the raw <basename>_taxonomy_sintax.tsv is an intermediate
-    // consumed by update_occurrence_table (mirroring the stampa path's
-    // unpublished chunks) — it stays in the work dir, only the log is
+    // The process emits two TSVs:
+    //   * <basename>_assignments_sintax.tsv — the canonical 5-column
+    //     join format above; an intermediate consumed by
+    //     update_occurrence_table that stays in the work dir
+    //     (mirroring the stampa path's unpublished chunks).
+    //   * <basename>_taxonomy_sintax.tsv — vsearch's verbatim 4-column
+    //     --tabbedout (query\ttaxonomy\tstrand\tcutoff_taxonomy) with a
+    //     header row, published to occurrence_table/ as the sintax
+    //     counterpart of the stampa path's <basename>_taxonomy_stampa.tsv
+    //     ([S59]/[S61]).
+    //
+    // The process is also used by the shadow path, whose `basename`
+    // carries the `_notmerged` token. Per the developer's policy the
+    // standalone sintax table is published only when the user explicitly
+    // selects --taxonomy_method=sintax (regular path) — never for the
+    // shadow run — so the occurrence_table publishDir skips any
+    // `_notmerged` basename via its saveAs closure. The log is always
     // published ([D16]: under logs/part_c/).
     publishDir path: { log_dir('part_c') }, mode: params.publish_mode, pattern: "*.log"
+    publishDir(
+        path: { publish_dir('occurrence_table') },
+        mode: params.publish_mode,
+        pattern: "*_taxonomy_sintax.tsv",
+        saveAs: { filename -> basename.toString().contains('_notmerged') ? null : filename },
+    )
 
     input:
     path representatives
@@ -32,8 +48,9 @@ process assign_taxonomy_sintax {
     val basename
 
     output:
-    path "${basename}_taxonomy_sintax.tsv", emit: taxonomy
-    path "${basename}_taxonomy.log",        emit: log
+    path "${basename}_assignments_sintax.tsv", emit: taxonomy
+    path "${basename}_taxonomy_sintax.tsv",    emit: published
+    path "${basename}_taxonomy.log",           emit: log
 
     shell:
     '''
@@ -54,11 +71,16 @@ process assign_taxonomy_sintax {
              abundance = parts[2] + 0
              taxonomy = ($2 == "") ? "NA" : $2
              print amplicon, abundance, "0.0", taxonomy, "NA"
-         }' raw_sintax.tsv > !{basename}_taxonomy_sintax.tsv
+         }' raw_sintax.tsv > !{basename}_assignments_sintax.tsv
+
+    {
+        printf 'query\\ttaxonomy\\tstrand\\tcutoff_taxonomy\\n'
+        cat raw_sintax.tsv
+    } > !{basename}_taxonomy_sintax.tsv
     '''
 
     stub:
     """
-    touch ${basename}_taxonomy_sintax.tsv ${basename}_taxonomy.log
+    touch ${basename}_assignments_sintax.tsv ${basename}_taxonomy_sintax.tsv ${basename}_taxonomy.log
     """
 }

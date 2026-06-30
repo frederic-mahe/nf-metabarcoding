@@ -10,7 +10,7 @@ nextflow_process {
         // of the regular Part C path. It consumes the assigned table
         // (<basename>_table_assigned.tsv) and the stampa-formatted
         // reference, and emits an independent three-column table
-        // <basename>_table_assigned_majority.tsv
+        // <basename>_taxonomy_stampa_majority.tsv
         // (OTU\tamplicon\ttaxonomy_majority). This test pins the output
         // filename and the per-rank majority vote (most-frequent name
         // with support, No_hit passthrough). LCA-vote correctness is
@@ -42,8 +42,8 @@ nextflow_process {
         then {
             assert process.success
             def out = process.out.table.get(0)
-            assert out.endsWith("proj_3_samples_table_assigned_majority.tsv") :
-                "expected <basename>_table_assigned_majority.tsv, got: ${out}"
+            assert out.endsWith("proj_3_samples_taxonomy_stampa_majority.tsv") :
+                "expected <basename>_taxonomy_stampa_majority.tsv, got: ${out}"
             def lines = path(out).readLines()
             assert lines.size() == 4   // header + 3 rows
             assert lines[0] == "OTU\tamplicon\ttaxonomy_majority"

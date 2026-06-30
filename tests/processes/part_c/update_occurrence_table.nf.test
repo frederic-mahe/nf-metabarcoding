@@ -48,6 +48,46 @@ nextflow_process {
         }
     }
 
+    test("skips a header row in the assignments file") {
+        // COVERAGE: [S51]
+        // The stampa path's published `_taxonomy_stampa.tsv` now carries
+        // a header row (amplicon\tabundance\tidentity\ttaxonomy\treferences,
+        // [S49]). update_occurrence_table must treat that leading row as a
+        // header — never as data — so the join stays correct. A regression
+        // that parsed the header as an assignment for an amplicon literally
+        // named "amplicon" would leave a stray entry and (harmlessly) miss
+        // nothing here, but the real guard is that the genuine amp1 row is
+        // still spliced and no row is corrupted.
+        tag "ci"
+        when {
+            process {
+                """
+                def t = workDir.resolve("input_table.tsv")
+                t.text = '''OTU\\ttotal\\tcloud\\tamplicon\\tlength\\tabundance\\tchimera\\tspread\\tquality\\tsequence\\tidentity\\ttaxonomy\\treferences\\ts1
+1\\t10\\tNA\\tamp1\\t10\\t10\\tN\\t1\\t0.001\\tACGTACGTAC\\t0.0\\tNA\\tNA\\t10
+'''
+                def a = workDir.resolve("assignments")
+                a.text = 'amplicon\\tabundance\\tidentity\\ttaxonomy\\treferences\\n' +
+                    'amp1\\t10\\t99.0\\tBacteria|Firmicutes\\trefA\\n'
+                input[0] = file(t.toString())
+                input[1] = file(a.toString())
+                input[2] = "proj_1_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.table.get(0)).readLines()
+            assert lines.size() == 2 :
+                "header row must not add a data row, got: ${lines}"
+            def row1 = lines[1].split("\t", -1)
+            assert row1[3] == "amp1" :
+                "the genuine amp1 row must survive the header skip, got: ${row1[3]}"
+            assert row1[10] == "99.0" && row1[11] == "Bacteria|Firmicutes" && row1[12] == "refA" :
+                "amp1 must still be spliced when the assignments carry a header, got: ${lines[1]}"
+        }
+    }
+
     test("leaves the input occurrence table untouched") {
         // COVERAGE: [S51]
         // [S51] guarantees Part C is non-destructive: the input

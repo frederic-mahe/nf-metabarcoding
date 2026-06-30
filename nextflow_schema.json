@@ -241,7 +241,7 @@
                 "majority_assignment": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Opt-in final step: recompute a majority-rule taxonomy per OTU and publish <basename>_table_assigned_majority.tsv. Requires --taxonomy_method=stampa."
+                    "description": "Opt-in final step: recompute a majority-rule taxonomy per OTU and publish <basename>_taxonomy_stampa_majority.tsv. Requires --taxonomy_method=stampa."
                 }
             }
         },

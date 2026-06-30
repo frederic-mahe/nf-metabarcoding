@@ -63,7 +63,16 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 
 def parse_assignments(path: str) -> dict[str, tuple[str, str, str]]:
-    """Map ``amplicon -> (identity, taxonomy, references)``."""
+    """Map ``amplicon -> (identity, taxonomy, references)``.
+
+    The assignments TSV may or may not carry a header row: the stampa
+    path's published ``_taxonomy_stampa.tsv`` does, the sintax
+    ``_assignments_sintax.tsv`` intermediate and the empty-input
+    fallback do not. A leading column literally named ``amplicon`` is
+    the header sentinel — real amplicon IDs are SHA1 hashes ([S46]), so
+    such a row can only be a header and is skipped rather than parsed as
+    data, keeping the join correct whether or not a header is present.
+    """
     assignments: dict[str, tuple[str, str, str]] = {}
     with open(path) as handle:
         for line in handle:
@@ -72,6 +81,8 @@ def parse_assignments(path: str) -> dict[str, tuple[str, str, str]]:
                 continue
             fields = line.split("\t")
             # amplicon\tabundance\tidentity\ttaxonomy\treferences
+            if fields[0] == "amplicon":
+                continue
             amplicon, _abundance, identity, taxonomy, references = fields
             assignments[amplicon] = (identity, taxonomy, references)
     return assignments

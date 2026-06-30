@@ -17,6 +17,11 @@ process sort_taxonomy {
     // multi-record chunks (the default and the `local`/`demo` profiles)
     // unsorted. Delegating the sort to a real process fixes that and
     // also lifts the JVM-heap limit noted in the original Plan B.
+    //
+    // The published table carries a header row with the [S46] column
+    // names (amplicon\tabundance\tidentity\ttaxonomy\treferences) so it
+    // is self-describing; update_occurrence_table tolerates that header
+    // when it splices the assignments back ([S51]).
     publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode
 
     input:
@@ -28,8 +33,10 @@ process sort_taxonomy {
 
     shell:
     '''
-    LC_ALL=C sort -t "$(printf '\\t')" -k2,2nr -k1,1d !{taxonomy} \
-        > !{basename}_taxonomy_stampa.tsv
+    {
+        printf 'amplicon\\tabundance\\tidentity\\ttaxonomy\\treferences\\n'
+        LC_ALL=C sort -t "$(printf '\\t')" -k2,2nr -k1,1d !{taxonomy}
+    } > !{basename}_taxonomy_stampa.tsv
     '''
 
     stub:

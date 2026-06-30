@@ -111,7 +111,10 @@ nextflow_workflow {
             )
             assert out.exists() :
                 "stampa path should publish occurrence_table/<basename>_taxonomy_stampa.tsv"
-            def rows = out.readLines().findAll { it.trim() }
+            def lines = out.readLines().findAll { it.trim() }
+            assert lines[0] == "amplicon\tabundance\tidentity\ttaxonomy\treferences" :
+                "published _taxonomy_stampa.tsv must start with the [S46] header row, got: ${lines[0]}"
+            def rows = lines.drop(1)
             def names = rows.collect { it.tokenize('\t')[0] }
             def abundances = rows.collect { it.tokenize('\t')[1] as Long }
             assert names == ['ampC', 'ampA', 'ampB', 'ampD'] :
@@ -171,7 +174,10 @@ nextflow_workflow {
             )
             assert out.exists() :
                 "stampa path should publish occurrence_table/<basename>_taxonomy_stampa.tsv"
-            def rows = out.readLines().findAll { it.trim() }
+            def lines = out.readLines().findAll { it.trim() }
+            assert lines[0] == "amplicon\tabundance\tidentity\ttaxonomy\treferences" :
+                "published _taxonomy_stampa.tsv must start with the [S46] header row, got: ${lines[0]}"
+            def rows = lines.drop(1)
             def names = rows.collect { it.tokenize('\t')[0] }
             def abundances = rows.collect { it.tokenize('\t')[1] as Long }
             assert names == ['ampC', 'ampA', 'ampB', 'ampD'] :
