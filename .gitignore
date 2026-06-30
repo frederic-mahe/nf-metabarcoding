@@ -33,6 +33,12 @@ tests/data/**/*.qual
 tests/data/**/*.stats
 .nf-test.log
 
+# nextflow DAG renders (nextflow run -with-dag pipeline.<ext>)
+pipeline.dot
+pipeline.mmd
+pipeline.png
+pipeline.svg
+
 # python
 __pycache__/
 *.py[cod]
