@@ -937,3 +937,83 @@ are structural to the method rather than knobs a user would tune:
 **Resolution:** keep 1–4 fixed. If a future use-case needs one of them,
 re-open this decision and promote it the same way (`params` default +
 schema range + `[Sxx]` + test) rather than editing the module in place.
+
+
+## D18 — Delegate stampa's LCA to vsearch `--lcaout` instead of `bin/stampa_merge.py`?
+
+**Blocks:** no new `[Sxx]` (evaluates whether `[S49]`'s last-common-ancestor
+step could drop `bin/stampa_merge.py` in favour of vsearch's native
+`--lcaout` / `--lca_cutoff`)
+**Status:** `proposed` — keep `bin/stampa_merge.py` (option 1); the swap
+is not behaviour-preserving and does not simplify
+
+Recent vsearch versions grow a native LCA facility on `--usearch_global`
+(and `--search_exact`): `--lcaout FILENAME` writes one
+`query\tlineage` row per query, and `--lca_cutoff REAL` (default `1.0`,
+must be `> 0.5` and `<= 1.0`) sets the fraction of top hits that must
+agree at a rank for that rank to survive. The question is whether the
+`[S49]` scatter — currently `vsearch --usearch_global ... --userout` +
+`bin/stampa_merge.py` — could collapse to a single vsearch call and
+delete the helper.
+
+**Question:** replace the `--userout` + `stampa_merge.py` LCA step with
+vsearch `--lcaout`, or keep the current helper?
+
+1. **Keep `bin/stampa_merge.py` (recommended).** The investigation
+   (2026-06-30) found four obstacles, the first two decisive:
+
+   - **Different LCA semantics — changes biological output and breaks a
+     pinned test.** `stampa_merge.py`
+     (`bin/stampa_merge.py:61-70`) wildcards each *disagreeing* rank with
+     `*` but **keeps deeper agreeing ranks**: two hits `K|P1|C` + `K|P2|C`
+     → `K|*|C`. vsearch `--lcaout` (`vsearch/src/results.cc:640-657`)
+     walks ranks and **`break`s at the first rank below `--lca_cutoff`**,
+     i.e. it *truncates*: the same two hits → `d:K` only (Class `C` is
+     dropped). vsearch's default `--lca_cutoff 1.0` does match stampa's
+     "all must agree" threshold — the divergence is purely
+     truncate-vs-wildcard. `tests/python/test_stampa_merge.py` pins the
+     `K|*|C` shape, so the swap would change results and fail `[S49]`.
+   - **Forces a reference-format change that erases the stampa/sintax
+     split.** `--lcaout` reads taxonomy from **sintax-format** DB headers
+     (`tax=d:Bacteria,p:...`, parsed by `tax_split`). The stampa path
+     deliberately consumes the *other* format — `>id <space> k|p|c|...`
+     (`[S47]`, `--reference_dataset`) — and the workflow already has a
+     separate sintax path (`--reference_dataset_sintax` +
+     `--taxonomy_method=sintax`, `[S50]`/`[S61]`) for the sintax format.
+     Routing stampa through `--lcaout` would require the sintax reference,
+     collapsing the two methods into one and defeating the reason both
+     reference flags exist.
+   - **`--lcaout` emits only 2 columns; the `[S46]`/`[S49]` contract needs
+     5.** `--lcaout` writes `query\tlineage` (`results.cc:531`), dropping
+     **abundance**, **identity**, and the **references** accession list
+     that `amplicon\tabundance\tidentity\ttaxonomy\treferences` requires.
+     Recovering those three still needs `--userout` + a merge — so
+     `stampa_merge.py` would not disappear; the design would gain a second
+     output stream and a join (more moving parts, not fewer).
+   - **Format / no-hit mismatches.** `--lcaout` lineages are
+     comma-separated with rank prefixes (`d:..,p:..`), not the
+     `|`-separated bare names stampa emits; and a no-hit query gets an
+     empty second field (`results.cc:533-536`), whereas stampa emits the
+     literal `No_hit` that `[S51]` / `[S66]` downstream depend on.
+
+   The LCA *computation* in `stampa_merge.py` is ~10 trivial lines; the
+   helper's real work is row assembly (parsing `;size=`, joining
+   accessions, threshold→`No_hit`, pipe-delimited lineage). `--lcaout`
+   replaces only the trivial part.
+
+2. **Adopt vsearch `--lcaout`.** Single vsearch call, no helper, LCA
+   maintained upstream. Costs: change `[S49]`'s documented LCA behaviour
+   from wildcard-and-keep to truncate-at-first-disagreement (a method
+   change, not a refactor — needs its own decision and re-pinned tests);
+   require the sintax-format reference for the stampa method; and re-add a
+   `--userout` join to recover abundance / identity / references. Net: not
+   simpler and not behaviour-preserving.
+
+**Proposed resolution:** option 1 — keep `bin/stampa_merge.py`. If the
+project ever *wants* vsearch-native LCA, the real decision to make first
+is "should the stampa method's truncate-vs-wildcard LCA behaviour change?"
+— a `[S49]` spec change with new fixtures, not a mechanical swap. Re-open
+this entry at that point.
+
+Until D18 lands, the `--userout` + `bin/stampa_merge.py` scatter (`[S49]`)
+stands and its tests stay green.
