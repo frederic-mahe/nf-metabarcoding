@@ -23,12 +23,21 @@ process run_mumu {
 
     shell:
     def new_table = "${reduced_table.baseName.replaceFirst(/_reduced$/, '_raw_mumu')}.table"
+    // [S43]: mumu's relative-cooccurrence threshold is coupled to the
+    // cleaving threshold --percentage ([S22]) as (1 - percentage), not an
+    // independent knob: cleaving keeps a sub-seed present in >= percentage
+    // of samples, and mumu merges a child OTU only when it co-occurs with
+    // its parent in >= (1 - percentage) of the child's samples. The default
+    // cleaving 0.05 gives 0.95. BigDecimal keeps the value exact (1 - 0.05
+    // = 0.95) and free of binary-float noise.
+    def minimum_relative_cooccurrence = BigDecimal.ONE - new BigDecimal(params.percentage.toString())
     """
     mumu \\
         --threads ${task.cpus} \\
         --otu_table ${reduced_table} \\
         --match_list ${match_list} \\
         --new_otu_table ${new_table} \\
+        --minimum_relative_cooccurrence ${minimum_relative_cooccurrence} \\
         --log ${basename}_post_clustering_curation.log
     """
 

@@ -789,8 +789,17 @@ the latter case.
     default `0.84` keeps.
 - `[S43]` Part B's `run_mumu` invokes the `mumu` binary
   (`>= 1.1.1`) with `--otu_table`, `--match_list`,
-  `--new_otu_table`, and `--log`. The cleaned-up intermediate
-  inputs (`_reduced.table`, `.match_list`) are not kept.
+  `--new_otu_table`, `--minimum_relative_cooccurrence`, and `--log`.
+  The cleaned-up intermediate inputs (`_reduced.table`, `.match_list`)
+  are not kept. `--minimum_relative_cooccurrence` is **not** an
+  independent parameter: it is coupled to the cleaving threshold
+  `--percentage` (`[S22]`) as `1 - percentage`, so the default cleaving
+  `0.05` yields `0.95` (which also matches mumu's built-in default).
+  The two thresholds are complementary — cleaving keeps a sub-seed that
+  appears in at least `percentage` of samples, and mumu merges a child
+  OTU only when it co-occurs with its parent in at least `1 -
+  percentage` of the child's samples. Passing it explicitly also pins
+  the value rather than inheriting a future change to mumu's default.
   - **Pass when:** the `_raw_mumu.table` and the `.mumu.log` are
     produced and the log is non-empty.
 - `[S44]` Part B's `rebuild_post_mumu_table` runs
