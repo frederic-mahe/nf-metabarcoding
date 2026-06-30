@@ -294,6 +294,11 @@
                     "type": "string",
                     "description": "sbatch -A / --account."
                 },
+                "require_slurm_account": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "When true, the run aborts at startup unless --slurm_account is set. Flipped on by cluster profiles whose site charges every job to a project (e.g. abims)."
+                },
                 "slurm_clusterOptions": {
                     "type": "string",
                     "description": "Extra sbatch options appended verbatim to every job's submit line (QoS, constraints, reservations)."
