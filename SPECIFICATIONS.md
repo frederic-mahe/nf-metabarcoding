@@ -370,6 +370,17 @@ the latter case.
   - **Pass when:** a pattern with equal sides (`*_{1,1}.fastq.gz`)
     raises an error at parse time; a pattern with differing sides
     (`{1,2}`, `{R1,R2}`) is accepted.
+- `[S96]` `--fastq_pattern` may contain at most a small fixed number of
+  `*` wildcards (3). Each `*` translates to a greedy `.*` in the
+  discovery regex; an unbounded count of them lets a crafted pattern
+  drive catastrophic regex backtracking — a denial-of-service hang — on
+  the scanned file names. A legitimate pattern needs one `*` to capture
+  the sample prefix (occasionally a second), so the cap never blocks a
+  real pattern. A pattern exceeding the cap is rejected at pattern-parse
+  time, before any file is globbed, with a message stating the limit.
+  - **Pass when:** a `--fastq_pattern` carrying more than three `*`
+    (e.g. `*a*a*a*a{1,2}.fastq`) raises at parse time naming the limit;
+    patterns with up to three `*` are accepted.
 - `[S12]` derives the sample ID for a paired-end pair from the R1
   basename by stripping the **first matching pattern** suffix (the
   same pattern table that drives `[S11]`). Single-end files derive
@@ -1590,6 +1601,20 @@ from placeholder values to real taxonomic assignments.
     per-sample artefacts ([S19]) publish under `<outdir>/per_sample/`
     ([S71]) regardless of whether the samples came from `--input` or a
     folder scan.
+- `[S95]` no samplesheet cell may contain a raw TAB, newline, or
+  carriage return. `bin/parse_samplesheet.py` emits its normalized rows
+  as TSV (columns joined by TAB, rows by newline) for the workflow to
+  consume via `splitCsv`, so a cell carrying one of those characters —
+  reachable through CSV quoting, e.g. a quoted `"a<TAB>b"` path cell —
+  would shift columns or inject a phantom row into the normalized output.
+  Such a cell aborts at startup, naming the offending row and column,
+  before any process runs. The `sample` column is already constrained to
+  the stricter `[S93]` charset; this rule closes the same hole in the
+  path (`fastq_1` / `fastq_2` / `fasta` / `qual` / `stats`) and `run`
+  columns.
+  - **Pass when:** a samplesheet whose `fastq_1` cell contains an
+    embedded TAB (or newline) exits non-zero naming the row and column;
+    a sheet whose cells are delimiter-free is accepted.
 
 
 ## Output (`--outdir`)

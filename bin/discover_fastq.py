@@ -133,6 +133,14 @@ _FASTQ_GLOBS: tuple[str, ...] = (
 # keep the surface small: `*` (any-chars), `{R1,R2}` / `{1,2}` (the
 # discriminator), literal `.`. Anything else is treated literally,
 # which matches the meaning the workflow had before this change.
+# Ceiling on the number of `*` a user pattern may carry ([S96]). Each
+# `*` becomes a greedy `.*` in the compiled regex, and an unbounded
+# count of them enables catastrophic backtracking on the scanned file
+# names. One `*` captures the sample prefix and a second is occasional,
+# so three is a generous cap that never blocks a real pattern.
+_MAX_WILDCARDS = 3
+
+
 def _user_pattern_to_entry(glob: str) -> PatternEntry:
     """Convert a user-supplied glob into a :class:`PatternEntry`.
 
@@ -149,6 +157,15 @@ def _user_pattern_to_entry(glob: str) -> PatternEntry:
     # plain basename glob.
     if glob.startswith("/"):
         glob = glob[1:]
+
+    wildcards = glob.count("*")
+    if wildcards > _MAX_WILDCARDS:
+        raise ValueError(
+            f"--fastq_pattern may contain at most {_MAX_WILDCARDS} '*' "
+            f"wildcards; got {wildcards} in {glob!r}. Each '*' becomes a "
+            "greedy '.*' in the discovery regex, and too many make matching "
+            "pathologically slow. Use one '*' to capture the sample prefix."
+        )
 
     brace = re.search(r"\{([^,{}]+),([^,{}]+)\}", glob)
     if brace is None:

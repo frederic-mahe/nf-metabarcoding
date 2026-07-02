@@ -38,6 +38,11 @@ from sample_id import InvalidSampleIdError, validate_sample_id
 
 RESERVED_SUFFIX = "notmerged"
 
+# Characters that must not appear inside a cell: they are the delimiters
+# of the normalized TSV this module emits ([S95]), so an embedded one
+# would shift columns or inject a phantom row downstream.
+_TSV_DELIMITERS = ("\t", "\n", "\r")
+
 FASTQ_REQUIRED = ("sample", "fastq_1")
 FASTQ_OPTIONAL = ("fastq_2", "run")
 FASTA_REQUIRED = ("sample", "fasta")
@@ -203,6 +208,22 @@ def parse_rows(
     return profile, _parse_fasta(rows)
 
 
+def _reject_tsv_delimiters(row: dict[str, str], line: int) -> None:
+    """Reject a cell carrying a TSV delimiter ([S95]).
+
+    ``str.strip()`` has already removed leading / trailing whitespace, so
+    a delimiter that survives here is genuinely embedded (reachable via
+    CSV quoting, e.g. a quoted ``"a<TAB>b"`` path cell).
+    """
+    for column, value in row.items():
+        if any(delim in value for delim in _TSV_DELIMITERS):
+            raise SamplesheetError(
+                f"row {line}: column '{column}' contains a tab, newline, or "
+                "carriage-return character, which would corrupt the "
+                "normalized TSV; remove it"
+            )
+
+
 def read_samplesheet(
     path: Union[str, Path]
 ) -> tuple[list[str], list[tuple[int, dict]]]:
@@ -220,7 +241,9 @@ def read_samplesheet(
                 continue  # skip blank lines
             cells = [cell.strip() for cell in raw]
             cells += [""] * (len(fieldnames) - len(cells))
-            rows.append((line, dict(zip(fieldnames, cells))))
+            row = dict(zip(fieldnames, cells))
+            _reject_tsv_delimiters(row, line)
+            rows.append((line, row))
     return fieldnames, rows
 
 
