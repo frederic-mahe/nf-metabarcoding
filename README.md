@@ -195,6 +195,23 @@ User patterns take precedence over the canonical table; supported
 glob meta-characters are limited to `*` (any chars) and the `{R1,R2}`
 brace token — anything else is matched literally.
 
+### A note on input trust
+
+The workflow reads and stages whatever files you point it at. A
+samplesheet (`--input`) may list any path on your filesystem —
+including absolute paths and `..` outside the launch directory — and a
+scanned `--fastq_folder` / `--fasta_folder` is read verbatim. This is
+intentional: you point the pipeline at your own data wherever it lives.
+
+The practical consequence is that the samplesheet and the input folders
+are a **trust boundary**. Whoever writes the samplesheet or fills the
+input folder decides which files the run touches, so treat them the way
+you would a script you are about to execute: **run only samplesheets and
+folders you or a trusted colleague produced.** The pipeline validates
+sample-ID characters and rejects cells that would corrupt its internal
+tables, but it does not — and is not meant to — sandbox which paths a
+samplesheet is allowed to reference.
+
 
 ## Running with containers
 

@@ -1576,6 +1576,21 @@ from placeholder values to real taxonomic assignments.
   Nextflow stages them and `-resume` sees a change to the samplesheet
   or any listed file.
 
+  **Trust boundary — path cells are deliberately unrestricted.** The
+  path columns accept any absolute or relative path, including `..`
+  traversal outside the launch directory; this is by design, because a
+  user legitimately points the workflow at data anywhere on their own
+  filesystem. The consequence is that whoever writes the samplesheet
+  (equivalently, whoever populates a scanned `--fastq_folder` /
+  `--fasta_folder`) can make the run read and stage any file the
+  launching user can read. The samplesheet and the input folders are
+  therefore a **trust boundary**: run only samplesheets and folders you
+  or a trusted party produced, exactly as you would only execute a
+  script you trust. The structural guards ([S93] sample-ID charset,
+  [S95] delimiter rejection, [S23] reserved suffix) constrain the
+  *sample-ID* and *cell-integrity* surface — they intentionally do **not**
+  sandbox the path cells' reach, which the operator owns.
+
   `--input` is mutually exclusive with the folder-scan inputs
   (`--fastq_folder` / `--fasta_folder`); setting `--input` together
   with either aborts at startup. The folder-scan inputs keep their
