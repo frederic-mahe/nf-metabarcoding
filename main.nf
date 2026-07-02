@@ -201,6 +201,20 @@ workflow part_b {
 }
 
 
+workflow fetch {
+    // Standalone ENA/SRA fetch mode ([S97]/[S98]/[S99]/[S100]/[S101]).
+    // A named workflow — like `part_b` / `part_c` — selected by param
+    // dispatch from the anonymous entry workflow below (Nextflow's
+    // strict parser drops `-entry`, so a named workflow is *called*, not
+    // selected via `-entry`). Accessions are validated at startup by
+    // validate_params() ([S98]); --accession is mutually exclusive with
+    // the other input-mode selectors ([S02]). Downloads the fastq files
+    // for each accession and publishes them under <outdir>/<accession>/;
+    // Parts A/B/C do not run.
+    fetch_accessions(Channel.fromList(parse_accessions(params.accession)))
+}
+
+
 workflow {
     // [S57]: --help short-circuits before any required-param assert.
     // print() (not log.info) so the usage block lands on stdout —
@@ -287,15 +301,13 @@ workflow {
     // inside a workflow body, so a one-shot mutation here is silently
     // dropped; the wrap-at-use-site pattern is the workaround.
 
-    // [S97]/[S98]/[S99]/[S100]/[S101]: --accession switches the pipeline
-    // into standalone fetch mode — download the fastq files for one or
-    // more ENA/SRA bioproject/study accessions and publish them under
-    // <outdir>/<accession>/. Parts A/B/C do not run. Accessions are
-    // validated at startup by validate_params() ([S98]); dispatch is by
-    // param presence (Nextflow's strict parser drops -entry), and
-    // --accession is mutually exclusive with the other selectors ([S02]).
+    // [S97]: --accession selects the standalone fetch mode. Dispatch by
+    // param presence (Nextflow's strict parser drops -entry), calling the
+    // named `fetch` workflow above — the same shape as the part_b /
+    // part_c dispatch below. --accession is mutually exclusive with the
+    // other selectors ([S02], enforced in validate_params()).
     if ( params.accession ) {
-        fetch_accessions(Channel.fromList(parse_accessions(params.accession)))
+        fetch()
         return
     }
 
