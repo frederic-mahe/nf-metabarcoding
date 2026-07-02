@@ -24,13 +24,13 @@ are grouped in a ready-to-use occurrence table.
 ## Project layout
 
 ```
-main.nf                <- entry workflow + Part B/C standalone routers
+main.nf                <- entry workflow + fetch / Part B/C standalone routers
 nextflow.config        <- manifest, parameter defaults, profiles
 nextflow_schema.json   <- parameter schema (nf-schema validation + --help)
 nf-test.config         <- nf-test wiring
 modules/local/         <- one .nf per process; functions.nf holds the
                           Groovy helpers (normalize_path, validate_params, ...)
-subworkflows/local/    <- part_a / part_b / part_c subworkflow wiring
+subworkflows/local/    <- part_a / part_b / part_c / fetch subworkflow wiring
 SPECIFICATIONS.md      <- behaviour spec (single source of truth)
 DECISIONS.md           <- open spec questions blocking [Sxx] IDs
 tests/
@@ -114,6 +114,60 @@ nextflow run main.nf \
     --fastq_folder  /data/run17,/data/run18 \
     --outdir        /path/to/results
 ```
+
+### Fetching reads from ENA/SRA (`--accession`)
+
+`[S97]`. Instead of pointing at local fastq files, you can have the
+pipeline download the raw reads for a public **bioproject** or **study**
+accession. Set `--accession` to a single accession or a comma-separated
+list:
+
+```bash
+# one bioproject
+nextflow run main.nf \
+    --accession PRJEB89924 \
+    --outdir    /path/to/data
+
+# several accessions at once (bioprojects and/or studies)
+nextflow run main.nf \
+    --accession PRJEB89924,PRJNA248678,SRP012345 \
+    --outdir    /path/to/data
+```
+
+This is a **standalone fetch mode** — Parts A/B/C do not run. It resolves
+each accession to its constituent runs and downloads one fastq set per
+run with [`fastq-dl`](https://github.com/rpetit3/fastq-dl) (pinned, and
+resolved on demand — only an `--accession` run pulls it in, so users of
+the other modes never install it). Files are published under a
+per-accession subfolder:
+
+```
+<outdir>/
+├── PRJEB89924/     ERR..._1.fastq.gz, ERR..._2.fastq.gz, ...
+└── SRP012345/      ERR..._1.fastq.gz, ...
+```
+
+Accepted accession forms (validated at startup, `[S98]`):
+
+| Kind        | Prefixes                 | Example      |
+|-------------|--------------------------|--------------|
+| bioproject  | `PRJEB` / `PRJNA` / `PRJDB` | `PRJEB89924` |
+| study       | `ERP` / `DRP` / `SRP`    | `SRP012345`  |
+
+Run accessions (`SRR…`), samples, and experiments are rejected.
+`--accession` is mutually exclusive with the other input selectors
+(`--fastq_folder` / `--fasta_folder` / `--occurrence_table` /
+`--representatives_fasta` / `--input`).
+
+Notes:
+
+- **Outbound network** must be reachable from wherever the download tasks
+  run (the login node *and*, under `-profile slurm`, the compute nodes).
+- A run that fails to download fails **only its own task**; the runs that
+  succeeded are published and cached, so re-running with `-resume`
+  retries just the missing runs.
+- Fetch does not chain into Part A yet — run Part A as a second step by
+  pointing `--fastq_folder` at `<outdir>/<accession>/`.
 
 ### Output layout (`--outdir`)
 
@@ -550,6 +604,9 @@ test. Summary at the time of writing:
   sintax shadow path), with optional majority-rule assignment (`[S66]`)
 - `--input` samplesheet input (`[S70]`) and the unified `--outdir`
   output layout (`[S71]`)
+- Fetch mode (`--accession`, `[S97]`) — download raw reads for an
+  ENA/SRA bioproject/study accession via `fastq-dl`; see "Fetching reads
+  from ENA/SRA" above
 - HPC / slurm profile + `conda` / `modules` dependency profiles
   (`[S07]`, `[S08]`) — see "Running on an HPC cluster (slurm)" below.
   The `conda` profile now resolves every tool — including `mumu` —
