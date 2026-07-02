@@ -1,0 +1,54 @@
+nextflow_process {
+
+    name "download_run"
+    script "modules/local/fetch/download_run.nf"
+    process "download_run"
+
+    // [S100]/[S101]: the download stage runs one task per run accession via
+    // fastq-dl (pinned fastq-dl=4.0.1 as a per-process conda directive, NOT
+    // in environment.yml; --provider ena), publishing under a per-accession
+    // subfolder <outdir>/<accession>/. Network-backed in production; here it
+    // is exercised only in stub mode (the stub touches fixture fastq.gz),
+    // per the D19 testing boundary. Blocked by D19 — pending until the fetch
+    // sub-workflow lands.
+
+    options "-stub"
+
+    test("downloads a run under its accession subfolder (stub)") {
+        // COVERAGE: [S100]
+        tag "pending"
+        when {
+            process {
+                """
+                input[0] = ['PRJEB89924', 'ERR13334567']
+                """
+            }
+        }
+        then {
+            assert process.success
+            def acc = process.out.reads.get(0).get(0)
+            assert acc == 'PRJEB89924'
+            // fastq files land under the accession-named subfolder ([S100]).
+            assert process.out.reads.get(0).get(1).any { it.contains('/PRJEB89924/') } :
+                "reads must be published under <outdir>/<accession>/"
+        }
+    }
+
+    test("pins fastq-dl=4.0.1 as a per-process conda directive and passes --provider ena") {
+        // COVERAGE: [S101]
+        // The pin lives on the process (not environment.yml) so non-fetch
+        // users never resolve it; the provider defaults to ena. Asserted
+        // statically against the module source.
+        tag "pending"
+        then {
+            def src = path("${projectDir}/modules/local/fetch/download_run.nf").text
+            assert src.contains("bioconda::fastq-dl=4.0.1") :
+                "download_run must pin fastq-dl=4.0.1 in a per-process conda directive"
+            assert src.contains("--provider ena") :
+                "download_run must pass --provider ena"
+            def env = path("${projectDir}/environment.yml").text
+            assert !env.contains("fastq-dl") :
+                "fastq-dl must NOT be in environment.yml (per-process only)"
+        }
+    }
+}

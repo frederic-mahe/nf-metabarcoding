@@ -1482,6 +1482,60 @@ from placeholder values to real taxonomic assignments.
     startup with stderr naming `majority_assignment`.
 
 
+## Fetch — download from ENA/SRA
+
+- `[S97]` a standalone `fetch` entry workflow (`-entry fetch`)
+  downloads raw fastq files for one or more accessions given by
+  `--accession`: a single accession or a comma-separated list
+  (`--accession PRJEB89924,SRP012345`); a `nextflow.config` may
+  instead supply a Groovy list (`accession = ['PRJEB89924', 'SRP...']`),
+  mirroring `--fastq_folder` (`[S10]`). It is a standalone entry —
+  not one of the mutually-exclusive input-mode selectors of `[S02]` —
+  and runs no Part A / B / C. Blocked by D19.
+  - **Pass when:** `nextflow run main.nf -entry fetch --accession A,B`
+    fans out to the fetch stages once per accession and invokes no
+    Part A / B / C process.
+- `[S98]` `--accession` accepts only bioproject and study accessions,
+  validated at startup before any network access:
+    - bioproject — `^PRJ(E|D|N)[A-Z][0-9]+$` (PRJEB / PRJNA / PRJDB)
+    - study — `^(E|D|S)RP[0-9]{6,}$` (ERP / DRP / SRP)
+  A value matching neither aborts at startup with a message naming the
+  offending accession and the two accepted forms. Validation is a
+  pure param check (no network), so it fires regardless of
+  connectivity. Blocked by D19.
+  - **Pass when:** `--accession PRJEB89924` and `--accession SRP012345`
+    are accepted; `--accession SRR123` (a run accession) and
+    `--accession bogus` each abort at startup naming the value and the
+    accepted forms.
+- `[S99]` fetch resolves each accession to its constituent run
+  accessions in a **resolve** stage (one task per `--accession`)
+  before any fastq download, so the download stage can fan out one
+  task per run. Blocked by D19.
+  - **Pass when:** a stubbed resolve stage emitting a fixture run list
+    for one accession produces one downstream download task per run.
+- `[S100]` fastq files for each accession are published under a
+  subfolder named after that accession
+  (`<outdir>/<accession>/<run>_{1,2}.fastq.gz`), so runs from distinct
+  accessions in a comma-separated list never collide in a shared
+  directory. Blocked by D19.
+  - **Pass when:** `--accession A,B` produces `<outdir>/A/…` and
+    `<outdir>/B/…`; no run file is written directly under `<outdir>`.
+- `[S101]` the **download** stage runs one task per run accession via
+  `fastq-dl`, pinned exactly to `fastq-dl=4.0.1` (`[S69]`) as a
+  **per-process** `conda` directive — NOT in `environment.yml` — so
+  native-conda users who never run `fetch` never resolve it and Wave
+  builds a fetch-only image on demand (D10), with `--provider ena` as
+  the default provider. The per-run granularity gives the failure
+  contract: a run that fails to download fails only its own task; runs
+  that succeeded are published and cached, so a re-run with `-resume`
+  retries only the failed runs. Blocked by D19.
+  - **Pass when:** the download process carries a `conda` directive
+    pinning `fastq-dl=4.0.1` and passes `--provider ena`;
+    `environment.yml` does not mention fastq-dl; a full Part A/B/C run
+    triggers no fastq-dl resolution; with a stub in which one run-task
+    fails, the sibling run-tasks still publish their fixtures.
+
+
 ## Reproducibility
 
 - `[S68]` every run records the versions of the external tools it

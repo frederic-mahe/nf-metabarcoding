@@ -1,0 +1,89 @@
+nextflow_function {
+
+    name "check_accession_format"
+    script "modules/local/functions.nf"
+    function "check_accession_format"
+
+    // [S98]: --accession accepts only bioproject and study accessions:
+    //   bioproject — ^PRJ(E|D|N)[A-Z][0-9]+$  (PRJEB / PRJNA / PRJDB)
+    //   study      — ^(E|D|S)RP[0-9]{6,}$      (ERP / DRP / SRP)
+    // Anything else (run / sample / experiment accession, or junk) throws
+    // at startup naming the offending value. Blocked by D19 — pending until
+    // the fetch sub-workflow lands. Workflow-level wiring is covered in
+    // tests/main.nf.test.
+
+    test("a PRJEB bioproject accession is accepted") {
+        // COVERAGE: [S98]
+        tag "pending"
+        when { function { """
+            input[0] = 'PRJEB89924'
+        """ } }
+        then {
+            assert function.success
+            assert function.result == 'PRJEB89924'
+        }
+    }
+
+    test("PRJNA and PRJDB bioproject accessions are accepted") {
+        // COVERAGE: [S98]
+        tag "pending"
+        when { function { """
+            input[0] = 'PRJNA248678'
+        """ } }
+        then { assert function.success }
+    }
+
+    test("ERP / DRP / SRP study accessions are accepted") {
+        // COVERAGE: [S98]
+        tag "pending"
+        when { function { """
+            input[0] = 'SRP012345'
+        """ } }
+        then {
+            assert function.success
+            assert function.result == 'SRP012345'
+        }
+    }
+
+    test("a run accession (SRR...) is rejected") {
+        // COVERAGE: [S98]
+        tag "pending"
+        when { function { """
+            input[0] = 'SRR1234567'
+        """ } }
+        then {
+            assert function.failed
+            // the message names the offending value and the accepted forms
+            assert function.errorReport.contains('SRR1234567')
+        }
+    }
+
+    test("a study accession with fewer than six digits is rejected") {
+        // COVERAGE: [S98]
+        tag "pending"
+        when { function { """
+            input[0] = 'SRP123'
+        """ } }
+        then { assert function.failed }
+    }
+
+    test("an unanchored partial match is rejected") {
+        // COVERAGE: [S98]
+        // the regex is anchored (^...$): a value that merely contains a
+        // valid accession must not slip through.
+        tag "pending"
+        when { function { """
+            input[0] = 'xPRJEB89924y'
+        """ } }
+        then { assert function.failed }
+    }
+
+    test("garbage is rejected") {
+        // COVERAGE: [S98]
+        tag "pending"
+        when { function { """
+            input[0] = 'bogus'
+        """ } }
+        then { assert function.failed }
+    }
+}

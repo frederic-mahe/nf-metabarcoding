@@ -2521,4 +2521,70 @@ nextflow_pipeline {
             }
         }
     }
+
+    // ----- Fetch entry workflow ([S97]-[S101], D19) -----
+    // All pending until the fetch sub-workflow lands. The download is
+    // stubbed (D19 testing boundary): -stub-run exercises the entry
+    // dispatch, accession fan-out, and published layout with no network.
+
+    test("an invalid --accession aborts at startup naming the value") {
+        // COVERAGE: [S98]
+        tag "pending"
+        when {
+            params {
+                accession = "SRR1234567"   // a run accession — rejected
+                outdir    = "${outputDir}/fetch_bad_acc"
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("SRR1234567") :
+                "[S98] the abort message must name the offending accession"
+        }
+    }
+
+    test("-entry fetch runs the fetch stages and no Part A/B/C process (stub)") {
+        // COVERAGE: [S97], [S99]
+        tag "pending"
+        when {
+            options "-entry fetch -stub-run"
+            params {
+                accession = "PRJEB89924,SRP012345"
+                outdir    = "${outputDir}/fetch_two"
+            }
+        }
+        then {
+            assert workflow.success
+            // no Part A/B/C process is scheduled on a fetch run
+            assert workflow.trace.tasks().every { !it.name.contains("part_") &&
+                !it.name.contains("merge_fastq") && !it.name.contains("global_") } :
+                "[S97] fetch must not schedule any Part A/B/C process"
+            // resolve stage runs once per accession ([S99])
+            assert workflow.trace.tasks().count { it.name.contains("resolve_runs") } == 2 :
+                "[S99] resolve stage must run once per accession"
+        }
+    }
+
+    test("-entry fetch publishes fastq under a per-accession subfolder (stub)") {
+        // COVERAGE: [S100], [S101]
+        tag "pending"
+        when {
+            options "-entry fetch -stub-run"
+            params {
+                accession = "PRJEB89924"
+                outdir    = "${outputDir}/fetch_layout"
+            }
+        }
+        then {
+            assert workflow.success
+            def subdir = file("${outputDir}/fetch_layout/PRJEB89924")
+            assert subdir.exists() && subdir.isDirectory() :
+                "[S100] fastq must be published under <outdir>/<accession>/"
+            // nothing is written directly under <outdir> (only the subfolder)
+            assert file("${outputDir}/fetch_layout").listFiles().every {
+                it.isDirectory()
+            } : "[S100] no run file may sit directly under <outdir>"
+        }
+    }
 }

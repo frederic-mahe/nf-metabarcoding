@@ -1,0 +1,37 @@
+nextflow_process {
+
+    name "resolve_runs"
+    script "modules/local/fetch/resolve_runs.nf"
+    process "resolve_runs"
+
+    // [S99]: the resolve stage maps a single accession to its constituent
+    // run accessions before any download, so the download stage can fan
+    // out one task per run. Network-backed in production; here it is
+    // exercised only in stub mode (the stub emits a fixture run list), per
+    // the D19 testing boundary. Blocked by D19 — pending until the fetch
+    // sub-workflow lands.
+
+    options "-stub"
+
+    test("resolves an accession to a run list (stub)") {
+        // COVERAGE: [S99]
+        tag "pending"
+        when {
+            process {
+                """
+                input[0] = 'PRJEB89924'
+                """
+            }
+        }
+        then {
+            assert process.success
+            // the process carries the accession through and emits a file
+            // listing its run accessions, one per line.
+            def acc = process.out.runs.get(0).get(0)
+            assert acc == 'PRJEB89924'
+            def runsFile = process.out.runs.get(0).get(1)
+            assert path(runsFile).readLines().every { it ==~ /^[EDS]RR[0-9]+$/ } :
+                "resolve stage must emit run accessions, got: ${path(runsFile).readLines()}"
+        }
+    }
+}

@@ -125,6 +125,17 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S90]`| `--fastq_minlen` (default 32) → vsearch `--fastq_minlen` in `filter_and_convert_to_fasta` | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test` | done | — |
 
 
+## Fetch — download from ENA/SRA
+
+| Spec   | Bullet                                                                     | Test file                                       | Status  | Blocked by |
+|--------|----------------------------------------------------------------------------|-------------------------------------------------|---------|------------|
+| `[S97]`| standalone `fetch` entry (`-entry fetch`); `--accession` single or comma-separated list; runs no Part A/B/C | `tests/main.nf.test` | red | D19 |
+| `[S98]`| `--accession` accepts only bioproject (`^PRJ(E\|D\|N)[A-Z][0-9]+$`) and study (`^(E\|D\|S)RP[0-9]{6,}$`); anything else aborts at startup | `tests/functions/check_accession_format.nf.test`, `tests/main.nf.test` | red | D19 |
+| `[S99]`| resolve stage maps each accession → its run accessions before download (one task per accession) | `tests/processes/fetch/resolve_runs.nf.test`, `tests/main.nf.test` | red | D19 |
+| `[S100]`| fastq published under a per-accession subfolder `<outdir>/<accession>/` | `tests/processes/fetch/download_run.nf.test`, `tests/main.nf.test` | red | D19 |
+| `[S101]`| per-run download via `fastq-dl=4.0.1` (per-process `conda`, not in `environment.yml`), `--provider ena`; failed run fails only its task | `tests/processes/fetch/download_run.nf.test`, `tests/python/test_reproducible_pins.py`, `tests/main.nf.test` | red | D19 |
+
+
 ## Per-process tests
 
 | Process in `main.nf`            | Test file                                              | Covers       | Status |
@@ -163,3 +174,5 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `update_occurrence_table`       | `tests/processes/part_c/update_occurrence_table.nf.test`      | S51          | done   |
 | `compute_majority_assignment`   | `tests/processes/part_c/compute_majority_assignment.nf.test`  | S66          | done   |
 | `dump_software_versions`        | `tests/processes/dump_software_versions.nf.test`              | S68          | done   |
+| `resolve_runs`                  | `tests/processes/fetch/resolve_runs.nf.test`                 | S99          | red    |
+| `download_run`                  | `tests/processes/fetch/download_run.nf.test`                 | S100, S101   | red    |

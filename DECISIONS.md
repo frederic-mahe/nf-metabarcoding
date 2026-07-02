@@ -1017,3 +1017,45 @@ this entry at that point.
 
 Until D18 lands, the `--userout` + `bin/stampa_merge.py` scatter (`[S49]`)
 stands and its tests stay green.
+
+
+## D19 — fetch sub-workflow: provider, network testing, chaining, failures
+
+**Blocks:** `[S97]`, `[S98]`, `[S99]`, `[S100]`, `[S101]`
+**Status:** `proposed`
+
+Adds a standalone `fetch` entry workflow that downloads fastq files
+for ENA/SRA bioproject and study accessions by wrapping `fastq-dl`.
+
+**Resolution (developer, this thread):**
+
+- **Accepted accessions** — bioproject `^PRJ(E|D|N)[A-Z][0-9]+$`
+  (PRJEB / PRJNA / PRJDB) and study `^(E|D|S)RP[0-9]{6,}$`
+  (ERP / DRP / SRP); run / sample / experiment accessions are
+  rejected (`[S98]`). Both regexes are anchored and case-sensitive.
+- **Tool + pin** — `fastq-dl=4.0.1`, declared as a per-process `conda`
+  directive, not in `environment.yml` (`[S101]`).
+- **Provider** — default `--provider ena`.
+- **Input** — `--accession`, a single accession or a comma-separated
+  list (`[S97]`).
+- **Output layout** — one subfolder per accession, named after the
+  accession (`[S100]`).
+- **Testing boundary** — stub the network (both the resolve and the
+  download stage) and test only the glue we own: validation (`[S98]`),
+  entry isolation and per-accession fan-out (`[S97]`), the
+  resolve→per-run topology (`[S99]`), the conda-directive /
+  `environment.yml` invariant and the per-run failure behaviour
+  (`[S101]`), and the published subfolder layout (`[S100]`). We do not
+  re-test `fastq-dl`'s own download behaviour, per `[S00]`.
+- **Chaining** — `fetch` is standalone for now; feeding fetched reads
+  into Part A in one invocation is deferred to a later spec.
+- **Partial failure / resume** — per-run tasks (a resolve stage feeds
+  one download task per run). A failed run fails only its own task;
+  runs that succeeded are published and cached; `-resume` retries only
+  the failed runs. Chosen over a single per-accession task, which
+  cannot both publish partial successes and retry only the missing
+  runs under `-resume` (a zero-exit task is cached whole, so `-resume`
+  would skip it; a non-zero task publishes nothing).
+
+Until D19 lands, `[S97]`–`[S101]` carry pending tests only, and their
+COVERAGE rows stay `red`.
