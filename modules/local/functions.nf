@@ -200,6 +200,47 @@ def check_primer_format(String name, value) {
 }
 
 
+def check_accession_format(value) {
+    // [S98]: --accession accepts only bioproject and study accessions:
+    //   bioproject — PRJ + (E|D|N) + one uppercase letter + digits
+    //                (PRJEB / PRJNA / PRJDB)
+    //   study      — (E|D|S) + RP + at least six digits (ERP / DRP / SRP)
+    // Both patterns are anchored and case-sensitive, so a run / sample /
+    // experiment accession — or a value that merely contains a valid
+    // accession — is rejected. Returns the value when valid; throws
+    // IllegalArgumentException naming the offending value so a bad
+    // --accession aborts at startup before any network access, rather
+    // than surfacing as an obscure fastq-dl error mid-run.
+    def bioproject
+    bioproject = value ==~ /^PRJ(E|D|N)[A-Z][0-9]+$/
+    def study
+    study = value ==~ /^(E|D|S)RP[0-9]{6,}$/
+    if ( !bioproject && !study ) {
+        throw new IllegalArgumentException(
+            "--accession must be a bioproject (PRJEB/PRJNA/PRJDB) or study " +
+            "(ERP/DRP/SRP) accession, got '${value}'")
+    }
+    return value
+}
+
+
+def parse_accessions(value) {
+    // [S97]: normalise --accession into a list of accession strings. The
+    // CLI form is a single accession or a comma-separated list; a
+    // nextflow.config may instead supply a Groovy list. Trims each entry
+    // and drops empties (so a trailing comma is harmless). Returns [] for
+    // an unset value.
+    if ( value == null ) {
+        return []
+    }
+    def raw
+    raw = ( value instanceof List )
+        ? value.collect { it.toString() }
+        : value.toString().split(',') as List
+    return raw.collect { it.trim() }.findAll { it }
+}
+
+
 def read_bounded_line(reader, int max_chars = 65536) {
     // [S94]: read at most `max_chars` characters from `reader`, stopping
     // at the first newline. Bounds memory — and, for a gzip stream, how
@@ -321,6 +362,7 @@ def validate_params() {
         input              : params.input,
         fasta_folder       : params.fasta_folder,
         fastq_folder       : params.fastq_folder,
+        accession          : params.accession,
     ]
     def selectors_set
     selectors_set = mode_selectors
@@ -329,7 +371,13 @@ def validate_params() {
     assert selectors_set.size() <= 1 :
         "the input-mode selectors are mutually exclusive; set at most one " +
         "of --occurrence_table / --representatives_fasta / --input / " +
-        "--fasta_folder / --fastq_folder, got: ${selectors_set}"
+        "--fasta_folder / --fastq_folder / --accession, got: ${selectors_set}"
+
+    // [S98]: validate every --accession entry up-front (a pure param
+    // check, no network) so a bad accession aborts at startup naming the
+    // offending value rather than surfacing as an obscure fastq-dl error
+    // mid-download.
+    parse_accessions(params.accession).each { check_accession_format(it) }
 
     // [S71]: --results_folder is a deprecated alias for --outdir. Warn
     // once at startup when it is the active output root.

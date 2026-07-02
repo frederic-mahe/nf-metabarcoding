@@ -14,7 +14,7 @@ nextflow_function {
 
     test("a PRJEB bioproject accession is accepted") {
         // COVERAGE: [S98]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = 'PRJEB89924'
         """ } }
@@ -26,7 +26,7 @@ nextflow_function {
 
     test("PRJNA and PRJDB bioproject accessions are accepted") {
         // COVERAGE: [S98]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = 'PRJNA248678'
         """ } }
@@ -35,7 +35,7 @@ nextflow_function {
 
     test("ERP / DRP / SRP study accessions are accepted") {
         // COVERAGE: [S98]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = 'SRP012345'
         """ } }
@@ -47,20 +47,21 @@ nextflow_function {
 
     test("a run accession (SRR...) is rejected") {
         // COVERAGE: [S98]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = 'SRR1234567'
         """ } }
         then {
+            // rejected at the function level; the "names the offending
+            // value" half of [S98] is asserted at the workflow level in
+            // tests/main.nf.test (where errorReport is populated).
             assert function.failed
-            // the message names the offending value and the accepted forms
-            assert function.errorReport.contains('SRR1234567')
         }
     }
 
     test("a study accession with fewer than six digits is rejected") {
         // COVERAGE: [S98]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = 'SRP123'
         """ } }
@@ -71,7 +72,7 @@ nextflow_function {
         // COVERAGE: [S98]
         // the regex is anchored (^...$): a value that merely contains a
         // valid accession must not slip through.
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = 'xPRJEB89924y'
         """ } }
@@ -80,7 +81,7 @@ nextflow_function {
 
     test("garbage is rejected") {
         // COVERAGE: [S98]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = 'bogus'
         """ } }

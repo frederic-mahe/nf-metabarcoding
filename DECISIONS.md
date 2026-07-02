@@ -1022,7 +1022,7 @@ stands and its tests stay green.
 ## D19 — fetch sub-workflow: provider, network testing, chaining, failures
 
 **Blocks:** `[S97]`, `[S98]`, `[S99]`, `[S100]`, `[S101]`
-**Status:** `proposed`
+**Status:** `resolved` — implemented, spec and tests reflect it.
 
 Adds a standalone `fetch` entry workflow that downloads fastq files
 for ENA/SRA bioproject and study accessions by wrapping `fastq-dl`.
@@ -1047,8 +1047,15 @@ for ENA/SRA bioproject and study accessions by wrapping `fastq-dl`.
   `environment.yml` invariant and the per-run failure behaviour
   (`[S101]`), and the published subfolder layout (`[S100]`). We do not
   re-test `fastq-dl`'s own download behaviour, per `[S00]`.
-- **Chaining** — `fetch` is standalone for now; feeding fetched reads
-  into Part A in one invocation is deferred to a later spec.
+- **Invocation** — dispatched by `--accession` presence inside the
+  entry workflow (`nextflow run main.nf --accession ...`), the same
+  param-dispatch mechanism as the other modes (`[S02]`). Not `-entry
+  fetch`: Nextflow's strict config parser (25.10+, default in 26.04)
+  drops the `-entry` option ("use a param to run a named workflow").
+  `--accession` is added as the sixth mutually-exclusive input-mode
+  selector of `[S02]`.
+- **Chaining** — the fetch mode is standalone for now; feeding fetched
+  reads into Part A in one invocation is deferred to a later spec.
 - **Partial failure / resume** — per-run tasks (a resolve stage feeds
   one download task per run). A failed run fails only its own task;
   runs that succeeded are published and cached; `-resume` retries only
@@ -1057,5 +1064,6 @@ for ENA/SRA bioproject and study accessions by wrapping `fastq-dl`.
   runs under `-resume` (a zero-exit task is cached whole, so `-resume`
   would skip it; a non-zero task publishes nothing).
 
-Until D19 lands, `[S97]`–`[S101]` carry pending tests only, and their
-COVERAGE rows stay `red`.
+Resolved 2026-07-02: the fetch mode is implemented (`--accession`
+dispatch, `resolve_runs` → per-run `download_run`), `[S97]`–`[S101]`
+carry green `ci` tests, and their COVERAGE rows are `done`.

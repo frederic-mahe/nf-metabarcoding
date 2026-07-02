@@ -31,6 +31,10 @@
                     "type": "string",
                     "description": "Representatives FASTA (header <amplicon>;size=<abundance>;); runs fasta-input Part C, publishing <basename>_taxonomy_<method>.tsv with no occurrence-table join."
                 },
+                "accession": {
+                    "type": "string",
+                    "description": "ENA/SRA bioproject (PRJEB/PRJNA/PRJDB) or study (ERP/DRP/SRP) accession, or a comma-separated list; runs the standalone `fetch` entry (-entry fetch) to download fastq files."
+                },
                 "outdir": {
                     "type": "string",
                     "description": "Single root for all published outputs (<outdir>/{per_sample,occurrence_table,pipeline_info}/). Defaults to --results_folder, then 'results'."

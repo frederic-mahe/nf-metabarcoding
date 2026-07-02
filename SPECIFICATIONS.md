@@ -48,14 +48,15 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
   on when `--reference_dataset` is set); `--fastq_folder` (or an
   `--input` samplesheet in the fastq profile) runs Part A end-to-end
   (with Part B / Part C chained on when `--project_name` /
-  `--reference_dataset` are set).
-  The five input-mode selectors `--occurrence_table` /
+  `--reference_dataset` are set); `--accession` runs the standalone
+  fetch mode ([S97]).
+  The six input-mode selectors `--occurrence_table` /
   `--representatives_fasta` / `--input` / `--fasta_folder` /
-  `--fastq_folder` are **mutually exclusive**: setting more than one
-  aborts at startup with a message listing the ones that were set,
-  rather than silently picking one and ignoring the rest. (This
-  supersedes the earlier "first match wins" dispatch and subsumes the
-  `--input`-vs-folder exclusivity of [S70].)
+  `--fastq_folder` / `--accession` are **mutually exclusive**: setting
+  more than one aborts at startup with a message listing the ones that
+  were set, rather than silently picking one and ignoring the rest.
+  (This supersedes the earlier "first match wins" dispatch and subsumes
+  the `--input`-vs-folder exclusivity of [S70].)
   - **Pass when:** running with only `--fastq_folder` set invokes
     every Part A process and no Part B / Part C process; the existing
     Part B standalone (`--fasta_folder`) and Part C standalone
@@ -1484,17 +1485,20 @@ from placeholder values to real taxonomic assignments.
 
 ## Fetch — download from ENA/SRA
 
-- `[S97]` a standalone `fetch` entry workflow (`-entry fetch`)
-  downloads raw fastq files for one or more accessions given by
-  `--accession`: a single accession or a comma-separated list
-  (`--accession PRJEB89924,SRP012345`); a `nextflow.config` may
-  instead supply a Groovy list (`accession = ['PRJEB89924', 'SRP...']`),
-  mirroring `--fastq_folder` (`[S10]`). It is a standalone entry —
-  not one of the mutually-exclusive input-mode selectors of `[S02]` —
-  and runs no Part A / B / C. Blocked by D19.
-  - **Pass when:** `nextflow run main.nf -entry fetch --accession A,B`
-    fans out to the fetch stages once per accession and invokes no
-    Part A / B / C process.
+- `[S97]` setting `--accession` selects a standalone fetch mode that
+  downloads raw fastq files for one or more accessions: a single
+  accession or a comma-separated list (`--accession PRJEB89924,SRP012345`);
+  a `nextflow.config` may instead supply a Groovy list
+  (`accession = ['PRJEB89924', 'SRP...']`), mirroring `--fastq_folder`
+  (`[S10]`). Dispatch is by param presence inside the entry workflow —
+  the same mechanism as the other modes (`[S02]`), because Nextflow's
+  strict config parser (25.10+) drops the `-entry` option. `--accession`
+  is the sixth mutually-exclusive input-mode selector of `[S02]`; the
+  fetch mode runs no Part A / B / C. Blocked by D19.
+  - **Pass when:** `nextflow run main.nf --accession A,B` fans out to
+    the fetch stages once per accession and invokes no Part A / B / C
+    process; combining `--accession` with any other input-mode selector
+    aborts at startup (`[S02]`).
 - `[S98]` `--accession` accepts only bioproject and study accessions,
   validated at startup before any network access:
     - bioproject — `^PRJ(E|D|N)[A-Z][0-9]+$` (PRJEB / PRJNA / PRJDB)

@@ -1,6 +1,7 @@
 #!/usr/bin/env nextflow
 
-include { normalize_path; validate_params; samplesheet_profile; check_primer_format; resource_size_warnings; slurm_account_requirement_error } from './modules/local/functions.nf'
+include { normalize_path; validate_params; samplesheet_profile; check_primer_format; parse_accessions; resource_size_warnings; slurm_account_requirement_error } from './modules/local/functions.nf'
+include { fetch_accessions } from './subworkflows/local/fetch.nf'
 include { part_A } from './subworkflows/local/part_a.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
 include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_fasta.nf'
@@ -285,6 +286,18 @@ workflow {
     // top of this file. Nextflow 25's `params` map is read-only from
     // inside a workflow body, so a one-shot mutation here is silently
     // dropped; the wrap-at-use-site pattern is the workaround.
+
+    // [S97]/[S98]/[S99]/[S100]/[S101]: --accession switches the pipeline
+    // into standalone fetch mode — download the fastq files for one or
+    // more ENA/SRA bioproject/study accessions and publish them under
+    // <outdir>/<accession>/. Parts A/B/C do not run. Accessions are
+    // validated at startup by validate_params() ([S98]); dispatch is by
+    // param presence (Nextflow's strict parser drops -entry), and
+    // --accession is mutually exclusive with the other selectors ([S02]).
+    if ( params.accession ) {
+        fetch_accessions(Channel.fromList(parse_accessions(params.accession)))
+        return
+    }
 
     // [S47]/[S48]: --occurrence_table switches the pipeline into
     // Part C standalone mode (Parts A and B do not run). The

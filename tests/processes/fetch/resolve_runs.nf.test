@@ -15,7 +15,7 @@ nextflow_process {
 
     test("resolves an accession to a run list (stub)") {
         // COVERAGE: [S99]
-        tag "pending"
+        tag "ci"
         when {
             process {
                 """

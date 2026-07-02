@@ -2522,14 +2522,15 @@ nextflow_pipeline {
         }
     }
 
-    // ----- Fetch entry workflow ([S97]-[S101], D19) -----
-    // All pending until the fetch sub-workflow lands. The download is
-    // stubbed (D19 testing boundary): -stub-run exercises the entry
-    // dispatch, accession fan-out, and published layout with no network.
+    // ----- Fetch mode (--accession, [S97]-[S101], D19) -----
+    // The download is stubbed (D19 testing boundary): -stub-run exercises
+    // the param dispatch, accession fan-out, and published layout with no
+    // network. Dispatch is by --accession (Nextflow's strict parser drops
+    // -entry), so these run like any other mode.
 
     test("an invalid --accession aborts at startup naming the value") {
         // COVERAGE: [S98]
-        tag "pending"
+        tag "ci"
         when {
             params {
                 accession = "SRR1234567"   // a run accession — rejected
@@ -2544,11 +2545,30 @@ nextflow_pipeline {
         }
     }
 
-    test("-entry fetch runs the fetch stages and no Part A/B/C process (stub)") {
-        // COVERAGE: [S97], [S99]
-        tag "pending"
+    test("--accession combined with another selector aborts (mutual exclusivity)") {
+        // COVERAGE: [S02], [S97]
+        tag "ci"
         when {
-            options "-entry fetch -stub-run"
+            params {
+                accession    = "PRJEB89924"
+                fastq_folder = "${projectDir}/tests/data"
+                outdir       = "${outputDir}/fetch_excl"
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("mutually exclusive") &&
+                msg.contains("--accession") :
+                "[S02] setting --accession with another selector must abort"
+        }
+    }
+
+    test("--accession runs the fetch stages and no Part A/B/C process (stub)") {
+        // COVERAGE: [S97], [S99]
+        tag "ci"
+        when {
+            options "-stub-run"
             params {
                 accession = "PRJEB89924,SRP012345"
                 outdir    = "${outputDir}/fetch_two"
@@ -2556,21 +2576,22 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            // no Part A/B/C process is scheduled on a fetch run
-            assert workflow.trace.tasks().every { !it.name.contains("part_") &&
-                !it.name.contains("merge_fastq") && !it.name.contains("global_") } :
-                "[S97] fetch must not schedule any Part A/B/C process"
+            def names = workflow.trace.tasks().collect { it.name }
+            // no Part A/B/C process is scheduled on a fetch run ([S97])
+            assert names.every { !it.contains("part_") &&
+                !it.contains("merge_fastq") && !it.contains("global_") } :
+                "[S97] fetch must not schedule any Part A/B/C process, got: ${names}"
             // resolve stage runs once per accession ([S99])
-            assert workflow.trace.tasks().count { it.name.contains("resolve_runs") } == 2 :
-                "[S99] resolve stage must run once per accession"
+            assert names.count { it.contains("resolve_runs") } == 2 :
+                "[S99] resolve stage must run once per accession, got: ${names}"
         }
     }
 
-    test("-entry fetch publishes fastq under a per-accession subfolder (stub)") {
+    test("--accession publishes fastq under a per-accession subfolder (stub)") {
         // COVERAGE: [S100], [S101]
-        tag "pending"
+        tag "ci"
         when {
-            options "-entry fetch -stub-run"
+            options "-stub-run"
             params {
                 accession = "PRJEB89924"
                 outdir    = "${outputDir}/fetch_layout"

@@ -14,9 +14,14 @@ nextflow_process {
 
     options "-stub"
 
-    test("downloads a run under its accession subfolder (stub)") {
-        // COVERAGE: [S100]
-        tag "pending"
+    test("downloads a run and carries its accession through (stub)") {
+        // COVERAGE: [S100], [S101]
+        // The emitted tuple keys each run's fastq to its accession — the
+        // key that lets the per-accession publishDir subfolder ([S100])
+        // resolve. The subfolder layout itself is asserted end-to-end in
+        // tests/main.nf.test (publishDir targets are not visible on
+        // process.out, which reports work-dir paths).
+        tag "ci"
         when {
             process {
                 """
@@ -27,10 +32,13 @@ nextflow_process {
         then {
             assert process.success
             def acc = process.out.reads.get(0).get(0)
-            assert acc == 'PRJEB89924'
-            // fastq files land under the accession-named subfolder ([S100]).
-            assert process.out.reads.get(0).get(1).any { it.contains('/PRJEB89924/') } :
-                "reads must be published under <outdir>/<accession>/"
+            assert acc == 'PRJEB89924' :
+                "the accession must be carried through as the tuple key"
+            def reads = process.out.reads.get(0).get(1)
+            assert reads.every { it.endsWith('.fastq.gz') } :
+                "download must emit fastq.gz file(s), got: ${reads}"
+            assert reads.any { it.contains('ERR13334567') } :
+                "emitted fastq must belong to the requested run"
         }
     }
 
@@ -39,7 +47,7 @@ nextflow_process {
         // The pin lives on the process (not environment.yml) so non-fetch
         // users never resolve it; the provider defaults to ena. Asserted
         // statically against the module source.
-        tag "pending"
+        tag "ci"
         then {
             def src = path("${projectDir}/modules/local/fetch/download_run.nf").text
             assert src.contains("bioconda::fastq-dl=4.0.1") :
