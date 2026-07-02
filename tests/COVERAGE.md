@@ -49,7 +49,8 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S20]`| `--no_trimming` toggle skips primer trimming; mutually exclusive w/ primers| `tests/main.nf.test`                            | done    | —          |
 | `[S21]`| unpaired fastq files skip the merging step                                 | `tests/main.nf.test`                            | done    | —          |
 | `[S22]`| Part B re-cleaves global swarm clusters using per-sample sub-seed presence | `tests/python/test_cluster_cleaver.py`          | done    | —          |
-| `[S23]`| `notmerged` reserved suffix — sample IDs ending in `notmerged` are rejected | `tests/python/test_reserved_keyword.py`, `tests/main.nf.test` | done | — |
+| `[S23]`| `notmerged` reserved suffix — sample IDs ending in `notmerged` are rejected | `tests/python/test_reserved_keyword.py`, `tests/main.nf.test` | done | —          |
+| `[S93]`| sample IDs restricted to safe charset `[A-Za-z0-9._-]` (shared validator) | `tests/python/test_sample_id.py` | done | — |
 | `[S24]`| shadow pipeline 3'-strip via `vsearch --fastq_stripright` (default 30)     | `tests/processes/part_a/strip_reads.nf.test`    | done    | —          |
 | `[S25]`| Part B requires `--project_name` (no default)                              | `tests/main.nf.test`                            | done    | —          |
 | `[S26]`| Part B requires `--results_folder` (no default); auto-created if missing   | `tests/main.nf.test`                            | done    | —          |

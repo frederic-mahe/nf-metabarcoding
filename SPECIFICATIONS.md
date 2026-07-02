@@ -526,6 +526,27 @@ the latter case.
   - **Pass when:** running Part A on a folder containing
     `<X_notmerged>_{1,2}.<ext>` (or any single-end variant) exits
     non-zero and the error message names the reserved keyword.
+- `[S93]` a sample ID must contain only the safe character set
+  `[A-Za-z0-9._-]` and must start with a letter, digit, or
+  underscore. The ID becomes a shell token and an output-file
+  basename in the Part A / Part B process scripts (`!{sampleId}`), so
+  characters outside this set — whitespace, path separators, shell
+  metacharacters (`$` `` ` `` `;` `|` `&` `(` `)` `<` `>` `*` `?`
+  quotes …), a leading `-` (read as an option by downstream tools) or
+  a leading `.` (hidden file / `..` traversal) — are rejected before
+  any process starts. The rule applies to IDs from an `--input`
+  samplesheet (`[S70]`) and to IDs derived from folder discovery
+  (`[S12]`), and is enforced by a single shared validator so the two
+  entry paths cannot diverge. It is independent of and additional to
+  the uniqueness (`[S13]` / `[S14]`) and reserved-suffix (`[S23]`)
+  checks.
+  - **Pass when:** `bin/parse_samplesheet.py` on a samplesheet whose
+    `sample` cell is `bad;id` (or contains a space, `/`, `$(...)`, or
+    a leading `-`) exits non-zero naming the offending ID; and
+    `bin/discover_fastq.py` / `bin/discover_fasta.py` on a folder
+    holding a file that derives such an ID exit non-zero naming it.
+    All three import the validator from the shared `bin/sample_id.py`
+    module.
 - `[S22]` Part B's first step re-cleaves global swarm clusters by
   detecting alternative ("sub-") seeds that appear in a configurable
   fraction of samples (default 5 %, exposed as `--percentage`). For

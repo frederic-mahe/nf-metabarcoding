@@ -34,6 +34,8 @@ from dataclasses import astuple, dataclass
 from pathlib import Path
 from typing import Union
 
+from sample_id import InvalidSampleIdError, validate_sample_id
+
 RESERVED_SUFFIX = "notmerged"
 
 FASTQ_REQUIRED = ("sample", "fastq_1")
@@ -117,6 +119,14 @@ def _require(row: dict[str, str], column: str, line: int) -> str:
     return value
 
 
+def _valid_sample(sample: str, line: int) -> str:
+    """Validate the sample-ID charset ([S93]), naming the row on failure."""
+    try:
+        return validate_sample_id(sample, context=f"row {line}")
+    except InvalidSampleIdError as err:
+        raise SamplesheetError(str(err))
+
+
 def _check_unique(records: list[Record], lines: list[int]) -> None:
     seen: dict[str, list[int]] = {}
     for record, line in zip(records, lines):
@@ -136,7 +146,7 @@ def _parse_fastq(rows: list[tuple[int, dict]]) -> list[FastqSample]:
     records: list[FastqSample] = []
     lines: list[int] = []
     for line, row in rows:
-        sample = _require(row, "sample", line)
+        sample = _valid_sample(_require(row, "sample", line), line)
         if sample.endswith(RESERVED_SUFFIX):
             raise SamplesheetError(
                 f"row {line}: sample '{sample}' ends with the reserved "
@@ -159,7 +169,7 @@ def _parse_fasta(rows: list[tuple[int, dict]]) -> list[FastaSample]:
     records: list[FastaSample] = []
     lines: list[int] = []
     for line, row in rows:
-        sample = _require(row, "sample", line)
+        sample = _valid_sample(_require(row, "sample", line), line)
         fasta = _expand(_require(row, "fasta", line))
         qual = row.get("qual", "").strip()
         stats = row.get("stats", "").strip()

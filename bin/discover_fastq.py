@@ -27,6 +27,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple, Optional
 
+from sample_id import InvalidSampleIdError, validate_sample_id
+
 
 # ---------- pattern table --------------------------------------------------
 
@@ -250,6 +252,18 @@ def check_reserved_suffix(samples: list[Sample]) -> None:
         )
 
 
+def check_sample_id_charset(samples: list[Sample]) -> None:
+    """Reject any discovered sample ID outside the safe charset ([S93]).
+
+    Sample IDs derived from fastq file names flow verbatim into the
+    Part A process scripts as shell tokens; the shared validator keeps
+    an unsafe basename (whitespace, path separators, shell
+    metacharacters) from reaching a command line.
+    """
+    for sample in samples:
+        validate_sample_id(sample.sample_id, context=str(sample.r1))
+
+
 class DuplicateSampleIDError(ValueError):
     """Raised when two or more discovered samples share a sample ID."""
 
@@ -430,9 +444,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
     samples = discover(args.folders, extra_pattern=args.extra_pattern)
     try:
+        check_sample_id_charset(samples)
         check_reserved_suffix(samples)
         check_unique_sample_ids(samples)
-    except (ReservedSuffixError, DuplicateSampleIDError) as exc:
+    except (
+        InvalidSampleIdError,
+        ReservedSuffixError,
+        DuplicateSampleIDError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     for sample in samples:

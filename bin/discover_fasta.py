@@ -26,6 +26,8 @@ import sys
 from pathlib import Path
 from typing import NamedTuple, Optional
 
+from sample_id import InvalidSampleIdError, validate_sample_id
+
 
 # Suffix used by the Part A shadow pipeline ([S04]). Stripping the
 # `.fas` extension first, anything ending in this token is dropped.
@@ -84,6 +86,17 @@ def discover(
     return samples
 
 
+def check_sample_id_charset(samples: list[FastaSample]) -> None:
+    """Reject any discovered sample ID outside the safe charset ([S93]).
+
+    Sample IDs derived from ``.fas`` file names flow verbatim into the
+    Part B process scripts as shell tokens; the shared validator keeps
+    an unsafe basename from reaching a command line.
+    """
+    for sample in samples:
+        validate_sample_id(sample.sample_id, context=str(sample.fasta))
+
+
 def check_unique_sample_ids(samples: list[FastaSample]) -> None:
     """Reject any duplicate sample ID across the discovered fastas.
 
@@ -140,8 +153,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
     samples = discover(args.folders, shadow=args.shadow)
     try:
+        check_sample_id_charset(samples)
         check_unique_sample_ids(samples)
-    except DuplicateSampleIDError as exc:
+    except (InvalidSampleIdError, DuplicateSampleIDError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     for sample in samples:
