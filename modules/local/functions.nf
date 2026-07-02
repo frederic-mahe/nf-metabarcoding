@@ -165,7 +165,7 @@ def samplesheet_profile() {
     }
     def header
     header = file(normalize_path(params.input)).withReader { reader ->
-        reader.readLine()
+        read_bounded_line(reader)
     }
     def cols
     cols = header ? header.split(',').collect { it.trim() } : []
@@ -200,6 +200,39 @@ def check_primer_format(String name, value) {
 }
 
 
+def read_bounded_line(reader, int max_chars = 65536) {
+    // [S94]: read at most `max_chars` characters from `reader`, stopping
+    // at the first newline. Bounds memory — and, for a gzip stream, how
+    // much of it is decompressed — so a crafted input whose first line is
+    // gigabytes long, or a decompression bomb whose first "line" inflates
+    // without bound, cannot OOM the launcher during the startup header
+    // sniffs ([S70] samplesheet profile / [S73] reference format). The
+    // 64 KiB cap dwarfs any real FASTA or CSV header, so a legitimate
+    // header is never truncated. Returns null on immediate EOF (empty
+    // input); otherwise the line without its trailing newline (a trailing
+    // carriage return is stripped so a CRLF-terminated header reads the
+    // same as an LF one), matching BufferedReader.readLine() for the short
+    // headers these sniffs read.
+    // A single bounded read pulls at most `max_chars` characters out of
+    // the (decompressed) stream — never the whole thing — so no explicit
+    // loop is needed and a huge first line or a decompression bomb cannot
+    // be materialised. We then cut at the first newline.
+    def cb = java.nio.CharBuffer.allocate(max_chars)
+    def n = reader.read(cb)
+    if ( n < 0 ) {
+        return null
+    }
+    cb.flip()
+    def chunk = cb.toString()
+    def nl = chunk.indexOf('\n')
+    def line = ( nl >= 0 ) ? chunk.substring(0, nl) : chunk
+    if ( line.endsWith('\r') ) {  // CRLF — strip the carriage return too
+        line = line.substring(0, line.length() - 1)
+    }
+    return line
+}
+
+
 def reference_first_header(ref_file, boolean gzipped) {
     // [S73] helper: return the first line of a reference fasta (its FASTA
     // header), transparently decompressing gzip. Reads a single line —
@@ -210,9 +243,9 @@ def reference_first_header(ref_file, boolean gzipped) {
     if ( gzipped ) {
         def stream
         stream = new java.util.zip.GZIPInputStream(ref_file.newInputStream())
-        header = stream.withReader { reader -> reader.readLine() }
+        header = stream.withReader { reader -> read_bounded_line(reader) }
     } else {
-        header = ref_file.withReader { reader -> reader.readLine() }
+        header = ref_file.withReader { reader -> read_bounded_line(reader) }
     }
     return header
 }

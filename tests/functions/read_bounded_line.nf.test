@@ -1,0 +1,102 @@
+nextflow_function {
+
+    name "read_bounded_line"
+    script "modules/local/functions.nf"
+    function "read_bounded_line"
+
+    // [S94]: the startup header sniffs ([S70] samplesheet profile, [S73]
+    // reference format) read the first line through this length-bounded
+    // reader, so a crafted input whose first line is enormous — or a gzip
+    // decompression bomb — cannot exhaust launcher memory. These unit
+    // tests pin the boundary behaviour; check_reference_format.nf.test and
+    // main.nf.test cover the wiring end-to-end.
+
+    test("reads at most max_chars characters when no newline is seen") {
+        // COVERAGE: [S94]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = new java.io.BufferedReader(
+                    new java.io.StringReader('x' * 100000))
+                input[1] = 10
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.length() == 10
+        }
+    }
+
+    test("stops at the first newline and drops it") {
+        // COVERAGE: [S94]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = new java.io.BufferedReader(
+                    new java.io.StringReader('header line\\nrest\\nmore'))
+                input[1] = 65536
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == 'header line'
+        }
+    }
+
+    test("strips a trailing carriage return (CRLF line ending)") {
+        // COVERAGE: [S94]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = new java.io.BufferedReader(
+                    new java.io.StringReader('sample,fastq_1\\r\\nA,a.fq\\r\\n'))
+                input[1] = 65536
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == 'sample,fastq_1'
+        }
+    }
+
+    test("returns null on empty input") {
+        // COVERAGE: [S94]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = new java.io.BufferedReader(new java.io.StringReader(''))
+                input[1] = 65536
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == null
+        }
+    }
+
+    test("returns the whole line when shorter than the cap and unterminated") {
+        // COVERAGE: [S94]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = new java.io.BufferedReader(
+                    new java.io.StringReader('>refA lineage'))
+                input[1] = 65536
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == '>refA lineage'
+        }
+    }
+}

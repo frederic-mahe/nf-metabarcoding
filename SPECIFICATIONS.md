@@ -1728,6 +1728,22 @@ from placeholder values to real taxonomic assignments.
     too-short / non-IUPAC values; an end-to-end Part A run with a
     malformed `--forward_primer` aborts at startup naming
     `forward_primer`.
+- `[S94]` the startup header sniffs — the `--input` samplesheet profile
+  probe (`[S70]`) and the reference-dataset format check (`[S73]`) —
+  read the first line through a **length-bounded** reader that pulls at
+  most a fixed cap of characters from the (possibly gzip-decompressed)
+  stream before the first newline. A header is a short line, so the cap
+  never truncates a legitimate one; it exists so a crafted input whose
+  first line is enormous (no newline for gigabytes) — or a gzip
+  **decompression bomb** whose first "line" inflates without bound —
+  cannot exhaust launcher memory at startup. Bounding the characters
+  pulled from a gzip reader also bounds how much is decompressed. A
+  single shared `read_bounded_line()` helper backs both call sites so
+  they cannot diverge.
+  - **Pass when:** `read_bounded_line()` returns at most `max_chars`
+    characters, stops at (and drops) the first newline, strips a
+    trailing carriage return, and returns `null` on empty input; the
+    existing `[S70]` / `[S73]` sniffs keep passing through it.
 
 - `[S75]` a site adapts the workflow to its cluster through a
   **`-c` site-config file**, never by editing `nextflow.config`. A
