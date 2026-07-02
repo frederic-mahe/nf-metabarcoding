@@ -440,6 +440,36 @@ nextflow_pipeline {
         }
     }
 
+    test("walks a Groovy list of fastq folders (config-style)") {
+        // COVERAGE: [S10]
+        // [S10] also allows a nextflow.config to supply a Groovy list
+        // (fastq_folder = ['a', 'b']) instead of a comma-separated
+        // string. discover_inputs.nf handles `instanceof List`; the
+        // schema must accept the array so validateParameters() does not
+        // reject it before discovery runs. Same two fixtures as the
+        // comma-separated test above — the list form must behave
+        // identically.
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = ["${projectDir}/tests/data/miseq", "${projectDir}/tests/data/unpaired_only"]
+                outdir         = "${outputDir}/a_list"
+                fastq_pattern  = ""
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def out = workflow.stdout.toString()
+            assert out.contains("merge_fastq_pairs") :
+                "expected merge_fastq_pairs to run on the MiSeq pair, got: ${out}"
+            assert file("${outputDir}/a_list/logs/part_a/per_sample/SampleX_S1_merging.log").exists()
+            assert file("${outputDir}/a_list/logs/part_a/per_sample/unpaired_sample_dereplicating.log").exists()
+        }
+    }
+
     test("paired-end pairs that cannot merge produce a _notmerged shadow set") {
         // COVERAGE: [S04], [S19]
         tag "ci"

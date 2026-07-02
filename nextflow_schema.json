@@ -16,12 +16,18 @@
                     "help_text": "Mutually exclusive with the folder-scan inputs (--fastq_folder / --fasta_folder / --occurrence_table)."
                 },
                 "fastq_folder": {
-                    "type": "string",
-                    "description": "Input fastq directory (one or more, comma-separated); runs Part A and, when --project_name is also set, Part B."
+                    "type": ["string", "array"],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Input fastq directory (one or more; a comma-separated string or a Groovy list); runs Part A and, when --project_name is also set, Part B."
                 },
                 "fasta_folder": {
-                    "type": "string",
-                    "description": "Per-sample .fas + .qual + .stats directory; runs Part B standalone."
+                    "type": ["string", "array"],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Per-sample .fas + .qual + .stats directory (one or more; a comma-separated string or a Groovy list); runs Part B standalone."
                 },
                 "occurrence_table": {
                     "type": "string",
