@@ -1,5 +1,13 @@
 # A swarm-based metabarcoding pipeline
 
+[![tests](https://github.com/frederic-mahe/nf-metabarcoding/actions/workflows/test.yml/badge.svg)](https://github.com/frederic-mahe/nf-metabarcoding/actions/workflows/test.yml)
+[![Nextflow](https://img.shields.io/badge/nextflow-%E2%89%A525.04.0-23aa62.svg)](https://www.nextflow.io/)
+[![run with conda](https://img.shields.io/badge/run%20with-conda-3EB049.svg)](https://docs.conda.io/en/latest/)
+[![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed.svg)](https://www.docker.com/)
+[![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg)](https://sylabs.io/singularity/)
+[![latest release](https://img.shields.io/github/v/tag/frederic-mahe/nf-metabarcoding?label=release)](https://github.com/frederic-mahe/nf-metabarcoding/tags)
+[![license](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+
 `nf-metabarcoding` is a fast, user-friendly, and scalable eDNA
 workflow built around [swarm](https://github.com/torognes/swarm). It
 is a first attempt at converting the [reference
