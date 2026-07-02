@@ -9,6 +9,19 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-02
+
+### Fixed
+
+- `--fastq_folder` / `--fasta_folder` now accept a Groovy list
+  (`fastq_folder = ['a', 'b']`) as `[S10]` / `[S27]` document, not only
+  a comma-separated string. The nf-schema migration had typed these
+  params as `string`, so `validateParameters()` rejected an array
+  (`Value is [array] but should be [string]`) before the discovery
+  processes — which already handle a list — ever ran. The schema type is
+  widened to `["string", "array"]`; the comma-separated string form is
+  unaffected.
+
 ## [0.2.0] - 2026-06-30
 
 ### Added
