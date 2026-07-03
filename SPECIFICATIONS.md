@@ -1494,7 +1494,7 @@ from placeholder values to real taxonomic assignments.
   the same mechanism as the other modes (`[S02]`), because Nextflow's
   strict config parser (25.10+) drops the `-entry` option. `--accession`
   is the sixth mutually-exclusive input-mode selector of `[S02]`; the
-  fetch mode runs no Part A / B / C. Blocked by D19.
+  fetch mode runs no Part A / B / C.
   - **Pass when:** `nextflow run main.nf --accession A,B` fans out to
     the fetch stages once per accession and invokes no Part A / B / C
     process; combining `--accession` with any other input-mode selector
@@ -1506,7 +1506,7 @@ from placeholder values to real taxonomic assignments.
   A value matching neither aborts at startup with a message naming the
   offending accession and the two accepted forms. Validation is a
   pure param check (no network), so it fires regardless of
-  connectivity. Blocked by D19.
+  connectivity.
   - **Pass when:** `--accession PRJEB89924` and `--accession SRP012345`
     are accepted; `--accession SRR123` (a run accession) and
     `--accession bogus` each abort at startup naming the value and the
@@ -1514,14 +1514,14 @@ from placeholder values to real taxonomic assignments.
 - `[S99]` fetch resolves each accession to its constituent run
   accessions in a **resolve** stage (one task per `--accession`)
   before any fastq download, so the download stage can fan out one
-  task per run. Blocked by D19.
+  task per run.
   - **Pass when:** a stubbed resolve stage emitting a fixture run list
     for one accession produces one downstream download task per run.
 - `[S100]` fastq files for each accession are published under a
   subfolder named after that accession
   (`<outdir>/<accession>/<run>_{1,2}.fastq.gz`), so runs from distinct
   accessions in a comma-separated list never collide in a shared
-  directory. Blocked by D19.
+  directory.
   - **Pass when:** `--accession A,B` produces `<outdir>/A/…` and
     `<outdir>/B/…`; no run file is written directly under `<outdir>`.
 - `[S101]` the **download** stage runs one task per run accession via
@@ -1534,7 +1534,7 @@ from placeholder values to real taxonomic assignments.
   times before the run-task fails. The per-run granularity gives the
   failure contract: a run that fails to download fails only its own
   task; runs that succeeded are published and cached, so a re-run with
-  `-resume` retries only the failed runs. Blocked by D19.
+  `-resume` retries only the failed runs.
   - **Pass when:** the download process carries a `conda` directive
     pinning `fastq-dl=4.0.1` and passes `--provider ena` and
     `--max-attempts 5`; `environment.yml` does not mention fastq-dl; a
