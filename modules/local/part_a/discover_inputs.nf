@@ -13,14 +13,22 @@ process discover_inputs {
     path "samples.tsv"
 
     script:
+    // [S10]: resolve each folder against launchDir so a relative
+    // fastq_folder (from the CLI or a nextflow.config) points at the
+    // launch directory — standard Nextflow file() semantics — rather
+    // than at the ephemeral task work dir this script runs in.
+    // normalize_path expands a leading `~`; file() then anchors any
+    // still-relative remainder to launchDir (absolute paths pass
+    // through unchanged).
     def folders = (params.fastq_folder instanceof List)
-        ? params.fastq_folder.collect { normalize_path(it) }
+        ? params.fastq_folder
+            .collect { file(normalize_path(it)).toAbsolutePath().toString() }
         : params.fastq_folder
             .toString()
             .split(',')
             .collect { it.trim() }
             .findAll { it }
-            .collect { normalize_path(it) }
+            .collect { file(normalize_path(it)).toAbsolutePath().toString() }
     def folder_args = folders.collect { "'${it}'" }.join(' ')
     def extra_arg = (params.fastq_pattern
         && !params.fastq_pattern.toString().isEmpty())

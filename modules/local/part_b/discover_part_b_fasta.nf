@@ -14,14 +14,22 @@ process discover_part_b_fasta {
     path "shadow_fastas.tsv", emit: shadow
 
     script:
+    // [S10]/[S27]: resolve each folder against launchDir so a relative
+    // fasta_folder (from the CLI or a nextflow.config) points at the
+    // launch directory — standard Nextflow file() semantics — rather
+    // than at the ephemeral task work dir this script runs in.
+    // normalize_path expands a leading `~`; file() then anchors any
+    // still-relative remainder to launchDir (absolute paths pass
+    // through unchanged).
     def folders = (params.fasta_folder instanceof List)
-        ? params.fasta_folder.collect { normalize_path(it) }
+        ? params.fasta_folder
+            .collect { file(normalize_path(it)).toAbsolutePath().toString() }
         : params.fasta_folder
             .toString()
             .split(',')
             .collect { it.trim() }
             .findAll { it }
-            .collect { normalize_path(it) }
+            .collect { file(normalize_path(it)).toAbsolutePath().toString() }
     def folder_args = folders.collect { "'${it}'" }.join(' ')
     """
     discover_fasta.py          ${folder_args} > fastas.tsv
