@@ -1529,15 +1529,18 @@ from placeholder values to real taxonomic assignments.
   **per-process** `conda` directive — NOT in `environment.yml` — so
   native-conda users who never run `fetch` never resolve it and Wave
   builds a fetch-only image on demand (D10), with `--provider ena` as
-  the default provider. The per-run granularity gives the failure
-  contract: a run that fails to download fails only its own task; runs
-  that succeeded are published and cached, so a re-run with `-resume`
-  retries only the failed runs. Blocked by D19.
+  the default provider and `--max-attempts 5` (raising fastq-dl's
+  default of 3) so a transient ENA / network hiccup is retried more
+  times before the run-task fails. The per-run granularity gives the
+  failure contract: a run that fails to download fails only its own
+  task; runs that succeeded are published and cached, so a re-run with
+  `-resume` retries only the failed runs. Blocked by D19.
   - **Pass when:** the download process carries a `conda` directive
-    pinning `fastq-dl=4.0.1` and passes `--provider ena`;
-    `environment.yml` does not mention fastq-dl; a full Part A/B/C run
-    triggers no fastq-dl resolution; with a stub in which one run-task
-    fails, the sibling run-tasks still publish their fixtures.
+    pinning `fastq-dl=4.0.1` and passes `--provider ena` and
+    `--max-attempts 5`; `environment.yml` does not mention fastq-dl; a
+    full Part A/B/C run triggers no fastq-dl resolution; with a stub in
+    which one run-task fails, the sibling run-tasks still publish their
+    fixtures.
 
 
 ## Reproducibility

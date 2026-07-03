@@ -59,4 +59,18 @@ nextflow_process {
                 "fastq-dl must NOT be in environment.yml (per-process only)"
         }
     }
+
+    test("passes --max-attempts 5 to fastq-dl (raising the default of 3)") {
+        // COVERAGE: [S101]
+        // fastq-dl defaults to 3 download attempts; the download stage
+        // raises the ceiling to 5 so a transient ENA / network hiccup is
+        // retried more times before the run-task fails. Asserted
+        // statically against the module source.
+        tag "ci"
+        then {
+            def src = path("${projectDir}/modules/local/fetch/download_run.nf").text
+            assert src.contains("--max-attempts 5") :
+                "download_run must pass --max-attempts 5 to fastq-dl"
+        }
+    }
 }

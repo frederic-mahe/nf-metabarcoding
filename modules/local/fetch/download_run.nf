@@ -27,13 +27,17 @@ process download_run {
     output:
     tuple val(accession), path("*.fastq.gz"), emit: reads
 
+    // [S101]: raise fastq-dl's retry ceiling from its default of 3 to 5
+    // attempts, so a transient ENA / network hiccup is retried more times
+    // before the run-task (and only that task) fails.
     script:
     """
     set -euo pipefail
 
     fastq-dl \\
         --accession ${run} \\
-        --provider ena
+        --provider ena \\
+        --max-attempts 5
     """
 
     stub:
