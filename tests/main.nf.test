@@ -470,6 +470,84 @@ nextflow_pipeline {
         }
     }
 
+    test("relative --fastq_folder resolves against launchDir") {
+        // COVERAGE: [S10]
+        // [S10]: a relative fastq_folder must be resolved against the
+        // Nextflow launch directory (launchDir), following standard
+        // file() semantics — not against the discovery process's work
+        // dir. We stage the MiSeq pair in a folder that only exists
+        // relative to launchDir, then point --fastq_folder at the bare
+        // relative name. If discovery mis-resolves the relative path
+        // the sample is never found and the per-sample merging log is
+        // absent.
+        tag "ci"
+        setup {
+            def reldir = file("${launchDir}/reldata_s10")
+            reldir.mkdirs()
+            ["SampleX_S1_L001_R1_001.fastq.gz",
+             "SampleX_S1_L001_R2_001.fastq.gz"].each { name ->
+                file("${reldir}/${name}").bytes =
+                    file("${projectDir}/tests/data/miseq/${name}").bytes
+            }
+        }
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "reldata_s10"
+                outdir         = "${outputDir}/a_reldir"
+                fastq_pattern  = ""
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success :
+                "relative fastq_folder should resolve vs launchDir: " +
+                "${workflow.errorReport}"
+            assert file("${outputDir}/a_reldir/logs/part_a/per_sample/SampleX_S1_merging.log").exists() :
+                "relative fastq_folder must be resolved against launchDir " +
+                "so SampleX_S1 is discovered and merged"
+        }
+    }
+
+    test("relative --fasta_folder resolves against launchDir") {
+        // COVERAGE: [S10], [S27]
+        // [S27] inherits [S10]'s folder semantics for Part B: a
+        // relative fasta_folder must resolve against launchDir. We
+        // stage S1/S2 (fas + qual + stats) in a folder that only
+        // exists relative to launchDir; if the relative path is
+        // mis-resolved the samples are never discovered and the final
+        // occurrence table is absent.
+        tag "ci"
+        setup {
+            def reldir = file("${launchDir}/reldata_partb")
+            reldir.mkdirs()
+            ["S1.fas", "S1.qual", "S1.stats",
+             "S2.fas", "S2.qual", "S2.stats"].each { name ->
+                file("${reldir}/${name}").bytes =
+                    file("${projectDir}/tests/data/part_b/${name}").bytes
+            }
+        }
+        when {
+            params {
+                project_name   = "myproj"
+                results_folder = "${outputDir}/part_b_reldir"
+                fasta_folder   = "reldata_partb"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success :
+                "relative fasta_folder should resolve vs launchDir: " +
+                "${workflow.errorReport}"
+            def finalTable = file("${outputDir}/part_b_reldir/occurrence_table/myproj_2_samples_table.tsv")
+            assert finalTable.exists() :
+                "relative fasta_folder must be resolved against launchDir " +
+                "so S1/S2 are discovered and the occurrence table is built"
+            assert finalTable.size() > 0
+        }
+    }
+
     test("paired-end pairs that cannot merge produce a _notmerged shadow set") {
         // COVERAGE: [S04], [S19]
         tag "ci"

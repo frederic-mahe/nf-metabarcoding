@@ -348,9 +348,15 @@ the latter case.
   relative paths). `--fastq_folder` accepts a single path or a
   comma-separated list (`--fastq_folder a,b,c`); a `nextflow.config`
   may instead supply a Groovy list (`fastq_folder = ['a', 'b']`).
+  Relative paths are resolved against the Nextflow launch directory
+  (`launchDir`, i.e. the directory `nextflow run` is invoked from) —
+  not against the config file's location — following standard Nextflow
+  `file()` semantics.
   - **Pass when:** every fastq file in every listed folder is
     discovered; identical inputs spread across two folders produce
-    identical artefacts to the single-folder run.
+    identical artefacts to the single-folder run; a relative
+    `fastq_folder` is discovered when its folder exists relative to
+    `launchDir`.
 - `[S11]` builds the input list by globbing every fastq file
   (`*.fastq`, `*.fq`, with optional `.gz` / `.bz2`) in the listed
   directories, then identifies paired-end pairs by matching the R1
