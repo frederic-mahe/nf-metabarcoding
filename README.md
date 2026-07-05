@@ -117,6 +117,15 @@ nextflow run main.nf \
 
 ### Fetching reads from ENA/SRA (`--accession`)
 
+> **Recommendation.** This fetch mode is provided for **convenience** —
+> a quick way to pull a public dataset without leaving the pipeline. For
+> anything more demanding we recommend the more battle-tested
+> [nf-core/fetchngs](https://nf-co.re/fetchngs), which covers many more
+> accession types and download edge cases. (Note, however, that
+> nf-core/fetchngs no longer appears to be actively maintained.) A
+> typical workflow is to fetch with fetchngs, then point
+> `--fastq_folder` at the downloaded reads.
+
 `[S97]`. Instead of pointing at local fastq files, you can have the
 pipeline download the raw reads for a public **bioproject** or **study**
 accession. Set `--accession` to a single accession or a comma-separated
@@ -604,8 +613,9 @@ test. Summary at the time of writing:
   sintax shadow path), with optional majority-rule assignment (`[S66]`)
 - `--input` samplesheet input (`[S70]`) and the unified `--outdir`
   output layout (`[S71]`)
-- Fetch mode (`--accession`, `[S97]`) — download raw reads for an
-  ENA/SRA bioproject/study accession via `fastq-dl`; see "Fetching reads
+- Fetch mode (`--accession`, `[S97]`) — a convenience path to download
+  raw reads for an ENA/SRA bioproject/study accession via `fastq-dl`
+  (for heavier use we recommend nf-core/fetchngs); see "Fetching reads
   from ENA/SRA" above
 - HPC / slurm profile + `conda` / `modules` dependency profiles
   (`[S07]`, `[S08]`) — see "Running on an HPC cluster (slurm)" below.
