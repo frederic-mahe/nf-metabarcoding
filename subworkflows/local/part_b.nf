@@ -26,6 +26,9 @@ include { trim_metadata_for_mumu }                         from '../../modules/l
 include { find_similar_sequences }                         from '../../modules/local/part_b/find_similar_sequences.nf'
 include { run_mumu }                                       from '../../modules/local/part_b/run_mumu.nf'
 include { rebuild_post_mumu_table }                        from '../../modules/local/part_b/rebuild_post_mumu_table.nf'
+include { recluster_search }                               from '../../modules/local/part_b/recluster_search.nf'
+include { recluster_merge }                                from '../../modules/local/part_b/recluster_merge.nf'
+include { extract_recluster_fasta }                        from '../../modules/local/part_b/extract_recluster_fasta.nf'
 include { hash_id_length }                                 from '../../modules/local/functions.nf'
 
 
@@ -120,10 +123,30 @@ workflow part_B {
     rebuild_post_mumu_table(run_mumu.out.table, merge_substring_otus.out.table, basename)
     extract_mumu_fasta(rebuild_post_mumu_table.out.table)
 
+    // [S102]–[S105]/D20: optional, terminal coarse re-clustering. Gated
+    // on the master switch --recluster_id (a compile-time param check,
+    // D-b). When on, the reclustered table replaces the post-mumu table
+    // as the emitted deliverable (D-a) and Part C runs on the reduced
+    // set; when off (default) no recluster process is scheduled and the
+    // output is byte-identical to before.
+    def final_table = rebuild_post_mumu_table.out.table
+    if ( params.recluster_id ) {
+        recluster_search(extract_mumu_fasta.out.fasta)
+        recluster_merge(
+            rebuild_post_mumu_table.out.table,
+            recluster_search.out.uc,
+            recluster_search.out.log,
+            basename,
+        )
+        extract_recluster_fasta(recluster_merge.out.table)
+        final_table = recluster_merge.out.table
+    }
+
     emit:
-    // [S46] final occurrence table — consumed by part_C when Part B
-    // and Part C run end-to-end.
-    table = rebuild_post_mumu_table.out.table
+    // [S46]/[S105] final occurrence table — the reclustered table when
+    // --recluster_id is set, otherwise the post-mumu table. Consumed by
+    // part_C when Part B and Part C run end-to-end.
+    table = final_table
 }
 
 
@@ -213,11 +236,26 @@ workflow part_B_shadow {
     rebuild_post_mumu_table(run_mumu.out.table, merge_substring_otus.out.table, basename)
     extract_mumu_fasta(rebuild_post_mumu_table.out.table)
 
+    // [S105]/D20: the re-clustering gate is symmetric with the regular
+    // part_B path (the _notmerged basename is already threaded through).
+    def final_table = rebuild_post_mumu_table.out.table
+    if ( params.recluster_id ) {
+        recluster_search(extract_mumu_fasta.out.fasta)
+        recluster_merge(
+            rebuild_post_mumu_table.out.table,
+            recluster_search.out.uc,
+            recluster_search.out.log,
+            basename,
+        )
+        extract_recluster_fasta(recluster_merge.out.table)
+        final_table = recluster_merge.out.table
+    }
+
     emit:
-    // [S46] final shadow occurrence table — exposed so callers can
-    // splice taxonomy onto the shadow path via a standalone Part C
+    // [S46]/[S105] final shadow occurrence table — exposed so callers
+    // can splice taxonomy onto the shadow path via a standalone Part C
     // invocation. End-to-end wiring runs Part C on the regular path
     // only; calling it twice from the same scope is forbidden in
     // DSL2.
-    table = rebuild_post_mumu_table.out.table
+    table = final_table
 }

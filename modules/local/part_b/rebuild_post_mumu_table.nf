@@ -8,7 +8,14 @@ process rebuild_post_mumu_table {
     //
     // [S46]: emits the final occurrence table as
     // <basename>_table.tsv.
-    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode
+    //
+    // [S105]/D-a: when the optional post-mumu re-clustering pass is on
+    // (--recluster_id set) the reclustered table replaces this one as
+    // Part B's deliverable, so this (now intermediate) table is left in
+    // the work directory and recluster_merge publishes the final
+    // <basename>_table.tsv instead. Default OFF → published as before.
+    publishDir path: { publish_dir('occurrence_table') }, mode: params.publish_mode,
+        enabled: !params.recluster_id
 
     input:
     path mumu_table
