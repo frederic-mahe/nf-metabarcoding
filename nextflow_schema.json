@@ -197,6 +197,20 @@
                     "default": 2,
                     "minimum": 1,
                     "description": "Occurrence-table filter: a cluster passes if spread >= min_spread (OR abundance >= min_abundance)."
+                },
+                "recluster_id": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1,
+                    "description": "Master switch + vsearch --cluster_size --id for the optional post-mumu re-clustering pass; null (default) = OFF, a real in (0, 1] (e.g. 0.97) enables it.",
+                    "help_text": "Opt-in, terminal coarse-clustering for divergent markers (D20). 0.97 is a starting value; fast-mutating viral markers often need 0.90-0.95."
+                },
+                "recluster_iddef": {
+                    "type": "integer",
+                    "default": 2,
+                    "minimum": 0,
+                    "maximum": 4,
+                    "description": "vsearch --iddef identity definition for the re-clustering pass; matters for markers with indels / length variation. Inert (and rejected) without --recluster_id."
                 }
             }
         },

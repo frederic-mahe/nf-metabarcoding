@@ -416,6 +416,21 @@ def validate_params() {
         "(fasta-input Part C produces no occurrence table to compute a " +
         "per-OTU majority on)"
 
+    // [S102]/D20: --recluster_id is the master switch for the optional
+    // post-mumu re-clustering pass; --recluster_iddef only tunes that
+    // pass. Setting --recluster_iddef to a non-default value while
+    // --recluster_id is unset would silently do nothing, so abort naming
+    // the switch. The `2` mirrors the recluster_iddef default declared in
+    // nextflow.config's params block (a user who explicitly passes the
+    // default value is harmless and not flagged).
+    if ( params.recluster_id == null && params.recluster_iddef != 2 ) {
+        throw new IllegalArgumentException(
+            "--recluster_iddef requires --recluster_id (the re-clustering " +
+            "master switch): set --recluster_id to a real in (0, 1] to " +
+            "enable the optional post-mumu re-clustering pass, or leave " +
+            "--recluster_iddef at its default.")
+    }
+
     // [S73]: sniff the header of each supplied reference so a swapped /
     // mis-formatted file aborts now rather than producing empty or wrong
     // assignments mid-pipeline. Format-only — presence is mode-specific
