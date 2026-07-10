@@ -1,0 +1,60 @@
+nextflow_process {
+
+    name "recluster_search"
+    script "modules/local/part_b/recluster_search.nf"
+    process "recluster_search"
+
+    test("emits ^H lines from a vsearch --cluster_size uc stream") {
+        // COVERAGE: [S103]
+        tag "ci"
+        when {
+            params {
+                threads         = 1
+                recluster_id    = 0.9
+                recluster_iddef = 2
+            }
+            process {
+                """
+                // Post-mumu FASTA (extract_mumu_fasta layout, header
+                // `>amplicon;size=total;`). ampLo is a single-mismatch
+                // variant of the more-abundant ampHi (39/40 = 97.5% id),
+                // so vsearch --cluster_size --id 0.9 makes ampHi the
+                // centroid and folds ampLo in → one H line. Both
+                // sequences are >= vsearch's default minseqlength=32.
+                def f = workDir.resolve("post_mumu.fas")
+                f.text = '''>ampHi;size=100;
+GATCAGTCAGTCAGGTCAGTGCATGCATGCATTAGCATCG
+>ampLo;size=5;
+GATCAGTCAGTCAGGTCAGAGCATGCATGCATTAGCATCG
+'''
+                input[0] = file(f.toString())
+                """
+            }
+        }
+        then {
+            assert process.success
+            def uc = process.out.uc.get(0)
+            assert uc.endsWith("post_mumu.uc")
+            def lines = path(uc).readLines()
+            // Every output line is an `H` row.
+            lines.each { l ->
+                assert l.startsWith("H") :
+                    "expected H-line, got: ${l}"
+            }
+            // The variant joins its more-abundant centroid.
+            assert lines.size() >= 1
+
+            // The member/centroid labels carry the ;size= annotation
+            // (recluster_otu_table.py strips it before matching).
+            def last = lines[0].split("\t")[-2..-1]
+            assert last[0].startsWith("ampLo") : "member should be ampLo, got ${last}"
+            assert last[1].startsWith("ampHi") : "centroid should be ampHi, got ${last}"
+
+            // [S105]: vsearch --log captures the search step's stderr;
+            // recluster_merge consumes it for the combined log.
+            def searchLog = process.out.log.get(0)
+            assert searchLog.endsWith("recluster_search.log")
+            assert path(searchLog).readLines().size() > 0
+        }
+    }
+}

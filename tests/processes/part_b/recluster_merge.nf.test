@@ -1,0 +1,60 @@
+nextflow_process {
+
+    name "recluster_merge"
+    script "modules/local/part_b/recluster_merge.nf"
+    process "recluster_merge"
+
+    test("folds members onto centroids, publishes <basename>_table.tsv, conserves reads") {
+        // COVERAGE: [S104], [S105]
+        tag "ci"
+        when {
+            params {
+                recluster_id    = 0.97
+                recluster_iddef = 2
+            }
+            process {
+                """
+                def searchLog = workDir.resolve("recluster_search.log")
+                searchLog.text = "vsearch v2.x.y — placeholder search log\\n"
+                input[0] = file("\${projectDir}/tests/data/recluster_otu_table/otu_table")
+                input[1] = file("\${projectDir}/tests/data/recluster_otu_table/matches")
+                input[2] = file(searchLog.toString())
+                input[3] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+
+            // [S105]: the reclustered table replaces the emitted table
+            // and is named <basename>_table.tsv.
+            def out = process.out.table.get(0)
+            assert out.endsWith("proj_3_samples_table.tsv")
+
+            // [S104]/D-d: 6 input OTUs collapse to 3 surviving centroids
+            // renumbered 1..3, in input order (ampA, ampB, ampF).
+            def lines = path(out).readLines()
+            assert lines.size() == 4 : "header + 3 rows expected, got ${lines.size()}"
+            def cols = lines[1..-1].collect { it.split("\t") }
+            assert cols.collect { it[0] } == ["1", "2", "3"] :
+                "OTUs must be renumbered 1..N"
+            assert cols.collect { it[3] } == ["ampA", "ampB", "ampF"] :
+                "surviving centroids should be ampA, ampB, ampF"
+
+            // [S104]: read count conserved (20+10+5+8+3+4 = 50).
+            def totalSum = cols.collect { it[1] as int }.sum()
+            assert totalSum == 50 : "read count not conserved: ${totalSum}"
+
+            // [S104]: cloud stays the post-mumu "NA".
+            assert cols.every { it[2] == "NA" } : "cloud must stay NA"
+
+            // [S105]: combined reclustering log = vsearch search log +
+            // python/invariant stderr.
+            def log = process.out.log.get(0)
+            assert log.endsWith("proj_3_samples_reclustering.log")
+            def logText = path(log).text
+            assert logText.contains("recluster_search")
+            assert logText.contains("read count conserved")
+        }
+    }
+}
