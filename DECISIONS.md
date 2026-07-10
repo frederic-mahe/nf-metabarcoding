@@ -1067,3 +1067,61 @@ for ENA/SRA bioproject and study accessions by wrapping `fastq-dl`.
 Resolved 2026-07-02: the fetch mode is implemented (`--accession`
 dispatch, `resolve_runs` → per-run `download_run`), `[S97]`–`[S101]`
 carry green `ci` tests, and their COVERAGE rows are `done`.
+
+
+## D20 — optional post-mumu re-clustering for divergent markers
+
+**Blocks:** `[S102]`, `[S103]`, `[S104]`, `[S105]`
+**Status:** `resolved` — implemented, spec and tests reflect it.
+
+Requested by Frédéric Mahé on behalf of a colleague (2026-07-09). For
+very variable / fast-mutating marker genes (e.g. viral protein-coding
+markers) swarm `d=1` ([S32]) over-splits into one fine OTU per variant
+and mumu ([S43]) collapses only some of them by co-occurrence; a large
+tail of near-identical variants remains. An **optional** coarse
+clustering pass at a user-chosen similarity threshold (vsearch
+`--cluster_size`, abundance-based greedy clustering) lumps that tail
+into broader OTUs, further reducing the dataset before Part C.
+
+It is deliberately **not** a replacement for swarm and **must stay
+terminal and opt-in**: fixed-threshold greedy clustering is the
+arbitrary-threshold approach swarm/mumu were designed to move past, so
+it runs last, on the fully-curated post-mumu table, and is never
+layered *inside* the curation chain (not before mumu / substring-
+merge). Default OFF — when off, Part B's output is byte-identical to
+before.
+
+**Resolution — the four locked decisions (2026-07-09):**
+
+- **D-a — Output mode: replace + feed Part C.** When enabled, the
+  reclustered table becomes `part_B.out.table`; Part C and the final
+  deliverable use the reduced set. The fine pre-recluster table is
+  **not** published. Implemented by gating
+  `rebuild_post_mumu_table` / `extract_mumu_fasta`'s `publishDir` on
+  `!params.recluster_id` and publishing the coarse `_table.tsv` /
+  `_table.fas` from `recluster_merge` / the aliased fasta extractor
+  instead (`[S105]`).
+- **D-b — Enable style: opt-in by value.** A single param
+  `--recluster_id` doubles as the on/off switch and the identity
+  threshold (`null` default = OFF; e.g. `0.97` enables). Matches the
+  `--slurm_array_size` (null=off) precedent. Gating in the subworkflow
+  is a single compile-time param check (`[S102]`).
+- **D-c — Merge metadata: centroid wins.** Per-OTU metadata is taken
+  from the vsearch centroid (the most abundant member under
+  `--cluster_size --sizein`). Members' distinct sequences are
+  discarded; only their read counts are summed into the sample columns
+  (`[S104]`).
+- **D-d — Renumber, restart at 1.** OTUs are renumbered `1..N` after
+  the collapse, like `[S44]`; contiguous IDs, no gaps (`[S104]`).
+
+`0.97` is documented as a *starting* value only — divergent viral
+markers often need lower (0.90–0.95); `--recluster_iddef` (default `2`,
+the vsearch default excluding terminal gaps) matters for markers with
+indels / length variation. The `recluster_*` tuning knob is inert
+without the master switch: `--recluster_iddef` at a non-default value
+with no `--recluster_id` aborts at startup (`[S102]`).
+
+Resolved 2026-07-10: the pass is implemented (`recluster_search` →
+`recluster_merge`, `bin/recluster_otu_table.py`), gated in both
+`part_B` and `part_B_shadow`, `[S102]`–`[S105]` carry green tests, and
+their COVERAGE rows are `done`.

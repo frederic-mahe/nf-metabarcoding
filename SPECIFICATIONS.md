@@ -921,6 +921,91 @@ the latter case.
     output.
 
 
+### Optional post-mumu re-clustering (divergent markers)
+
+For very variable / fast-mutating marker genes (e.g. viral
+protein-coding markers) swarm `d=1` ([S32]) over-splits and mumu
+([S43]) leaves a large tail of near-identical variants. An **opt-in,
+terminal** coarse clustering pass (vsearch `--cluster_size`, abundance-
+based greedy clustering) lumps that tail into broader OTUs, reducing
+the dataset before Part C. It is **not** a replacement for swarm and is
+never layered inside the curation chain — it runs last, on the fully-
+curated post-mumu table. Default OFF; see D20 for the rationale and the
+locked decisions D-a…D-d.
+
+- `[S102]` The re-clustering pass is gated on a single master switch,
+  `--recluster_id` (vsearch `--id`, a real in `(0, 1]`, default
+  `null` = OFF). A second knob `--recluster_iddef` (vsearch `--iddef`,
+  int `[0, 4]`, default `2`) tunes the identity definition for markers
+  with indels / length variation. The `--recluster_iddef` knob is inert
+  without `--recluster_id`: setting it to a non-default value while
+  `--recluster_id` is unset aborts at startup naming `--recluster_id`,
+  rather than silently ignoring the value.
+  - **Pass when:** `--recluster_iddef` set to a non-default value with
+    no `--recluster_id` exits non-zero and stderr names
+    `--recluster_id`; the schema pins `recluster_id` to a real in
+    `(0, 1]` and `recluster_iddef` to an int in `[0, 4]` with
+    default `2`.
+- `[S103]` When `--recluster_id` is set, Part B's `recluster_search`
+  runs `vsearch --cluster_size` on the post-mumu FASTA
+  (`extract_mumu_fasta`'s output, [S40], header `>amplicon;size=total;`)
+  with `--sizein --sizeout --id <--recluster_id>
+  --iddef <--recluster_iddef> --qmask none --fasta_width 0 --strand plus
+  --maxaccepts 0 --maxrejects 0 --threads <task.cpus>` and captures the
+  `^H` lines of the `--uc` stream (member → centroid connexions). The
+  fixed flags (`--cluster_size`, `--sizein`/`--sizeout`, `--qmask none`,
+  `--maxaccepts 0`/`--maxrejects 0`) are not user-facing; only `--id`
+  and `--iddef` are exposed ([S102]). vsearch's `--log` captures the
+  step's stderr.
+  - **Pass when:** running `recluster_search` on a small FASTA whose
+    records are identical modulo a chosen threshold produces a
+    `.uc`-style stream whose rows all start with `H`; an empty stream
+    (no member below the centroid) is a legitimate green outcome.
+- `[S104]` Part B's `recluster_merge` runs `bin/recluster_otu_table.py`
+  to fold each member OTU into its vsearch centroid: sample columns
+  summed, `total` summed, `spread` recomputed from the non-zero merged
+  columns, per-OTU metadata (`amplicon`, `length`, `abundance`,
+  `quality`, `sequence`, `identity`, `taxonomy`, `references`) taken
+  from the centroid (the most abundant member; D-c), `cloud` left at the
+  post-mumu `"NA"` and `chimera` at `"N"` (no arithmetic — post-mumu
+  they are already strings). Surviving centroid rows are emitted in
+  input order and renumbered `1..N` (D-d). The `;size=N;` annotation is
+  stripped from the `.uc` labels before matching on the amplicon column.
+  As in [S39] the merge aborts non-zero if any OTU is both a centroid
+  and a member, and asserts the total read count is conserved.
+  - **Pass when:** golden-file characterization tests for
+    `bin/recluster_otu_table.py` reproduce byte-exact output on a
+    fixture covering: (a) a pass-through singleton, (b) a centroid with
+    a single member, (c) a centroid with two members, (d) a member row
+    that precedes its centroid in the table, (e) `cloud` staying `"NA"`,
+    (f) contiguous `1..N` renumbering and read-count conservation; and a
+    match list where one OTU is both centroid and member aborts
+    non-zero with a WARNING on stderr.
+- `[S105]` When `--recluster_id` is set the reclustered table
+  **replaces** the post-mumu table as Part B's emitted output (D-a): it
+  is published as `<basename>_table.tsv`, a coarse post-mumu FASTA
+  sibling `<basename>_table.fas` is re-extracted from it (so table and
+  FASTA stay consistent), and both the fine pre-recluster
+  `rebuild_post_mumu_table` table and its FASTA stay unpublished in the
+  work directory. Part C then runs on the reduced set. The combined
+  vsearch-search + merge stderr is published as
+  `<basename>_reclustering.log` under `<outdir>/logs/part_b/` (a
+  conditional 7th step log alongside the six of [S45]). The
+  [S59] `occurrence_table/` whitelist is unchanged — the two published
+  filenames (`_table.tsv`, `_table.fas`) are the same, only their
+  contents are the coarse set. The gating applies symmetrically to the
+  shadow Part B path ([S56], `_notmerged` basename). When
+  `--recluster_id` is unset (default) no re-clustering process is
+  scheduled and Part B's output is byte-identical to today.
+  - **Pass when:** a Part B run with `--recluster_id` unset schedules no
+    `recluster_*` process and its `occurrence_table/` output is
+    unchanged; a run with `--recluster_id` set publishes a
+    `<basename>_table.tsv` with fewer data rows than the pre-recluster
+    table, a matching `<basename>_table.fas`, a
+    `<basename>_reclustering.log` under `logs/part_b/`, and Part C
+    consumes the reduced table.
+
+
 ## Part C — taxonomic assignment
 
 Part C re-implements the legacy
