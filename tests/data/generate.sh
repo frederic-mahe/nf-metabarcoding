@@ -390,6 +390,45 @@ emit_large_cleaved_fixture() {
     }' > "${dir}/big_cleaved.fas2"
 }
 
+emit_recluster_fixture() {
+    # [S102]-[S105]/D20: per-sample Part B inputs for the optional
+    # post-mumu re-clustering pass. Three 40-nt variants of one seed,
+    # each two substitutions from the seed (so swarm d=1 keeps them as
+    # three separate OTUs and fastidious grafting — mass >= boundary 3 —
+    # does not bridge them) and each dominant in a distinct sample (so
+    # they never co-occur and mumu keeps all three). They are 90-95%
+    # identical, so `vsearch --cluster_size --id 0.9` folds all three
+    # into one centroid: the OFF run emits three rows, the ON run one.
+    local -r dir="recluster"
+    mkdir -p "${dir}"
+
+    local -r id0="1111111111111111111111111111111111111111"
+    local -r id1="2222222222222222222222222222222222222222"
+    local -r id2="3333333333333333333333333333333333333333"
+
+    # v0 = seed; v1 = seed with a 3' CG->AA; v2 = seed with a 5' GA->TT.
+    local -r v0="GATCAGTCAGTCAGGTCAGTGCATGCATGCATTAGCATCG"
+    local -r v1="GATCAGTCAGTCAGGTCAGTGCATGCATGCATTAGCATAA"
+    local -r v2="TTTCAGTCAGTCAGGTCAGTGCATGCATGCATTAGCATCG"
+
+    # Per-sample .fas (vsearch "SHA1;size=N" header, --fasta_width 0).
+    printf '>%s;size=20\n%s\n' "${id0}" "${v0}" > "${dir}/rcA.fas"
+    printf '>%s;size=10\n%s\n' "${id1}" "${v1}" > "${dir}/rcB.fas"
+    printf '>%s;size=8\n%s\n'  "${id2}" "${v2}" > "${dir}/rcC.fas"
+
+    # Per-sample .qual (extract_ee.awk "<SHA1> <ee> <length>"). ee/length
+    # = 0.0001 <= max_ee 0.0002 so every variant clears the [S35] filter.
+    printf '%s 0.004000 40\n' "${id0}" > "${dir}/rcA.qual"
+    printf '%s 0.004000 40\n' "${id1}" > "${dir}/rcB.qual"
+    printf '%s 0.004000 40\n' "${id2}" > "${dir}/rcC.qual"
+
+    # Per-sample .stats (swarm --statistics-file rows). One single-
+    # amplicon local cluster per sample.
+    printf '1\t20\t%s\t20\t1\t0\t0\n' "${id0}" > "${dir}/rcA.stats"
+    printf '1\t10\t%s\t10\t1\t0\t0\n' "${id1}" > "${dir}/rcB.stats"
+    printf '1\t8\t%s\t8\t1\t0\t0\n'  "${id2}" > "${dir}/rcC.stats"
+}
+
 
 emit_paired "paired_merge_ok"   "${AMPLICONS_OK[@]}"
 emit_paired "paired_merge_fail" "${AMPLICONS_LONG[@]}"
@@ -405,5 +444,6 @@ emit_e2e_part_b_fixture
 emit_compression_variants
 emit_hash_function_fixtures
 emit_large_cleaved_fixture
+emit_recluster_fixture
 
 echo "Wrote fixtures to ${DATA_DIR}"

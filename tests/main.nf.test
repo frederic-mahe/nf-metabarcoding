@@ -2716,4 +2716,125 @@ nextflow_pipeline {
             } : "[S100] no run file may sit directly under <outdir>"
         }
     }
+
+    test("--recluster_iddef without --recluster_id aborts before any process runs") {
+        // COVERAGE: [S102]
+        tag "ci"
+        when {
+            params {
+                fasta_folder    = "${projectDir}/tests/data/recluster"
+                project_name    = "reclguard"
+                results_folder  = "${outputDir}/recl_guard"
+                recluster_iddef = 3      // non-default, but no --recluster_id
+                threads         = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert msg.contains("recluster_id") :
+                "expected error to name --recluster_id, got: ${msg}"
+        }
+    }
+
+    test("--recluster_id unset leaves Part B output unchanged (no re-clustering)") {
+        // COVERAGE: [S105]
+        // The recluster fixture yields three post-mumu OTUs (three
+        // near-identical variants, one per sample). With the master
+        // switch off, no recluster_* process runs and the table keeps
+        // all three rows — byte-identical to before the feature landed.
+        tag "ci"
+        when {
+            params {
+                fasta_folder   = "${projectDir}/tests/data/recluster"
+                project_name   = "recloff"
+                results_folder = "${outputDir}/recl_off"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def base = "${outputDir}/recl_off/occurrence_table/recloff_3_samples"
+
+            // Three data rows survive to the published table.
+            def table = file("${base}_table.tsv")
+            assert table.exists() : "Part B table should exist"
+            assert table.readLines().size() == 4 :
+                "expected header + 3 rows (no collapse), got: ${table.readLines().size()}"
+
+            // No re-clustering step ran → no <basename>_reclustering.log.
+            assert !file("${outputDir}/recl_off/logs/part_b/recloff_3_samples_reclustering.log").exists() :
+                "the reclustering log must be absent when --recluster_id is unset"
+        }
+    }
+
+    test("--recluster_id collapses the post-mumu table and Part C runs on the reduced set") {
+        // COVERAGE: [S102], [S103], [S104], [S105]
+        // Same fixture as the OFF case; with --recluster_id 0.9 the
+        // three 90-95%-identical variants fold into one centroid OTU.
+        // The reclustered table replaces the emitted table (D-a), a
+        // matching coarse fasta is re-extracted, the reclustering log is
+        // published, and Part C's <basename>_table_assigned.tsv carries
+        // the reduced (single-row) set.
+        tag "ci"
+        when {
+            params {
+                fasta_folder      = "${projectDir}/tests/data/recluster"
+                project_name      = "reclon"
+                results_folder    = "${outputDir}/recl_on"
+                reference_dataset = "${outputDir}/recl_on_ref.fas"
+                recluster_id      = 0.9
+                threads           = 1
+            }
+        }
+        setup {
+            // Reference carries the centroid variant so stampa assigns it.
+            def ref = file("${outputDir}/recl_on_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refX Bacteria|Firmicutes|Bacilli\n" +
+                "GATCAGTCAGTCAGGTCAGTGCATGCATGCATTAGCATCG\n"
+            )
+        }
+        then {
+            assert workflow.success
+            def base = "${outputDir}/recl_on/occurrence_table/reclon_3_samples"
+
+            // [S105]/D-a: exactly one published _table.tsv — the coarse
+            // one, a single data row (three OTUs → one centroid).
+            def table = file("${base}_table.tsv")
+            assert table.exists() : "reclustered Part B table should exist"
+            def rows = table.readLines()
+            assert rows.size() == 2 :
+                "expected header + 1 collapsed row, got: ${rows.size()}"
+            def cols = rows[1].split("\t")
+            assert cols[1] == "38" : "collapsed total should be 20+10+8=38, got: ${cols[1]}"
+            assert cols[2] == "NA" : "cloud must stay NA post-mumu"
+
+            // [S105]: coarse fasta sibling re-extracted from the coarse
+            // table (one record, size=38).
+            def fasta = file("${base}_table.fas").readLines()
+            assert fasta.size() == 2 : "expected one coarse fasta record, got: ${fasta}"
+            assert fasta[0].contains(";size=38;") :
+                "coarse fasta header should carry the merged size, got: ${fasta[0]}"
+
+            // [S105]: the combined reclustering log is published under
+            // logs/part_b/ (the conditional 7th step log).
+            def rlog = file("${outputDir}/recl_on/logs/part_b/reclon_3_samples_reclustering.log")
+            assert rlog.exists() && rlog.size() > 0 : "reclustering log should be published"
+            assert rlog.text.contains("read count conserved") :
+                "reclustering log should record the conservation check"
+
+            // [S105]: Part C runs on the reduced set — the assigned
+            // table has the same single row (Part C never adds/removes
+            // rows), keyed on the surviving centroid amplicon.
+            def assigned = file("${base}_table_assigned.tsv")
+            assert assigned.exists() : "Part C should publish <basename>_table_assigned.tsv"
+            def assignedRows = assigned.readLines()
+            assert assignedRows.size() == 2 :
+                "Part C should run on the 1-row reduced table, got: ${assignedRows.size()}"
+            assert assignedRows[1].split("\t")[3].startsWith("1111") :
+                "surviving centroid amplicon should carry through Part C"
+        }
+    }
 }

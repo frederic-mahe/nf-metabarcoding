@@ -9,6 +9,26 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-10
+
+### Added
+
+- Optional, terminal post-mumu re-clustering pass for divergent markers
+  (`[S102]`–`[S105]`, D20). `--recluster_id` (a real in `(0, 1]`, default
+  `null` = OFF) is the master switch and the `vsearch --cluster_size`
+  identity threshold; `--recluster_iddef` (int `[0, 4]`, default `2`)
+  tunes the identity definition and is rejected without `--recluster_id`.
+  When enabled, `recluster_search` runs abundance-based greedy clustering
+  on the post-mumu FASTA and `recluster_merge`
+  (`bin/recluster_otu_table.py`) folds each member OTU onto its centroid
+  (samples + total summed, `spread` recomputed, metadata from the
+  centroid, `cloud` left `NA`, OTUs renumbered `1..N`, read count
+  asserted conserved). The reclustered table **replaces** Part B's
+  emitted table and is fed to Part C, with a matching coarse
+  `<basename>_table.fas` and a `<basename>_reclustering.log`. Default OFF
+  keeps Part B's output byte-identical. Gated symmetrically on the shadow
+  Part B path.
+
 ## [0.3.0] - 2026-07-02
 
 ### Fixed
