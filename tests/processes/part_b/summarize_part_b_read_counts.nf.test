@@ -1,0 +1,76 @@
+nextflow_process {
+
+    name "summarize_part_b_read_counts"
+    script "modules/local/part_b/summarize_part_b_read_counts.nf"
+    process "summarize_part_b_read_counts"
+
+    test("builds the per-sample read/cluster tracking summary") {
+        // COVERAGE: [S107]
+        tag "ci"
+        when {
+            process {
+                """
+                def dir = "\${projectDir}/tests/data/part_b_read_counts"
+                input[0] = file("\${dir}/distribution.distr")
+                input[1] = file("\${dir}/filtered.table")
+                input[2] = file("\${dir}/merged.table")
+                input[3] = file("\${dir}/mumu.table")
+                input[4] = file("\${dir}/mumu.table")   // final == post-mumu (recluster off)
+                input[5] = "S1,S2,S3"
+                input[6] = false
+                input[7] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def out = process.out.table.get(0)
+            assert out.endsWith("proj_3_samples_read_counts.tsv")
+
+            def lines = path(out).readLines()
+            // header (no clusters_recluster column when recluster is off)
+            assert lines[0] == "samples\treads_in\treads_kept\t" +
+                "clusters_kept\tclusters_merged\tclusters_mumu"
+            // S1 keeps all reads; its cluster count drops 3 -> 2 -> 1
+            assert lines[1] == "S1\t17\t17\t3\t2\t1"
+            // S2 loses reads at the [S35] filter (11 -> 3)
+            assert lines[2] == "S2\t11\t3\t1\t1\t1"
+            // S3 is an empty sample ([S09]): an all-zero row
+            assert lines[3] == "S3\t0\t0\t0\t0\t0"
+            // Total row = column sums
+            assert lines[4] == "Total\t28\t20\t4\t3\t2"
+        }
+    }
+
+    test("appends the clusters_recluster column when re-clustering is on") {
+        // COVERAGE: [S107]
+        tag "ci"
+        when {
+            process {
+                """
+                def dir = "\${projectDir}/tests/data/part_b_read_counts"
+                input[0] = file("\${dir}/distribution.distr")
+                input[1] = file("\${dir}/filtered.table")
+                input[2] = file("\${dir}/merged.table")
+                input[3] = file("\${dir}/mumu.table")
+                input[4] = file("\${dir}/recluster.table")
+                input[5] = "S1,S2,S3"
+                input[6] = true
+                input[7] = "proj_3_samples_notmerged"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def out = process.out.table.get(0)
+            assert out.endsWith("proj_3_samples_notmerged_read_counts.tsv")
+
+            def lines = path(out).readLines()
+            assert lines[0].endsWith("clusters_recluster")
+            assert lines[0].split("\t").size() == 7
+            assert lines[1] == "S1\t17\t17\t3\t2\t1\t1"
+            assert lines[4] == "Total\t28\t20\t4\t3\t2\t2"
+        }
+    }
+
+}

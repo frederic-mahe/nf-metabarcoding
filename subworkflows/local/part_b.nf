@@ -29,6 +29,7 @@ include { rebuild_post_mumu_table }                        from '../../modules/l
 include { recluster_search }                               from '../../modules/local/part_b/recluster_search.nf'
 include { recluster_merge }                                from '../../modules/local/part_b/recluster_merge.nf'
 include { extract_recluster_fasta }                        from '../../modules/local/part_b/extract_recluster_fasta.nf'
+include { summarize_part_b_read_counts }                   from '../../modules/local/part_b/summarize_part_b_read_counts.nf'
 include { hash_id_length }                                 from '../../modules/local/functions.nf'
 
 
@@ -142,6 +143,23 @@ workflow part_B {
         final_table = recluster_merge.out.table
     }
 
+    // [S107]: per-sample read/cluster tracking summary — the Part B
+    // counterpart of Part A's [S86]. Reconstructed from the .distr
+    // ([S29]) and the per-sample columns of the intermediate OTU tables
+    // (the pooled step logs carry no per-sample dimension). Always-on;
+    // `final_table` is the post-mumu table when re-clustering is off, so
+    // the clusters_recluster column is gated on --recluster_id.
+    summarize_part_b_read_counts(
+        build_distribution_file.out.distr,
+        build_occurrence_table.out.table,
+        merge_substring_otus.out.table,
+        rebuild_post_mumu_table.out.table,
+        final_table,
+        sample_ids,
+        (params.recluster_id != null),
+        basename,
+    )
+
     emit:
     // [S46]/[S105] final occurrence table — the reclustered table when
     // --recluster_id is set, otherwise the post-mumu table. Consumed by
@@ -250,6 +268,20 @@ workflow part_B_shadow {
         extract_recluster_fasta(recluster_merge.out.table)
         final_table = recluster_merge.out.table
     }
+
+    // [S107]: per-sample summary on the shadow path too (the _notmerged
+    // basename is already threaded through `basename`), symmetric with
+    // the regular part_B above.
+    summarize_part_b_read_counts(
+        build_distribution_file.out.distr,
+        build_occurrence_table.out.table,
+        merge_substring_otus.out.table,
+        rebuild_post_mumu_table.out.table,
+        final_table,
+        sample_ids,
+        (params.recluster_id != null),
+        basename,
+    )
 
     emit:
     // [S46]/[S105] final shadow occurrence table — exposed so callers

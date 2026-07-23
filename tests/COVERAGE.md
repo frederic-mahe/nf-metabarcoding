@@ -90,6 +90,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S55]`| every vsearch fasta-emitting module preserves the single-line-sequence layout        | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_b/global_dereplication.nf.test` | done | — |
 | `[S56]`| shadow Part B workflow — runs Part B as-is on A-padded shadow inputs; publishes `_notmerged` artefacts | `tests/main.nf.test` | done   | —          |
 | `[S106]`| fastq-reading vsearch processes accept the full representable quality range (`--fastq_qmax = 126 - offset`, and the same as `--fastq_qmaxout` on merge) under either encoding, for PacBio HiFi-grade input | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/strip_reads.nf.test`, `tests/processes/part_a/filter_and_convert_to_fasta.nf.test` | done | — |
+| `[S107]`| Part B publishes a per-sample read/cluster tracking summary `<basename>_read_counts.tsv` to `logs/part_b/` (reads_in/reads_kept + clusters per curation stage, empty samples as zero rows, Total row, optional recluster column; shadow path mirrored) | `tests/python/test_build_part_b_read_counts.py`, `tests/processes/part_b/summarize_part_b_read_counts.nf.test` | done | — |
 | `[S57]`| `--help` prints a usage block describing all modes/params and exits without running any process | `tests/main.nf.test` | done | — |
 | `[S58]`| `params.publish_mode` threads through every `publishDir` directive; invalid values abort at startup | `tests/main.nf.test` | done   | —          |
 | `[S59]`| `occurrence_table/` whitelist: Part B table + post-mumu fasta; Part C `_table_assigned`, `_taxonomy_<method>` (sintax standalone only on explicit `--taxonomy_method=sintax`, never shadow), `_taxonomy_stampa_majority` (logs → `logs/part_b/` + `logs/part_c/`) | `tests/main.nf.test`                            | done    | D15, D16   |
@@ -174,6 +175,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `rebuild_post_mumu_table`       | `tests/processes/part_b/rebuild_post_mumu_table.nf.test`      | S44, S46     | done   |
 | `recluster_search`              | `tests/processes/part_b/recluster_search.nf.test`            | S103         | done   |
 | `recluster_merge`               | `tests/processes/part_b/recluster_merge.nf.test`             | S104, S105   | done   |
+| `summarize_part_b_read_counts`  | `tests/processes/part_b/summarize_part_b_read_counts.nf.test` | S107        | done   |
 | `extract_fasta_sequences_from_occurrence_table` | `tests/processes/part_c/extract_fasta_sequences_from_occurrence_table.nf.test` | S48 | done   |
 | `assign_taxonomy_stampa`        | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`       | S49          | done   |
 | `sort_taxonomy`                 | `tests/processes/part_c/sort_taxonomy.nf.test`               | S49          | done   |

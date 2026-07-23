@@ -1127,26 +1127,26 @@ nextflow_pipeline {
             assert actual == expected.sort() :
                 "Part B occurrence_table mismatch.\nexpected: ${expected.sort()}\nactual:   ${actual}"
 
-            // [S45]/D16: logs/part_b/ holds exactly the six step logs
-            // (regular + shadow) and nothing else.
+            // [S45]/[S107]/D16: logs/part_b/ holds the six step logs
+            // (regular + shadow) plus the per-sample read-count summary
+            // (regular + shadow), and nothing else.
             def expectedLogs = []
             [regular, shadow].each { base ->
                 stepLogs.each { suffix -> expectedLogs << "${base}${suffix}" }
+                expectedLogs << "${base}_read_counts.tsv"
             }
             def actualLogs = file(logB).listFiles()*.name.toList().sort()
             assert actualLogs == expectedLogs.sort() :
                 "logs/part_b mismatch.\nexpected: ${expectedLogs.sort()}\nactual:   ${actualLogs}"
 
-            // [S86]/D16: the read-count summary lives under logs/part_a/
-            // (a sibling of the per_sample/ step-log directory), never in
-            // logs/part_b/.
+            // [S86]/D16: Part A's read-count summary lives under logs/part_a/
+            // (a sibling of per_sample/); Part B's [S107] summary lives under
+            // logs/part_b/ (asserted above).
             def partAnames = file(logA).listFiles()*.name.toList().sort()
             assert partAnames.contains("${regular}_read_counts.tsv".toString()) :
                 "missing read-count summary in logs/part_a: ${partAnames}"
             assert partAnames.contains("per_sample") :
                 "logs/part_a should also hold the per_sample step-log dir: ${partAnames}"
-            assert !actualLogs.any { it.endsWith("_read_counts.tsv") } :
-                "read-count summary must not appear in logs/part_b"
 
             // [S68]/[S71]: software_versions.yml is a sibling under
             // <outdir>/pipeline_info/, not inside occurrence_table/.

@@ -1006,6 +1006,54 @@ locked decisions D-a…D-d.
     consumes the reduced table.
 
 
+### Per-sample read/cluster tracking
+
+- `[S107]` Part B publishes a per-sample **read/cluster tracking**
+  summary `<basename>_read_counts.tsv` to `<outdir>/logs/part_b/`
+  ([S71]/D16) — the Part B counterpart of Part A's `[S86]` summary.
+  Part B is a **pooled** pipeline (every sample is merged at
+  `global_dereplication`, [S31]), so its step logs ([S45]) carry only
+  project-wide totals and cannot yield a per-sample view; the per-sample
+  dimension survives instead in the abundance data. The summary is
+  therefore reconstructed by `bin/build_part_b_read_counts.py` from the
+  sequence-to-sample distribution ([S29] `.distr`) and the per-sample
+  columns (14…N of the occurrence-table schema) of the intermediate OTU
+  tables — **not** from the logs. One row per sample (sorted), then a
+  `Total` row; every cell is a non-negative integer. The columns are:
+    - `reads_in` — reads entering Part B, the sum of the sample's
+      `.distr` sizes ([S29]);
+    - `reads_kept` — reads surviving the occurrence-table filter
+      ([S35]), the sum of the sample's column in `build_occurrence_table`'s
+      output. Reads are conserved by every later curation step
+      ([S39]/[S44]/[S104]), so this is also the sample's final read
+      count and the per-sample loss `reads_in - reads_kept` is
+      concentrated at the [S35] filter;
+    - `clusters_kept` / `clusters_merged` / `clusters_mumu` — the number
+      of clusters the sample appears in (cells `> 0`) after the filter
+      ([S35]), after substring-merging ([S39]), and after mumu ([S44]);
+    - `clusters_recluster` — appended **only** when the optional
+      re-clustering pass runs (`--recluster_id`, [S105]): the same count
+      on the reclustered table. Absent otherwise.
+  The `Total` row sums each column: for the read columns this is the
+  project read count, for the cluster columns the sum of per-sample
+  cluster memberships (i.e. total `<cluster, sample>` incidences at that
+  stage), not the number of distinct clusters. Empty samples ([S09])
+  contribute no `.distr` rows, so they surface as an all-zero row — the
+  authoritative sorted sample list is threaded in (as for [S35]'s
+  `--samples`) so the row still appears. The summary is produced on both
+  the regular Part B path and the shadow path ([S56], `_notmerged`
+  basename); it is always-on (no gating flag).
+  - **Pass when:** golden-style tests for
+    `bin/build_part_b_read_counts.py` on a fixture covering (a) a sample
+    losing reads at the [S35] filter (`reads_kept < reads_in`), (b) a
+    sample whose cluster count drops at substring-merge and again at
+    mumu, (c) an empty sample as an all-zero row, (d) a correct `Total`
+    row, and (e) the `clusters_recluster` column present with
+    `--recluster` and absent without it; and a process test publishes
+    `<basename>_read_counts.tsv` under `logs/part_b/` with the documented
+    header.
+
+
 ## Part C — taxonomic assignment
 
 Part C re-implements the legacy

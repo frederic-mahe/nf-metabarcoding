@@ -194,7 +194,10 @@ fixed layout:
 │   │   │                       dereplicating / clustering)
 │   │   └── <basename>_read_counts.tsv  per-sample read-tracking
 │   │                           summary (fastq runs)
-│   ├── part_b/             Part B step logs
+│   ├── part_b/
+│   │   ├── <basename>_<step>.log       Part B step logs
+│   │   └── <basename>_read_counts.tsv  per-sample read/cluster
+│   │                           tracking summary (Part B runs)
 │   └── part_c/             Part C taxonomy log
 └── pipeline_info/      software_versions.yml (tool versions) +
                         execution_{report,timeline}.html,
