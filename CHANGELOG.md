@@ -9,6 +9,15 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-23
+
+### Changed
+
+- Require `swarm` 3.1.8: the exact pins in `environment.yml` and the CI
+  workflow (`.github/workflows/test.yml`) move from `3.1.6` to `3.1.8`
+  ([S69]). The modules-profile examples in `README.md` and
+  `conf/site.config.example` are bumped to match.
+
 ## [0.4.0] - 2026-07-10
 
 ### Added

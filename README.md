@@ -376,7 +376,7 @@ nextflow run main.nf -profile slurm,modules \
     --fastq_folder    /scratch/me/run17 \
     --slurm_queue     normal \
     --module_vsearch  vsearch/2.31.0 \
-    --module_swarm    swarm/3.1.5 \
+    --module_swarm    swarm/3.1.8 \
     --module_cutadapt  cutadapt/4.9 \
     --module_mumu     mumu/1.1.1 \
     --threads         8

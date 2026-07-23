@@ -18,7 +18,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bioconda::swarm=3.1.6
+  - bioconda::swarm=3.1.8
   - bioconda::vsearch=2.31.0
   - bioconda::cutadapt=5.2
   - bioconda::mumu=1.1.4

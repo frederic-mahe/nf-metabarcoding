@@ -24,14 +24,14 @@ from collect_versions import collect, extract_version, to_yaml
 # Real first-line `--version` output captured from the pinned tools.
 REAL_OUTPUTS = {
     "vsearch": "vsearch v2.31.0_linux_x86_64, 125.3GB RAM, 24 cores",
-    "swarm": "Swarm 3.1.6",
+    "swarm": "Swarm 3.1.8",
     "cutadapt": "5.2",
     "mumu": "mumu 1.1.3",
     "python": "Python 3.12.3",
 }
 EXPECTED = {
     "vsearch": "2.31.0",
-    "swarm": "3.1.6",
+    "swarm": "3.1.8",
     "cutadapt": "5.2",
     "mumu": "1.1.3",
     "python": "3.12.3",
