@@ -89,6 +89,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S54]`| every vsearch fastq-emitting module preserves the canonical 4-line layout            | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/strip_reads.nf.test`, `tests/processes/part_a/join_notmerged.nf.test` | done | — |
 | `[S55]`| every vsearch fasta-emitting module preserves the single-line-sequence layout        | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_b/global_dereplication.nf.test` | done | — |
 | `[S56]`| shadow Part B workflow — runs Part B as-is on A-padded shadow inputs; publishes `_notmerged` artefacts | `tests/main.nf.test` | done   | —          |
+| `[S106]`| fastq-reading vsearch processes accept the full representable quality range (`--fastq_qmax = 126 - offset`, and the same as `--fastq_qmaxout` on merge) under either encoding, for PacBio HiFi-grade input | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/strip_reads.nf.test`, `tests/processes/part_a/filter_and_convert_to_fasta.nf.test` | done | — |
 | `[S57]`| `--help` prints a usage block describing all modes/params and exits without running any process | `tests/main.nf.test` | done | — |
 | `[S58]`| `params.publish_mode` threads through every `publishDir` directive; invalid values abort at startup | `tests/main.nf.test` | done   | —          |
 | `[S59]`| `occurrence_table/` whitelist: Part B table + post-mumu fasta; Part C `_table_assigned`, `_taxonomy_<method>` (sintax standalone only on explicit `--taxonomy_method=sintax`, never shadow), `_taxonomy_stampa_majority` (logs → `logs/part_b/` + `logs/part_c/`) | `tests/main.nf.test`                            | done    | D15, D16   |
@@ -144,14 +145,14 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 
 | Process in `main.nf`            | Test file                                              | Covers       | Status |
 |---------------------------------|--------------------------------------------------------|--------------|--------|
-| `merge_fastq_pairs`             | `tests/processes/part_a/merge_fastq_pairs.nf.test`            | S01, S03, S04, S54 | done   |
+| `merge_fastq_pairs`             | `tests/processes/part_a/merge_fastq_pairs.nf.test`            | S01, S03, S04, S54, S106 | done   |
 | `trim_primers`                  | `tests/processes/part_a/trim_primers.nf.test`                 | S01, S19, S88, S89 | done   |
-| `filter_and_convert_to_fasta`   | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`  | S01, S55, S65, S90 | done  |
+| `filter_and_convert_to_fasta`   | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`  | S01, S55, S65, S90, S106 | done  |
 | `extract_expected_error_values` | `tests/processes/part_a/extract_expected_error_values.nf.test`| S01, S65     | done   |
 | `dereplicate_fasta`             | `tests/processes/part_a/dereplicate_fasta.nf.test`            | S01, S19, S55| done   |
 | `list_local_clusters`           | `tests/processes/part_a/list_local_clusters.nf.test`          | S17, S19     | done   |
 | `join_notmerged`                | `tests/processes/part_a/join_notmerged.nf.test`               | S04, S19, S54, S63 | done   |
-| `strip_reads`                   | `tests/processes/part_a/strip_reads.nf.test`                  | S24, S54     | done   |
+| `strip_reads`                   | `tests/processes/part_a/strip_reads.nf.test`                  | S24, S54, S106 | done   |
 | `build_expected_error_file`     | `tests/processes/part_b/build_expected_error_file.nf.test`    | S28, S65     | done   |
 | `build_distribution_file`       | `tests/processes/part_b/build_distribution_file.nf.test`      | S29          | done   |
 | `list_all_cluster_seeds_of_size_greater_than_2` | `tests/processes/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf.test` | S30 | done |

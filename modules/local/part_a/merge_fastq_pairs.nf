@@ -19,11 +19,21 @@ process merge_fastq_pairs {
     '''
     #!/bin/bash
 
+    readonly OFFSET=!{params.fastq_encoding}
+    # [S106] vsearch requires offset + qmax <= 126 (126 = last printable
+    # ASCII); 126 - offset is the highest representable quality, so this
+    # accepts the full range for either encoding (93 at offset 33, 62 at
+    # offset 64). --fastq_qmaxout uses the same ceiling so the merged
+    # region is written at up to that value rather than clamped to 41.
+    readonly QMAX=$((126 - OFFSET))
+
     vsearch \
         --fastq_mergepairs !{fastq_pair[0]} \
         --reverse !{fastq_pair[1]} \
         --threads !{task.cpus} \
-        --fastq_ascii !{params.fastq_encoding} \
+        --fastq_ascii "${OFFSET}" \
+        --fastq_qmax "${QMAX}" \
+        --fastq_qmaxout "${QMAX}" \
         --fastq_allowmergestagger \
         --quiet \
         --log !{sampleId}_merging.log \

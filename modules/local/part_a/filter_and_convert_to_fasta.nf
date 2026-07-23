@@ -17,13 +17,20 @@ process filter_and_convert_to_fasta {
     #!/bin/bash
 
     readonly MIN_LENGTH=!{params.fastq_minlen}
+    readonly OFFSET=!{params.fastq_encoding}
+    # [S106] vsearch requires offset + qmax <= 126 (126 = last printable
+    # ASCII); 126 - offset is the highest representable quality, so this
+    # accepts the full range for either encoding (93 at offset 33, 62 at
+    # offset 64).
+    readonly QMAX=$((126 - OFFSET))
 
     vsearch \
-        --fastq_filter !{trimmed_fastq} \
+        --fastx_filter !{trimmed_fastq} \
         --fastq_minlen "${MIN_LENGTH}" \
         --fastq_maxns 0 \
         !{relabel_flag} \
-        --fastq_ascii !{params.fastq_encoding} \
+        --fastq_ascii "${OFFSET}" \
+        --fastq_qmax "${QMAX}" \
         --quiet \
         --eeout \
         --lengthout \

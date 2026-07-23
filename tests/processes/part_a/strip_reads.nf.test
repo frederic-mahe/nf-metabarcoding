@@ -115,4 +115,74 @@ nextflow_process {
             }
         }
     }
+
+    test("accepts maximum Phred+33 quality (Q93) reads") {
+        // COVERAGE: [S106]
+        // Both --fastx_filter passes must read Q93 ('~') input, which
+        // vsearch rejects under its default --fastq_qmax 41. Success
+        // with non-empty output proves --fastq_qmax 93 reached both
+        // passes; --fastx_filter has no --fastq_qmaxout, so the Q93
+        // scores also pass through to the stripped streams unchanged.
+        tag "ci"
+        when {
+            params {
+                stripright = 0
+            }
+            process {
+                """
+                input[0] = tuple(
+                    "sample_hq",
+                    file("\${projectDir}/tests/data/highqual_1.fastq.gz"),
+                    file("\${projectDir}/tests/data/highqual_2.fastq.gz")
+                )
+                """
+            }
+        }
+        then {
+            assert process.success
+            def fwd = path(process.out.stripped.get(0)[1]).readLines()
+            def rev = path(process.out.stripped.get(0)[2]).readLines()
+            assert fwd.size() == 4 && rev.size() == 4 :
+                "expected one 4-line record per stream, got fwd=${fwd.size()} rev=${rev.size()}"
+            assert fwd[3] ==~ /^~+$/ :
+                "fwd quality must stay Q93 ('~'), got: ${fwd[3]}"
+            assert rev[3] ==~ /^~+$/ :
+                "rev quality must stay Q93 ('~'), got: ${rev[3]}"
+        }
+    }
+
+    test("derives the quality ceiling from the encoding offset (offset 64)") {
+        // COVERAGE: [S106]
+        // Under fastq_encoding=64 the highest representable quality is
+        // 126-64=62; the all-'~' fixture reads as Q62. A hardcoded
+        // --fastq_qmax 93 would abort both passes (64 + 93 > 126), so
+        // success proves each pass derives qmax as 126-offset.
+        tag "ci"
+        when {
+            params {
+                stripright     = 0
+                fastq_encoding = 64
+            }
+            process {
+                """
+                input[0] = tuple(
+                    "sample_hq64",
+                    file("\${projectDir}/tests/data/highqual_1.fastq.gz"),
+                    file("\${projectDir}/tests/data/highqual_2.fastq.gz")
+                )
+                """
+            }
+        }
+        then {
+            assert process.success
+            def fwd = path(process.out.stripped.get(0)[1]).readLines()
+            def rev = path(process.out.stripped.get(0)[2]).readLines()
+            assert fwd.size() == 4 && rev.size() == 4 :
+                "expected one 4-line record per stream, got fwd=${fwd.size()} rev=${rev.size()}"
+            assert fwd[3] ==~ /^~+$/ :
+                "fwd quality must stay at the Q62 ceiling ('~'), got: ${fwd[3]}"
+            assert rev[3] ==~ /^~+$/ :
+                "rev quality must stay at the Q62 ceiling ('~'), got: ${rev[3]}"
+        }
+    }
 }

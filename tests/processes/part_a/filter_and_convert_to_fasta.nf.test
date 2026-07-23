@@ -167,4 +167,72 @@ nextflow_process {
         }
     }
 
+    test("accepts maximum Phred+33 quality (Q93) input") {
+        // COVERAGE: [S106]
+        // Feed a fastq whose every base is Q93 ('~') straight in as the
+        // "trimmed" input. vsearch --fastx_filter aborts on quality
+        // above its default --fastq_qmax 41, so a populated fasta proves
+        // --fastq_qmax 93 reached the command.
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+            }
+            process {
+                """
+                input[0] = tuple(
+                    "sample_hq",
+                    file("\${projectDir}/tests/data/highqual_1.fastq.gz")
+                )
+                input[1] = "--relabel_sha1"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.fasta.get(0)[1]).readLines()
+                .findAll { !it.trim().isEmpty() }
+            assert !lines.isEmpty() :
+                "expected a non-empty fasta from Q93 input (proves --fastq_qmax 93)"
+            assert lines[0].startsWith(">") :
+                "expected a fasta header, got: ${lines[0]}"
+        }
+    }
+
+    test("derives the quality ceiling from the encoding offset (offset 64)") {
+        // COVERAGE: [S106]
+        // Under fastq_encoding=64 the highest representable quality is
+        // 126-64=62; the all-'~' fixture reads as Q62. A hardcoded
+        // --fastq_qmax 93 would abort here (64 + 93 > 126), so a
+        // populated fasta proves --fastx_filter derives qmax as
+        // 126-offset.
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_encoding = 64
+            }
+            process {
+                """
+                input[0] = tuple(
+                    "sample_hq64",
+                    file("\${projectDir}/tests/data/highqual_1.fastq.gz")
+                )
+                input[1] = "--relabel_sha1"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.fasta.get(0)[1]).readLines()
+                .findAll { !it.trim().isEmpty() }
+            assert !lines.isEmpty() :
+                "expected a non-empty fasta from max-quality input at offset 64 (proves qmax = 126 - offset)"
+            assert lines[0].startsWith(">") :
+                "expected a fasta header, got: ${lines[0]}"
+        }
+    }
+
 }

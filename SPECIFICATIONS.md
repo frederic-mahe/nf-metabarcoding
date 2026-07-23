@@ -89,7 +89,7 @@ block one or more `[Sxx]` IDs live in [`DECISIONS.md`](DECISIONS.md).
        (trimming, dereplicating, clustering) appear under
        `<sampleId>_notmerged_*.log`;
     2. trim primers (when `--no_trimming` is false) and convert to
-       fasta with `vsearch --fastq_filter --fastq_maxns 0`; the
+       fasta with `vsearch --fastx_filter --fastq_maxns 0`; the
        A-padding contributes no `N`s, so the shadow path uses the
        same max-N budget as the regular path;
     3. dereplicate and extract ee values per the normal pipeline; the
@@ -1246,6 +1246,34 @@ from placeholder values to real taxonomic assignments.
     has a length divisible by 2 lines, with even-indexed lines
     starting with `>` and odd-indexed lines containing no `>`
     character.
+- `[S106]` every `vsearch` process that **reads** fastq accepts the
+  full quality range representable under the active encoding by
+  default, so high-accuracy reads — e.g. PacBio HiFi, whose per-base
+  quality reaches the maximum — are not rejected. vsearch's default
+  `--fastq_qmax` is 41 and aborts with a fatal error on any higher
+  score; it also requires `offset + qmax <= 126` (126 is the last
+  printable ASCII, `~`). The processes therefore derive
+  `--fastq_qmax` as `126 - --fastq_ascii`, i.e. the highest score the
+  encoding can represent: **93** at offset 33 (`fastq_encoding = 33`)
+  and **62** at offset 64. The derived value is passed to
+  `merge_fastq_pairs` (`--fastq_mergepairs`), `strip_reads`
+  (`--fastx_filter`, both the R1 and R2 pass), and
+  `filter_and_convert_to_fasta` (`--fastx_filter`). `merge_fastq_pairs`
+  passes the same value as `--fastq_qmaxout` so the posterior quality
+  of the merged region is written at up to that ceiling rather than
+  clamped to the default 41. `join_notmerged` (`--fastq_join`) needs
+  no flag — vsearch documents `--fastq_qmax` as ignored for that
+  command — and `chimera_detection` (`--fastx_filter` on fasta
+  representatives) reads no quality scores, so the option would be a
+  no-op there.
+  - **Pass when:** a fixture whose every base carries the maximum
+    representable quality (`~`) is merged by `merge_fastq_pairs`
+    without error and its merged quality is written at that ceiling
+    (not clamped to Q41); the same reads are converted by
+    `filter_and_convert_to_fasta` and stripped by `strip_reads`
+    without vsearch aborting — under **both** `fastq_encoding = 33`
+    (a hardcoded qmax of 93 would abort at offset 64 because
+    `64 + 93 > 126`) and `fastq_encoding = 64`.
 - `[S56]` shadow Part B is a separate workflow (`part_B_shadow`)
   called alongside `part_B` from both the end-to-end
   (`--project_name`) and the standalone (`--fasta_folder`) entry

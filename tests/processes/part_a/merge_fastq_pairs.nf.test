@@ -147,4 +147,81 @@ nextflow_process {
                 "fwd=${fwdLines.size()} rev=${revLines.size()}"
         }
     }
+
+    test("accepts and preserves maximum Phred+33 quality (Q93)") {
+        // COVERAGE: [S106]
+        // PacBio HiFi-style input carries per-base quality up to Q93.
+        // vsearch's default --fastq_qmax is 41 and aborts on anything
+        // higher, so success here proves --fastq_qmax 93 reached
+        // --fastq_mergepairs. Every base of the fixture is Q93 ('~');
+        // the R1/R2 overlap agrees, so its merged posterior quality is
+        // far above Q41 and — with --fastq_qmaxout 93 — is written as
+        // Q93 rather than clamped to the default 41 ('J'). Asserting
+        // that every merged quality character is '~' therefore
+        // witnesses both flags at once.
+        tag "ci"
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "sample_hq",
+                    [
+                        file("\${projectDir}/tests/data/highqual_1.fastq.gz"),
+                        file("\${projectDir}/tests/data/highqual_2.fastq.gz")
+                    ]
+                )
+                """
+            }
+        }
+        then {
+            assert process.success
+
+            def merged = path(process.out.merged.get(0)[1]).readLines()
+            assert merged.size() > 0 && merged.size() % 4 == 0 :
+                "expected a non-empty 4-line-record merged fastq, got ${merged.size()} lines"
+            for (int i = 3; i < merged.size(); i += 4) {
+                assert merged[i] ==~ /^~+$/ :
+                    "merged quality must be all Q93 ('~') with --fastq_qmaxout 93, got: ${merged[i]}"
+            }
+        }
+    }
+
+    test("derives the quality ceiling from the encoding offset (offset 64)") {
+        // COVERAGE: [S106]
+        // Under fastq_encoding=64 the highest representable quality is
+        // 126-64=62, so the all-'~' fixture reads as Q62. A hardcoded
+        // --fastq_qmax / --fastq_qmaxout of 93 would abort here because
+        // 64 + 93 > 126; success proves the ceiling is derived as
+        // 126-offset. With the derived --fastq_qmaxout 62 the agreeing
+        // overlap is written at Q62 — again '~' at offset 64 — so every
+        // merged quality character is '~'.
+        tag "ci"
+        when {
+            params {
+                fastq_encoding = 64
+            }
+            process {
+                """
+                input[0] = tuple(
+                    "sample_hq64",
+                    [
+                        file("\${projectDir}/tests/data/highqual_1.fastq.gz"),
+                        file("\${projectDir}/tests/data/highqual_2.fastq.gz")
+                    ]
+                )
+                """
+            }
+        }
+        then {
+            assert process.success
+
+            def merged = path(process.out.merged.get(0)[1]).readLines()
+            assert merged.size() > 0 && merged.size() % 4 == 0 :
+                "expected a non-empty 4-line-record merged fastq, got ${merged.size()} lines"
+            for (int i = 3; i < merged.size(); i += 4) {
+                assert merged[i] ==~ /^~+$/ :
+                    "merged quality must reach the Q62 ceiling ('~') with the derived --fastq_qmaxout, got: ${merged[i]}"
+            }
+        }
+    }
 }

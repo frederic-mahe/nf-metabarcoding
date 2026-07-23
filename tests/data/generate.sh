@@ -31,6 +31,18 @@ qual_string() {
     printf 'I%.0s' $(seq 1 "${n}")
 }
 
+# Build a quality string of N copies of an arbitrary character. Used for
+# the maximum-quality fixture ([S106]) where the fill character is '~'
+# (Phred 93). Kept separate from qual_string so the SC2059-safe literal
+# 'I' format above is left untouched.
+qual_string_char() {
+    local -r n="${1}"
+    local -r char="${2}"
+    local blanks
+    blanks="$(printf '%*s' "${n}" '')"
+    printf '%s' "${blanks// /${char}}"
+}
+
 # Write one fastq record to a file.
 write_record() {
     local -r out="${1}"
@@ -86,6 +98,34 @@ emit_paired() {
         write_record "${r1}" "read_${i} 1:N:0:1" "${fwd}"
         write_record "${r2}" "read_${i} 2:N:0:1" "${rev}"
     done
+    gzip --force "${r1}" "${r2}"
+}
+
+emit_highqual_pair() {
+    # [S106] a mergeable paired-end fixture whose every base carries the
+    # maximum Phred+33 quality score (Q93, the '~' character). vsearch's
+    # default --fastq_qmax is 41 and aborts on any higher score, so this
+    # fixture only survives the fastq-reading processes when they pass
+    # --fastq_qmax 93 (the range PacBio HiFi reads use). A single
+    # amplicon is enough to exercise the read + merge path; because the
+    # overlap of two agreeing Q93 reads has a posterior quality far above
+    # Q41, the merged output also witnesses --fastq_qmaxout 93.
+    local -r prefix="highqual"
+    local -r r1="${prefix}_1.fastq"
+    local -r r2="${prefix}_2.fastq"
+    local -r amplicon="${AMPLICONS_OK[0]}"
+    local fwd
+    fwd="${amplicon:0:${READ_LEN}}"
+    local rev_src
+    rev_src="${amplicon: -${READ_LEN}}"
+    local rev
+    rev="$(reverse_complement "${rev_src}")"
+    local qf
+    qf="$(qual_string_char "${#fwd}" '~')"
+    local qr
+    qr="$(qual_string_char "${#rev}" '~')"
+    printf '@%s\n%s\n+\n%s\n' "read_1 1:N:0:1" "${fwd}" "${qf}" > "${r1}"
+    printf '@%s\n%s\n+\n%s\n' "read_1 2:N:0:1" "${rev}" "${qr}" > "${r2}"
     gzip --force "${r1}" "${r2}"
 }
 
@@ -432,6 +472,7 @@ emit_recluster_fixture() {
 
 emit_paired "paired_merge_ok"   "${AMPLICONS_OK[@]}"
 emit_paired "paired_merge_fail" "${AMPLICONS_LONG[@]}"
+emit_highqual_pair
 emit_single
 emit_uncompressed
 emit_empty
