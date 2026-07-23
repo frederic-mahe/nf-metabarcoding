@@ -36,7 +36,7 @@ jobs:
             -c bioconda -c conda-forge
             vsearch=2.31.0
             cutadapt=5.2
-            swarm=3.1.8
+            swarm=3.1.7
             mumu=1.1.4
 
       - name: Generate test fixtures
