@@ -219,14 +219,29 @@ the latter case.
 ## Workflow requirements
 
 - `[S06]` configurable via a config file or command-line parameters
-  - Not part of automated CI: the workflow accesses every user-facing
-    value through `params.X`, a hashmap Nextflow populates from
-    `nextflow.config`, `-params-file params.yml`, and `--key value`
-    flags indistinguishably. There is nothing in the workflow code to
-    test — the equivalence is structurally guaranteed upstream. `[S18]`
-    asserts the contract explicitly for required parameters
-    ("supplying the parameter via either `-params-file` or
-    `--key value` lets the run proceed"); that is the meaningful gate.
+  - The workflow accesses every user-facing value through `params.X`, a
+    hashmap Nextflow populates from `nextflow.config`,
+    `-params-file params.yml`, and `--key value` flags. For most types
+    the three sources are indistinguishable, so the equivalence is
+    structurally guaranteed upstream and there is nothing in the
+    workflow code to test; `[S18]` asserts the contract explicitly for
+    required parameters ("supplying the parameter via either
+    `-params-file` or `--key value` lets the run proceed").
+  - Booleans are the exception. A boolean set in a config file or
+    `-params-file` arrives as a real Boolean, but the same flag
+    overridden on the command line (`--flag false`) arrives as the
+    String `'false'` — which is truthy, so a bare `params.flag ? ..` /
+    `if (params.flag)` test would read `--flag false` as ON (and a
+    default-true flag such as `--fastidious` could not be turned off
+    from the command line at all). Every boolean param is therefore
+    read through `coerce_bool()` (`modules/local/functions.nf`), which
+    normalises both forms to a real Boolean so a CLI `--flag false` and
+    a config `flag = false` behave identically. Covered by
+    `tests/functions/coerce_bool.nf.test`, the per-flag cases in
+    `tests/main.nf.test` (`--help`, `--no_trimming`,
+    `--recover_unmerged`, `--majority_assignment`,
+    `--require_slurm_account`), and the `--fastidious` CLI cases in the
+    Part B `global_clustering` / `cleaving` process tests.
 - `[S07]` runs locally or on HPC with slurm
   - Not part of automated CI; covered by manual smoke tests on the
     cluster. Profiles live in `nextflow.config`.

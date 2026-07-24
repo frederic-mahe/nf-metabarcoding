@@ -2837,4 +2837,138 @@ nextflow_pipeline {
                 "surviving centroid amplicon should carry through Part C"
         }
     }
+
+    test("--help set on the CLI (String 'false') does not short-circuit into the banner") {
+        // COVERAGE: [S57], [S06]
+        // [S06]: `--help false` on the command line arrives as the String
+        // 'false' (truthy). Without coercion `if (params.help)` fires and
+        // prints the usage banner instead of running; with coercion help is
+        // read as OFF, so the run proceeds and (with no input) aborts on the
+        // missing --fastq_folder.
+        tag "ci"
+        when {
+            params {
+                help = 'false'
+                // no fastq_folder / primers: the run must reach the
+                // mode-required assertions rather than short-circuit.
+            }
+        }
+        then {
+            assert workflow.failed
+            def out = (workflow.stdout + workflow.errorReport).toString()
+            assert !out.contains("Usage:") :
+                "help='false' must not print the usage banner, got: ${out}"
+            assert out.contains("fastq_folder") :
+                "expected the missing --fastq_folder abort, got: ${out}"
+        }
+    }
+
+    test("--no_trimming set on the CLI (String 'false') keeps primer trimming on") {
+        // COVERAGE: [S20], [S06]
+        // [S06]: `--no_trimming false` on the command line arrives as the
+        // String 'false' (truthy). Without coercion `if (params.no_trimming)`
+        // fires, skips trimming, and aborts because the primers are set (the
+        // [S20] mutual-exclusion guard); with coercion trimming runs and
+        // trim_primers appears in the trace.
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                no_trimming    = 'false'
+                fastq_folder   = "${projectDir}/tests/data"
+                fastq_pattern  = "/paired_merge_ok_{1,2}.fastq.gz"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def out = workflow.stdout.toString()
+            assert out.contains("trim_primers") :
+                "trim_primers must run when --no_trimming is 'false', got: ${out}"
+        }
+    }
+
+    test("--recover_unmerged set on the CLI (String 'false') keeps the shadow path off") {
+        // COVERAGE: [S78], [S06]
+        // [S06]: `--recover_unmerged false` on the command line arrives as
+        // the String 'false' (truthy). Without coercion the shadow pipeline
+        // ([S04]) switches on, running join_notmerged / strip_reads on the
+        // unmergeable fixture; with coercion the shadow path stays off,
+        // exactly as when the flag is unset.
+        tag "ci"
+        when {
+            params {
+                outdir           = "${outputDir}/a_recover_false_str"
+                forward_primer   = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer   = "ACTTTCGTTCTTGATYRA"
+                fastq_folder     = "${projectDir}/tests/data"
+                fastq_pattern    = "/paired_merge_fail_{1,2}.fastq.gz"
+                recover_unmerged = 'false'
+                threads          = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def out = workflow.stdout.toString()
+            ["join_notmerged", "strip_reads"].each { proc ->
+                assert !out.contains(proc) :
+                    "${proc} must not run when --recover_unmerged is 'false', got: ${out}"
+            }
+        }
+    }
+
+    test("--majority_assignment set on the CLI (String 'false') is not read as ON") {
+        // COVERAGE: [S66], [S06]
+        // [S06]: `--majority_assignment false` on the command line arrives
+        // as the String 'false' (truthy). Without coercion the startup guard
+        // `majority_assignment && taxonomy_method == 'sintax'` ([S66]) fires
+        // and aborts demanding --taxonomy_method=stampa; with coercion
+        // majority is read as OFF, so the sintax combination is allowed and
+        // the run instead aborts later on the missing input.
+        tag "ci"
+        when {
+            params {
+                majority_assignment = 'false'
+                taxonomy_method     = 'sintax'
+                threads             = 1
+                // no input mode: the run must get past the [S66]
+                // majority/sintax guard and abort on the missing input.
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert !msg.contains("majority_assignment requires") :
+                "majority_assignment='false' must not trigger the [S66] sintax guard, got: ${msg}"
+            assert msg.contains("fastq_folder") :
+                "expected the missing --fastq_folder abort once majority is OFF, got: ${msg}"
+        }
+    }
+
+    test("--require_slurm_account set on the CLI (String 'false') does not force --slurm_account") {
+        // COVERAGE: [S92], [S06]
+        // [S06]: `--require_slurm_account false` on the command line arrives
+        // as the String 'false' (truthy). Without coercion the [S92] guard
+        // treats the requirement as ON and aborts demanding --slurm_account;
+        // with coercion it is read as OFF, so the run proceeds and instead
+        // aborts later on the missing input.
+        tag "ci"
+        when {
+            params {
+                require_slurm_account = 'false'
+                threads               = 1
+                // no slurm_account, no input mode: with the requirement read
+                // as OFF the run must reach the missing-input abort.
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.errorReport).toString()
+            assert !msg.contains("slurm_account is required") :
+                "require_slurm_account='false' must not force --slurm_account, got: ${msg}"
+            assert msg.contains("fastq_folder") :
+                "expected the missing --fastq_folder abort once the requirement is OFF, got: ${msg}"
+        }
+    }
 }

@@ -16,7 +16,7 @@ include { sort_taxonomy }                                  from '../../modules/l
 include { assign_taxonomy_sintax }                         from '../../modules/local/part_c/assign_taxonomy_sintax.nf'
 include { update_occurrence_table }                        from '../../modules/local/part_c/update_occurrence_table.nf'
 include { compute_majority_assignment }                    from '../../modules/local/part_c/compute_majority_assignment.nf'
-include { normalize_path; log_dir }                          from '../../modules/local/functions.nf'
+include { normalize_path; log_dir; coerce_bool }             from '../../modules/local/functions.nf'
 
 
 workflow part_C_assign {
@@ -144,7 +144,7 @@ workflow part_C {
     // assigned table. Stampa branch only — the startup assert ([S66])
     // guarantees majority is never combined with sintax, so the
     // stampa-formatted --reference_dataset is the right reference.
-    if ( params.majority_assignment ) {
+    if ( coerce_bool(params.majority_assignment) ) {
         def reference = file(normalize_path(params.reference_dataset))
         compute_majority_assignment(
             update_occurrence_table.out.table,

@@ -1,4 +1,4 @@
-include { log_dir } from '../functions.nf'
+include { log_dir; coerce_bool } from '../functions.nf'
 
 
 process cleaving {
@@ -28,13 +28,13 @@ process cleaving {
     val basename
 
     output:
-    path "${basename}_${params.fastidious ? '1f' : '1'}.stats2",               emit: stats
-    path "${basename}_${params.fastidious ? '1f' : '1'}.swarms2",              emit: swarms
-    path "${basename}_${params.fastidious ? '1f' : '1'}_representatives.fas2", emit: representatives
+    path "${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}.stats2",               emit: stats
+    path "${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}.swarms2",              emit: swarms
+    path "${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}_representatives.fas2", emit: representatives
     path "${basename}_cleaving.log",                                          emit: log
 
     shell:
-    def fastidious_flag = params.fastidious ? '--fastidious' : '--no-fastidious'
+    def fastidious_flag = coerce_bool(params.fastidious) ? '--fastidious' : '--no-fastidious'
     """
     cluster_cleaver.py \\
         --global_stats ${global_stats} \\
@@ -49,6 +49,6 @@ process cleaving {
 
     stub:
     """
-    touch ${basename}_${params.fastidious ? '1f' : '1'}.stats2 ${basename}_${params.fastidious ? '1f' : '1'}.swarms2 ${basename}_${params.fastidious ? '1f' : '1'}_representatives.fas2 ${basename}_cleaving.log
+    touch ${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}.stats2 ${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}.swarms2 ${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}_representatives.fas2 ${basename}_cleaving.log
     """
 }

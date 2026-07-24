@@ -158,4 +158,36 @@ nextflow_process {
                 "expected _1_representatives.fas2 with --fastidious=false, got: ${fas2}"
         }
     }
+
+    test("--fastidious set on the CLI (String 'false') also swaps the representatives suffix") {
+        // COVERAGE: [S22], [S06]
+        // [S06]: `--fastidious false` on the command line reaches the
+        // process as the String 'false' (truthy). Without coercion the
+        // cleaved representatives FASTA would keep the _1f suffix, so the
+        // CLI could not turn fastidious off. Mirrors the Boolean-false
+        // test above with the String form Nextflow delivers for a CLI
+        // override.
+        tag "ci"
+        when {
+            params {
+                fastidious = 'false'
+            }
+            process {
+                """
+                input[0] = global_clustering.out.stats   // .stats
+                input[1] = global_clustering.out.struct   // .struct
+                input[2] = global_clustering.out.swarms   // .swarms
+                input[3] = global_dereplication.out.fasta // global .fas
+                input[4] = list_all_cluster_seeds_of_size_greater_than_2.out.stats
+                input[5] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def fas2 = process.out.representatives.get(0)
+            assert fas2.endsWith("proj_3_samples_1_representatives.fas2") :
+                "expected _1_representatives.fas2 with --fastidious='false', got: ${fas2}"
+        }
+    }
 }

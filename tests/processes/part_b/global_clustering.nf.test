@@ -110,4 +110,53 @@ nextflow_process {
             }
         }
     }
+
+    test("--fastidious set on the CLI (String 'false') also drops the flag and suffix") {
+        // COVERAGE: [S32], [S06]
+        // [S06]: a config boolean arrives as a real Boolean, but the same
+        // flag overridden on the command line (`--fastidious false`)
+        // arrives as the String 'false' — which is truthy. Without
+        // coercion the swarm run and filenames would stay '_1f' (fastidious
+        // ON), so `--fastidious false` could not disable fastidious from the
+        // CLI. This mirrors the sibling Boolean-false test above, but with
+        // the String form Nextflow delivers for a CLI override.
+        tag "ci"
+        when {
+            params {
+                threads    = 1
+                fastidious = 'false'
+            }
+            process {
+                """
+                input[0] = global_dereplication.out.fasta
+                input[1] = "proj_3_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+
+            def swarmsPath = process.out.swarms.get(0)
+            def statsPath  = process.out.stats.get(0)
+            def structPath = process.out.struct.get(0)
+            def repPath    = process.out.representatives.get(0)
+
+            // _1f → _1 across every swarm output, exactly as for the
+            // Boolean-false case.
+            assert swarmsPath.endsWith("proj_3_samples_1.swarms") :
+                "expected _1.swarms with --fastidious='false', got: ${swarmsPath}"
+            assert statsPath.endsWith("proj_3_samples_1.stats") :
+                "expected _1.stats with --fastidious='false', got: ${statsPath}"
+            assert structPath.endsWith("proj_3_samples_1.struct") :
+                "expected _1.struct with --fastidious='false', got: ${structPath}"
+            assert repPath.endsWith("proj_3_samples_1_representatives.fas") :
+                "expected _1_representatives.fas with --fastidious='false', got: ${repPath}"
+
+            // No _1f artefact must have leaked through the String form.
+            [swarmsPath, statsPath, structPath, repPath].each { p ->
+                assert !p.contains("_1f.") && !p.contains("_1f_") :
+                    "_1f artefact slipped through with --fastidious='false': ${p}"
+            }
+        }
+    }
 }

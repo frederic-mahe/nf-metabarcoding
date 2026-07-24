@@ -1,0 +1,95 @@
+nextflow_function {
+
+    name "coerce_bool"
+    script "modules/local/functions.nf"
+    function "coerce_bool"
+
+    // [S06]: a boolean param set in a config file / -params-file arrives
+    // as a real Boolean, but the same param overridden on the command
+    // line (`--flag false`) arrives as the String 'false' — which is
+    // truthy, so a bare `params.flag ? ..` / `if (params.flag)` test would
+    // read `--flag false` as ON. coerce_bool() normalises both forms to a
+    // real Boolean so the CLI and the config file behave identically.
+
+    test("a real Boolean true is preserved") {
+        // COVERAGE: [S06]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = true
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == true
+        }
+    }
+
+    test("a real Boolean false is preserved") {
+        // COVERAGE: [S06]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = false
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == false
+        }
+    }
+
+    test("the CLI string 'true' coerces to Boolean true") {
+        // COVERAGE: [S06]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = 'true'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == true
+        }
+    }
+
+    test("the CLI string 'false' coerces to Boolean false (the bug case)") {
+        // COVERAGE: [S06]
+        // Without coercion the non-empty String 'false' is truthy, so
+        // `--flag false` on the command line would wrongly read as ON.
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = 'false'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == false
+        }
+    }
+
+    test("null coerces to Boolean false (an unset flag is off)") {
+        // COVERAGE: [S06]
+        tag "ci"
+        when {
+            function {
+                """
+                input[0] = null
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == false
+        }
+    }
+}

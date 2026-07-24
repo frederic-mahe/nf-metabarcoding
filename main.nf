@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-include { normalize_path; validate_params; samplesheet_profile; check_primer_format; parse_accessions; resource_size_warnings; slurm_account_requirement_error } from './modules/local/functions.nf'
+include { normalize_path; validate_params; samplesheet_profile; check_primer_format; parse_accessions; resource_size_warnings; slurm_account_requirement_error; coerce_bool } from './modules/local/functions.nf'
 include { fetch_accessions } from './subworkflows/local/fetch.nf'
 include { part_A } from './subworkflows/local/part_a.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
@@ -48,7 +48,7 @@ workflow part_c {
     // self-suppresses (no work, no output). The --recover_unmerged
     // ([S78]) and --reference_dataset_sintax gates are param checks
     // (config, not disk state), so they stay an `if`.
-    if ( params.recover_unmerged && params.reference_dataset_sintax ) {
+    if ( coerce_bool(params.recover_unmerged) && params.reference_dataset_sintax ) {
         def shadow_table_ch = Channel
             .fromPath(
                 "${table_path.parent}/${derived_basename}_notmerged_table.tsv",
@@ -186,7 +186,7 @@ workflow part_b {
     // --recover_unmerged is unset (the default), part_B_shadow is never
     // invoked, so no `_notmerged` Part B table is produced even if
     // `_notmerged.fas` files were discovered in --fasta_folder.
-    if ( params.recover_unmerged ) {
+    if ( coerce_bool(params.recover_unmerged) ) {
         part_B_shadow(s_fasta_list, s_qual_list, s_stats_list)
         if ( params.reference_dataset_sintax ) {
             // [S50]/[S64]: shadow taxonomy on part_B_shadow's occurrence
@@ -220,7 +220,7 @@ workflow {
     // print() (not log.info) so the usage block lands on stdout —
     // the conventional channel for help output and what nf-test
     // captures in workflow.stdout.
-    if ( params.help ) {
+    if ( coerce_bool(params.help) ) {
         // [S57]: a small hand-written banner carries the two things the
         // parameter schema cannot express — the three entry points and
         // the README/SPECIFICATIONS pointer — wrapped around the
@@ -270,7 +270,7 @@ workflow {
     // letting every sbatch be rejected mid-run. Silent when the flag is
     // off (the default) or an account is given.
     def slurm_account_error = slurm_account_requirement_error(
-        params.require_slurm_account,
+        coerce_bool(params.require_slurm_account),
         params.slurm_account
     )
     assert slurm_account_error == null : slurm_account_error
@@ -350,7 +350,7 @@ workflow {
     // [S18]/[S20]: primers and --no_trimming are mutually exclusive — when
     // params.no_trimming is true, forward_primer and reverse_primer must be
     // empty and the trim_primers step is skipped; otherwise both are required.
-    if ( params.no_trimming ) {
+    if ( coerce_bool(params.no_trimming) ) {
         assert !params.forward_primer : "--forward_primer must be empty when --no_trimming is set"
         assert !params.reverse_primer : "--reverse_primer must be empty when --no_trimming is set"
     } else {
@@ -415,7 +415,7 @@ workflow {
         // `_notmerged` samples and the shadow sub-workflows are never
         // invoked. Shadow Part C ([S50]) additionally requires
         // --reference_dataset_sintax ([S64]).
-        if ( params.recover_unmerged ) {
+        if ( coerce_bool(params.recover_unmerged) ) {
             def shadow_fasta = part_A.out.fasta.filter { id, _f -> id.endsWith("_notmerged") }
             def shadow_qual  = part_A.out.qual .filter { id, _f -> id.endsWith("_notmerged") }
             def shadow_stats = part_A.out.stats.filter { id, _f -> id.endsWith("_notmerged") }

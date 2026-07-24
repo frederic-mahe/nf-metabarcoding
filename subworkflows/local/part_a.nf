@@ -9,7 +9,7 @@ include { dereplicate_fasta }               from '../../modules/local/part_a/der
 include { list_local_clusters }             from '../../modules/local/part_a/list_local_clusters.nf'
 include { summarize_read_counts }           from '../../modules/local/part_a/summarize_read_counts.nf'
 include { validate_samplesheet }            from '../../modules/local/validate_samplesheet.nf'
-include { normalize_path; hash_relabel_flag; hash_id_length } from '../../modules/local/functions.nf'
+include { normalize_path; hash_relabel_flag; hash_id_length; coerce_bool } from '../../modules/local/functions.nf'
 
 
 workflow part_A {
@@ -80,7 +80,7 @@ workflow part_A {
     // consumed: no shadow processes run and no `_notmerged` artefacts
     // are produced.
     def to_process
-    if ( params.recover_unmerged ) {
+    if ( coerce_bool(params.recover_unmerged) ) {
         strip_reads(merge_fastq_pairs.out.notmerged)
         join_notmerged(
             strip_reads.out.stripped.map { id, fwd, rev ->
@@ -96,7 +96,7 @@ workflow part_A {
     def trimmed_ch
     def trim_fwd_log_ch
     def trim_rev_log_ch
-    if ( params.no_trimming ) {
+    if ( coerce_bool(params.no_trimming) ) {
         trimmed_ch = to_process
         // no trimming logs in this mode — the read-count summary ([S86])
         // records the F / R columns as 0.

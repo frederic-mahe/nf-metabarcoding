@@ -1,4 +1,4 @@
-include { log_dir } from '../functions.nf'
+include { log_dir; coerce_bool } from '../functions.nf'
 
 
 process global_clustering {
@@ -19,15 +19,15 @@ process global_clustering {
     val basename
 
     output:
-    path "${basename}_${params.fastidious ? '1f' : '1'}.swarms",              emit: swarms
-    path "${basename}_${params.fastidious ? '1f' : '1'}.stats",               emit: stats
-    path "${basename}_${params.fastidious ? '1f' : '1'}.struct",              emit: struct
-    path "${basename}_${params.fastidious ? '1f' : '1'}_representatives.fas", emit: representatives
+    path "${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}.swarms",              emit: swarms
+    path "${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}.stats",               emit: stats
+    path "${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}.struct",              emit: struct
+    path "${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}_representatives.fas", emit: representatives
     path "${basename}_clustering.log",                                        emit: log
 
     shell:
-    def sfx = params.fastidious ? '1f' : '1'
-    def fastidious_flag = params.fastidious ? '--fastidious' : ''
+    def sfx = coerce_bool(params.fastidious) ? '1f' : '1'
+    def fastidious_flag = coerce_bool(params.fastidious) ? '--fastidious' : ''
     """
     swarm \\
         --threads ${task.cpus} \\
@@ -43,6 +43,6 @@ process global_clustering {
 
     stub:
     """
-    touch ${basename}_${params.fastidious ? '1f' : '1'}.swarms ${basename}_${params.fastidious ? '1f' : '1'}.stats ${basename}_${params.fastidious ? '1f' : '1'}.struct ${basename}_${params.fastidious ? '1f' : '1'}_representatives.fas ${basename}_clustering.log
+    touch ${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}.swarms ${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}.stats ${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}.struct ${basename}_${coerce_bool(params.fastidious) ? '1f' : '1'}_representatives.fas ${basename}_clustering.log
     """
 }

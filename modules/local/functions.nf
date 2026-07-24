@@ -93,6 +93,20 @@ def lookup_user_home(String user) {
 }
 
 
+def coerce_bool(value) {
+    // [S06]: normalise a boolean parameter to a real Boolean. A value set in
+    // nextflow.config / -params-file arrives as a Groovy Boolean, but the
+    // same flag overridden on the command line (`--flag false`) arrives as
+    // the String 'false' — which is truthy, so a bare `params.flag ? ..` or
+    // `if (params.flag)` test would read `--flag false` as ON. Comparing the
+    // string form makes the CLI and the config file behave identically; null
+    // (an unset flag) is false. This is the boolean counterpart of the
+    // "wrap-at-use-site" pattern already used for path params ([S60]), since
+    // Nextflow's params map is read-only from inside a workflow body.
+    return "${value}" == 'true'
+}
+
+
 def effective_outdir(outdir, results_folder) {
     // [S71]: resolve the output root. Precedence: --outdir, then the
     // deprecated --results_folder alias, then the default 'results'.
@@ -402,7 +416,7 @@ def validate_params() {
     // stampa method populates that column ([S50] leaves it at the NA
     // placeholder), so --majority_assignment is incompatible with
     // --taxonomy_method=sintax. Fail fast before any process is wired.
-    assert !(params.majority_assignment && params.taxonomy_method == 'sintax') :
+    assert !(coerce_bool(params.majority_assignment) && params.taxonomy_method == 'sintax') :
         "--majority_assignment requires --taxonomy_method=stampa " +
         "(sintax leaves the references column unpopulated)"
 
@@ -411,7 +425,7 @@ def validate_params() {
     // (--representatives_fasta) produces no occurrence table, so there is
     // nothing to compute a majority on. Fail fast rather than silently
     // ignore the flag.
-    assert !(params.majority_assignment && params.representatives_fasta) :
+    assert !(coerce_bool(params.majority_assignment) && params.representatives_fasta) :
         "--majority_assignment cannot be combined with --representatives_fasta " +
         "(fasta-input Part C produces no occurrence table to compute a " +
         "per-OTU majority on)"
