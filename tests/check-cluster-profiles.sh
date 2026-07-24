@@ -121,11 +121,18 @@ assert_contains "abims: requires --slurm_account" \
 assert_contains "genotoul: apptainer module beforeScript" \
     "module load containers/Apptainer/1.4.1" "genotoul,apptainer"
 
-# meso derives partition + account per task from its own closures.
+# meso derives partition + account per task from its own closures. Every
+# CIRAD-dedicated account carries a wall-time QoS suffix
+# (-default / -normal / -long); the short and bigmem tiers are asserted
+# explicitly so a stale account string fails CI, not a cluster run.
 assert_contains "meso: per-task partition selector" \
     "task.memory > 1400.GB ? 'bigmem-cirad-dedicated' : 'cpu-dedicated'" "meso"
-assert_contains "meso: per-task account routing" \
+assert_contains "meso: short-tier account (<= 1 h)" \
+    "dedicated-cpu@cirad-default" "meso"
+assert_contains "meso: normal-tier account (<= 48 h)" \
     "dedicated-cpu@cirad-normal" "meso"
+assert_contains "meso: bigmem-tier account" \
+    "dedicated-bigmem@cirad-long" "meso"
 
 # A plain run (no profile) must not silently enable the slurm executor.
 flat="$(nextflow config main.nf -flat 2>&1)"
