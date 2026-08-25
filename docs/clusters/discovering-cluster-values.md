@@ -70,7 +70,7 @@ sshare -U          # fairshare accounts you belong to
   the site *derives* the account from the job (as `meso` does: bigmem vs
   cpu, and a wall-time tier).
 - The **per-account `MaxWall`** can encode the policy: on `meso`,
-  `dedicated-cpu@cirad-default` = 1 h, `-normal` = 2 d, `-long` = 120 d —
+  `dedicated-cpu@cirad-default` = 1 h, `-normal` = 2 d, `-long` = 90 d —
   which is exactly the account-routing closure in
   `conf/clusters/meso.config`.
 
