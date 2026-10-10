@@ -19,17 +19,24 @@ Characterization tests in
 byte-exact output — refactors must keep that test green.
 """
 
-from __future__ import annotations
+import sys
+
+if sys.version_info < (3, 10):
+    sys.exit(
+        "build_filtered_contingency_table.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
 
 __author__ = "Frédéric Mahé <frederic.mahe@cirad.fr>"
 __date__ = "2020/01/14"
 __version__ = "$Revision: 5.0"
 
-import argparse
-import operator
-import re
-import sys
-from typing import Iterator, Optional
+import argparse  # noqa: E402
+import operator  # noqa: E402
+import re  # noqa: E402
+from typing import Iterator, Optional  # noqa: E402
 
 
 # Filter defaults (the legacy values). Each is overridable from the

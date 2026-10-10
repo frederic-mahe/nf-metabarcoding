@@ -20,11 +20,18 @@ Reads the lines from stdin (or from files passed as arguments) and
 writes the sorted YAML mapping to stdout.
 """
 
-from __future__ import annotations
-
-import re
 import sys
-from typing import Iterable
+
+if sys.version_info < (3, 10):
+    sys.exit(
+        "collect_versions.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
+
+import re  # noqa: E402
+from typing import Iterable  # noqa: E402
 
 _VERSION_RE = re.compile(r"\d+\.\d+(?:\.\d+)*")
 

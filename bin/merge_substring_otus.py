@@ -27,16 +27,23 @@ Characterization tests at
 output. Refactors must keep them green.
 """
 
-from __future__ import annotations
+import sys
+
+if sys.version_info < (3, 10):
+    sys.exit(
+        "merge_substring_otus.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
 
 __author__ = "Frédéric Mahé <frederic.mahe@cirad.fr>"
 __date__ = "2019/09/20"
 __version__ = "$Revision: 2.0"
 
-import argparse
-import csv
-import sys
-from typing import Optional
+import argparse  # noqa: E402
+import csv  # noqa: E402
+from typing import Optional  # noqa: E402
 
 
 # The OTU table's per-cluster metadata columns. Anything else in the

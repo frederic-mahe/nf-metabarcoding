@@ -4,19 +4,26 @@
    break swarm clusters, using sample distribution data
 """
 
-from __future__ import annotations
+import sys
+
+if sys.version_info < (3, 10):
+    sys.exit(
+        "cluster_cleaver.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
 
 __author__ = "Frédéric Mahé <frederic.mahe@cirad.fr>"
 __date__ = "2021/03/19"
 __version__ = "$Revision: 1.2"
 
-import argparse
-import logging
-import operator
-import os
-import re
-import sys
-from typing import Optional
+import argparse  # noqa: E402
+import logging  # noqa: E402
+import operator  # noqa: E402
+import os  # noqa: E402
+import re  # noqa: E402
+from typing import Optional  # noqa: E402
 
 
 logger = logging.getLogger(__name__)

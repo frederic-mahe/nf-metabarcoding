@@ -18,16 +18,23 @@ Characterization tests at
 output. Refactors must keep them green.
 """
 
-from __future__ import annotations
+import sys
+
+if sys.version_info < (3, 10):
+    sys.exit(
+        "rebuild_table_after_mumu.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
 
 __author__ = "Frédéric Mahé <frederic.mahe@cirad.fr>"
 __date__ = "2020/12/22"
 __version__ = "$Revision: 2.0"
 
-import argparse
-import sys
-from dataclasses import dataclass
-from typing import Optional
+import argparse  # noqa: E402
+from dataclasses import dataclass  # noqa: E402
+from typing import Optional  # noqa: E402
 
 
 # Constants the legacy bash + python pair always uses.

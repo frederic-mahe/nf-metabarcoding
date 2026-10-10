@@ -25,16 +25,23 @@ the profile implicitly (``fastq_1`` vs ``fasta``), so the workflow
 infers the profile the same way this module does.
 """
 
-from __future__ import annotations
-
-import csv
-import os
 import sys
-from dataclasses import astuple, dataclass
-from pathlib import Path
-from typing import Union
 
-from sample_id import InvalidSampleIdError, validate_sample_id
+if sys.version_info < (3, 10):
+    sys.exit(
+        "parse_samplesheet.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
+
+import csv  # noqa: E402
+import os  # noqa: E402
+from dataclasses import astuple, dataclass  # noqa: E402
+from pathlib import Path  # noqa: E402
+from typing import Union  # noqa: E402
+
+from sample_id import InvalidSampleIdError, validate_sample_id  # noqa: E402
 
 RESERVED_SUFFIX = "notmerged"
 

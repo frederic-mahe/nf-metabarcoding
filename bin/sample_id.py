@@ -21,9 +21,17 @@ be read as an option by downstream tools and a leading ``.`` would name
 a hidden file or open ``..`` traversal.
 """
 
-from __future__ import annotations
+import sys
 
-import re
+if sys.version_info < (3, 10):
+    sys.exit(
+        "sample_id.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
+
+import re  # noqa: E402
 
 # First character: letter, digit, or underscore (no leading `-` or `.`).
 # Remaining characters: the safe set plus `.` and `-`.

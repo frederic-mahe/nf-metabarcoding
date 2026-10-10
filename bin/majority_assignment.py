@@ -40,21 +40,28 @@ Majority assignment only makes sense for the stampa method: sintax
 workflow forbids the flag combination at startup ([S66]).
 """
 
-from __future__ import annotations
+import sys
+
+if sys.version_info < (3, 10):
+    sys.exit(
+        "majority_assignment.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
 
 __authors__ = "Frédéric Mahé"
 __license__ = "GPL3"
 __email__ = "frederic.mahe@cirad.fr"
 __version__ = "0.3"
 
-import bz2
-import csv
-import gzip
-import itertools
-import sys
-from argparse import ArgumentParser, Namespace
-from collections import Counter
-from typing import IO, Iterator, Optional, TextIO
+import bz2  # noqa: E402
+import csv  # noqa: E402
+import gzip  # noqa: E402
+import itertools  # noqa: E402
+from argparse import ArgumentParser, Namespace  # noqa: E402
+from collections import Counter  # noqa: E402
+from typing import IO, Iterator, Optional, TextIO  # noqa: E402
 
 
 # gzip and bzip2 file signatures (first two bytes).

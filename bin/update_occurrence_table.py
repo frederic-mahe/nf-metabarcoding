@@ -22,15 +22,22 @@ through unchanged so an empty / partial assignments file does not
 silently drop data.
 """
 
-from __future__ import annotations
+import sys
+
+if sys.version_info < (3, 10):
+    sys.exit(
+        "update_occurrence_table.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
 
 __author__ = "Frédéric Mahé <frederic.mahe@cirad.fr>"
 __date__ = "2026/05/19"
 __version__ = "$Revision: 0.1"
 
-import argparse
-import sys
-from typing import Optional
+import argparse  # noqa: E402
+from typing import Optional  # noqa: E402
 
 
 # Column indices in the occurrence table ([S46]).

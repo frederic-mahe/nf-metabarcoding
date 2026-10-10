@@ -18,16 +18,23 @@ Used as:
 See ``[S10]``, ``[S11]``, ``[S12]``, ``[S21]`` in SPECIFICATIONS.md.
 """
 
-from __future__ import annotations
-
-import argparse
-import re
 import sys
-from dataclasses import dataclass
-from pathlib import Path
-from typing import NamedTuple, Optional
 
-from sample_id import InvalidSampleIdError, validate_sample_id
+if sys.version_info < (3, 10):
+    sys.exit(
+        "discover_fastq.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
+
+import argparse  # noqa: E402
+import re  # noqa: E402
+from dataclasses import dataclass  # noqa: E402
+from pathlib import Path  # noqa: E402
+from typing import NamedTuple, Optional  # noqa: E402
+
+from sample_id import InvalidSampleIdError, validate_sample_id  # noqa: E402
 
 
 # ---------- pattern table --------------------------------------------------

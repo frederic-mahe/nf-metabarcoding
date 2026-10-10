@@ -27,16 +27,23 @@ every top hit are kept verbatim; levels that disagree are rewritten
 to ``*``.
 """
 
-from __future__ import annotations
+import sys
+
+if sys.version_info < (3, 10):
+    sys.exit(
+        "stampa_merge.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
 
 __author__ = "Frédéric Mahé <frederic.mahe@cirad.fr>"
 __date__ = "2026/05/21"
 __version__ = "$Revision: 3.1"
 
-import argparse
-import re
-import sys
-from typing import Iterator, Optional
+import argparse  # noqa: E402
+import re  # noqa: E402
+from typing import Iterator, Optional  # noqa: E402
 
 
 SIZE_RE = re.compile(r"^(?P<amplicon>.+);size=(?P<abundance>\d+);?$")

@@ -19,14 +19,21 @@ Rules (see ``[S27]`` in SPECIFICATIONS.md):
   ``[S14]``).
 """
 
-from __future__ import annotations
-
-import argparse
 import sys
-from pathlib import Path
-from typing import NamedTuple, Optional
 
-from sample_id import InvalidSampleIdError, validate_sample_id
+if sys.version_info < (3, 10):
+    sys.exit(
+        "discover_fasta.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
+
+import argparse  # noqa: E402
+from pathlib import Path  # noqa: E402
+from typing import NamedTuple, Optional  # noqa: E402
+
+from sample_id import InvalidSampleIdError, validate_sample_id  # noqa: E402
 
 
 # Suffix used by the Part A shadow pipeline ([S04]). Stripping the

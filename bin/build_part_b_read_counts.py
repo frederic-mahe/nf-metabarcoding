@@ -36,16 +36,23 @@ Characterization tests at
 ``tests/python/test_build_part_b_read_counts.py`` pin the output.
 """
 
-from __future__ import annotations
+import sys
+
+if sys.version_info < (3, 10):
+    sys.exit(
+        "build_part_b_read_counts.py: Python >= 3.10 required, found "
+        + sys.version.split()[0]
+        + ". Enable a container or conda profile"
+        + " (e.g. -profile apptainer)."
+    )
 
 __author__ = "Frédéric Mahé <frederic.mahe@cirad.fr>"
 __date__ = "2026/07/23"
 __version__ = "$Revision: 1.0"
 
-import argparse
-import csv
-import sys
-from typing import Optional, TextIO
+import argparse  # noqa: E402
+import csv  # noqa: E402
+from typing import Optional, TextIO  # noqa: E402
 
 # The OTU table's per-cluster metadata columns ([S107] refers to the
 # occurrence-table schema). Anything else in the header is a per-sample
