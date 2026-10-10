@@ -107,6 +107,43 @@ nextflow_process {
         }
     }
 
+    test("writes the padding quality as Q40 under offset 64 ('h', not 'I')") {
+        // COVERAGE: [S63]
+        // At fastq_encoding=64, Q40 is 'h' (64 + 40); a fixed 'I'
+        // would read as Q9. The all-'~' high-quality pair is valid at
+        // offset 64 (Q62) and is fed in directly as the not-merged
+        // pair: --fastq_join does not require unmergeable reads. The
+        // reads themselves carry no 'h' or 'I', so the only such run
+        // is the padding.
+        tag "ci"
+        when {
+            params {
+                fastq_encoding = 64
+            }
+            process {
+                """
+                input[0] = tuple(
+                    "sample_hq64_notmerged",
+                    file("\${projectDir}/tests/data/highqual_1.fastq.gz"),
+                    file("\${projectDir}/tests/data/highqual_2.fastq.gz")
+                )
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.joined.get(0)[1]).readLines()
+            assert lines.size() >= 4 && lines.size() % 4 == 0 :
+                "expected a non-empty 4-line-record fastq, got ${lines.size()} lines"
+            for (int i = 3; i < lines.size(); i += 4) {
+                assert lines[i].contains("h" * 8) :
+                    "expected an 8-h (Q40 at offset 64) padding-quality run in: ${lines[i]}"
+                assert !lines[i].contains("I") :
+                    "'I' is Q9 at offset 64 and must not appear in: ${lines[i]}"
+            }
+        }
+    }
+
     test("emits canonical 4-line fastq from vsearch --fastq_join") {
         // COVERAGE: [S54]
         // Regression guard for the vsearch --fastq_join output shape

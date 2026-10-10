@@ -21,6 +21,9 @@ process join_notmerged {
     tuple val(sampleId), path("joined_fastq"), emit: joined
 
     shell:
+    // [S63] the padding quality is Q40 under the active encoding: the
+    // character fastq_encoding + 40, 'I' at offset 33 and 'h' at
+    // offset 64 (a fixed 'I' would read as Q9 at offset 64).
     '''
     #!/bin/bash
 
@@ -29,7 +32,7 @@ process join_notmerged {
         --reverse !{notmerged_rev} \
         --fastq_ascii !{params.fastq_encoding} \
         --join_padgap  !{'A' * (params.join_padding_length as int)} \
-        --join_padgapq !{'I' * (params.join_padding_length as int)} \
+        --join_padgapq !{Character.toString((params.fastq_encoding as int) + 40) * (params.join_padding_length as int)} \
         --quiet \
         --fastqout joined_fastq
     '''

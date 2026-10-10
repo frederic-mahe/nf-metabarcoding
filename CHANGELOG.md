@@ -34,6 +34,14 @@ version here must match `manifest.version` in
   assignment retained at `--sintax_cutoff`, differ from those produced
   with vsearch 2.31.0 for the same seed.
 
+### Fixed
+
+- `join_notmerged` wrote the join-padding quality as a fixed `I`, which
+  is Q40 at `--fastq_encoding 33` but Q9 at `64`: the eight padding
+  bases then added about 1.0 expected error per read, enough to drop
+  every shadow cluster at the `max_ee` filter. The padding quality is
+  now Q40 under either encoding (`h` at offset 64) ([S63]).
+
 ## [0.5.0] - 2026-07-23
 
 ### Changed

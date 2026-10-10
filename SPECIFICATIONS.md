@@ -1546,7 +1546,11 @@ from placeholder values to real taxonomic assignments.
   `8`) sets the length of the run of `A`s that
   `vsearch --fastq_join` inserts between R1 and R2 in the shadow
   Part A path ([S04]). The same length is used for the matching
-  `--join_padgapq` quality string (Phred 40, `I`). The parameter
+  `--join_padgapq` quality string, Phred 40 under the active
+  encoding: the character `fastq_encoding + 40`, i.e. `I` at offset
+  33 and `h` at offset 64. (A fixed `I` would read as Q9 at offset
+  64: eight such bases add about 1.0 expected error, enough to push
+  every shadow cluster over the `max_ee` filter.) The parameter
   is the workflow's single knob over the join padding: increase
   it to make the artificial join site more visible to a human
   reader at the cost of slightly larger fastas; decrease it to
@@ -1560,7 +1564,8 @@ from placeholder values to real taxonomic assignments.
     default); running without the flag uses 8; running with
     `--join_padding_length 0` aborts the workflow before
     `merge_fastq_pairs` is scheduled, with stderr naming the
-    parameter.
+    parameter. Under `fastq_encoding = 64`, `join_notmerged` writes
+    the padding quality as a run of `h` (Q40), not `I`.
 - `[S64]` `params.reference_dataset_sintax` (optional, default
   `null`) is a path to a **sintax-formatted** reference fasta
   (header `>id;tax=d:Dom,p:Phy,...;` — see vsearch's
