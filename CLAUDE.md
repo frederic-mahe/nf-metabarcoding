@@ -100,8 +100,10 @@ branch-creation rights:
 ### Python conventions
 
 - type-hint every function in `bin/*.py` (parameters and return).
-  `from __future__ import annotations` is preferred so forward
-  references work uniformly. Modules that already exist set the bar:
+  Do **not** use `from __future__ import annotations` — it is a
+  compile-time error on Python < 3.7 and would mask the `[S109]`
+  version check; annotations are evaluated at runtime (Python ≥ 3.10),
+  so avoid forward references. Modules that already exist set the bar:
   match their style for `list[Path]`, `Optional[...]`, etc.
 
 
