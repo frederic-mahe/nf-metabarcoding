@@ -16,6 +16,11 @@
 
 set -euo pipefail
 
+# sort and comm must collate alike: under a UTF-8 locale comm can reject
+# sort's order as unsorted and exit 1, which aborts this script (set -e)
+# without any message.
+export LC_ALL=C
+
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 readonly REPO_ROOT
 readonly SPEC_FILE="${REPO_ROOT}/SPECIFICATIONS.md"
