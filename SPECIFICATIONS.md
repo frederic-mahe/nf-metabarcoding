@@ -2313,3 +2313,24 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
     publishes `<outdir>/logs/part_a/<basename>_read_counts.tsv`
     with the expected sample rows and column sums, while a fasta-input
     Part B standalone run publishes no such file.
+- `[S109]` every `bin/*.py` helper refuses to run on a Python older
+  than 3.10 and says so in plain words, instead of crashing with a
+  `SyntaxError` or `TypeError` deep in the file. This happens when no
+  container / conda profile is enabled ([S08]) and the task picks up the
+  host's `python3` — e.g. `-profile genotoul,demo`, where the compute
+  nodes ship Python 3.6. Each helper therefore:
+    - does **not** use `from __future__ import annotations` (a
+      compile-time `SyntaxError` on Python < 3.7, raised before any code
+      runs), and its source parses under the Python 3.6 grammar, so the
+      check below is always reached;
+    - checks `sys.version_info` before any other import, and on a
+      too-old interpreter exits with status 1 and a one-line message on
+      stderr naming the script, the required (`>= 3.10`) and the found
+      version, and suggesting an engine profile.
+  3.10 is the oldest Python that evaluates the helpers' annotations
+  (`list[str]`, `X | None`); the container ships 3.12 ([S69]).
+  - **Pass when:** for every `bin/*.py`, `ast.parse(...,
+    feature_version=(3, 6))` succeeds and the file has no `from
+    __future__ import annotations`; running it with `sys.version_info`
+    patched to 3.6 exits 1 with `Python >= 3.10 required` and the
+    script name on stderr.
