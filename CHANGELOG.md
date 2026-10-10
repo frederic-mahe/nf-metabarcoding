@@ -15,6 +15,14 @@ version here must match `manifest.version` in
   CI workflow (`.github/workflows/test.yml`) move from `2.31.0` to
   `2.32.0` ([S69]). The modules-profile examples in `README.md` and
   `conf/site.config.example` are bumped to match.
+- Require `swarm` 3.2.0: the exact pins in `environment.yml` and the CI
+  workflow move from `3.1.7` to `3.2.0` ([S69]), with the
+  modules-profile examples in `README.md` and `conf/site.config.example`.
+  swarm 3.2.0 fixes a data race in the fastidious phase that could
+  silently drop light amplicons (making `--fastidious` results depend on
+  thread timing), reports failed writes with a non-zero exit status,
+  respects container memory limits, and is two to three times faster
+  with `d` > 1.
 - `merge_fastq_pairs`, `strip_reads` and `filter_and_convert_to_fasta`
   no longer pass `--fastq_qmax`: vsearch 2.32.0 defaults it to the
   highest quality the encoding can represent, which is the value the
