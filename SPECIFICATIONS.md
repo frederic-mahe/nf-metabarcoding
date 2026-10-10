@@ -1145,12 +1145,14 @@ from placeholder values to real taxonomic assignments.
     2. each chunk feeds `vsearch --usearch_global` against the
        reference dataset with `--top_hits_only --output_no_hits
        --maxaccepts 0 --maxrejects ${params.stampa_maxrejects}
+       --minwordmatches 0
        --id ${params.stampa_id} --notrunclabels --rowlen 0`
        and `--userfields query+id<iddef>+target`. The two
        tunables expose the vsearch flags directly:
        `params.stampa_maxrejects` (default `0` = vsearch's
-       "no limit" sentinel: exhaustive search, every reference
-       seq is considered as a potential top hit) and
+       "no limit" sentinel; with `--maxaccepts 0` and
+       `--minwordmatches 0` ([S108]) the search is exhaustive,
+       every reference seq is considered as a potential top hit) and
        `params.stampa_id` (default `0.5`, identity threshold
        below which a hit is dropped — `stampa_merge.py` then
        emits `No_hit` for the amplicon). Each chunk is then
@@ -1193,6 +1195,23 @@ from placeholder values to real taxonomic assignments.
     gathers the per-chunk logs into a published
     `logs/part_c/<basename>_taxonomy.log`; and LCA correctness is
     pinned at the helper level by `tests/python/test_stampa_merge.py`.
+- `[S108]` `assign_taxonomy_stampa` passes `--minwordmatches 0` to
+  `vsearch --usearch_global`, which turns off the k-mer pre-filter.
+  Without it, a reference is aligned only if it shares at least 12
+  distinct 8-mers with the query (vsearch's default for word length
+  8), whatever `--maxaccepts 0 --maxrejects 0` say, so the best
+  reference of a short or divergent amplicon can be skipped: a 43-nt
+  V4 amplicon at 88.9 % identity to its best PR2 reference shares only
+  10. `--maxaccepts 0 --maxrejects 0 --minwordmatches 0` is the
+  exhaustive search documented in vsearch's own manual
+  (`vsearch-usearch(7)`). On 167 real 18S V4 amplicons against the
+  V4 region of PR2 5.0.0 (87,237 references), it improved the top
+  identity of 10 amplicons (5 from no hit), changed no other, and
+  cost about 4 % more run time. The value is fixed, not a param.
+  - **Pass when:** a query whose only reference is at 88.9 % identity
+    but shares fewer than 12 distinct 8-mers with it (no hit under
+    vsearch's default `--minwordmatches`) is assigned that
+    reference's taxonomy by `assign_taxonomy_stampa`.
 - `[S50]` Part C's **shadow path** runs `vsearch --sintax`
   against `--reference_dataset_sintax` ([S64]) on the shadow
   occurrence table `<basename>_notmerged_table.tsv` produced by

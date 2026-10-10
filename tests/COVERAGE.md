@@ -90,6 +90,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S55]`| every vsearch fasta-emitting module preserves the single-line-sequence layout        | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_b/global_dereplication.nf.test` | done | — |
 | `[S56]`| shadow Part B workflow — runs Part B as-is on A-padded shadow inputs; publishes `_notmerged` artefacts | `tests/main.nf.test` | done   | —          |
 | `[S106]`| fastq-reading vsearch processes accept the full representable quality range (vsearch ≥ 2.32.0's default `--fastq_qmax = 126 - offset`; merge derives `--fastq_qmaxout` as the same value) under either encoding, for PacBio HiFi-grade input | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/strip_reads.nf.test`, `tests/processes/part_a/filter_and_convert_to_fasta.nf.test` | done | — |
+| `[S108]`| `assign_taxonomy_stampa` passes `--minwordmatches 0` (no k-mer pre-filter: exhaustive search together with `--maxaccepts 0 --maxrejects 0`), so short or divergent amplicons reach their best reference | `tests/processes/part_c/assign_taxonomy_stampa.nf.test` | done | — |
 | `[S107]`| Part B publishes a per-sample read/cluster tracking summary `<basename>_read_counts.tsv` to `logs/part_b/` (reads_in/reads_kept + clusters per curation stage, empty samples as zero rows, Total row, optional recluster column; shadow path mirrored) | `tests/python/test_build_part_b_read_counts.py`, `tests/processes/part_b/summarize_part_b_read_counts.nf.test` | done | — |
 | `[S57]`| `--help` prints a usage block describing all modes/params and exits without running any process | `tests/main.nf.test` | done | — |
 | `[S58]`| `params.publish_mode` threads through every `publishDir` directive; invalid values abort at startup | `tests/main.nf.test` | done   | —          |
@@ -177,7 +178,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `recluster_merge`               | `tests/processes/part_b/recluster_merge.nf.test`             | S104, S105   | done   |
 | `summarize_part_b_read_counts`  | `tests/processes/part_b/summarize_part_b_read_counts.nf.test` | S107        | done   |
 | `extract_fasta_sequences_from_occurrence_table` | `tests/processes/part_c/extract_fasta_sequences_from_occurrence_table.nf.test` | S48 | done   |
-| `assign_taxonomy_stampa`        | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`       | S49          | done   |
+| `assign_taxonomy_stampa`        | `tests/processes/part_c/assign_taxonomy_stampa.nf.test`       | S49, S108    | done   |
 | `sort_taxonomy`                 | `tests/processes/part_c/sort_taxonomy.nf.test`               | S49          | done   |
 | `assign_taxonomy_sintax`        | `tests/processes/part_c/assign_taxonomy_sintax.nf.test`       | S50          | done   |
 | `update_occurrence_table`       | `tests/processes/part_c/update_occurrence_table.nf.test`      | S51          | done   |

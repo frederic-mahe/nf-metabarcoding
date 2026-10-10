@@ -36,6 +36,15 @@ version here must match `manifest.version` in
 
 ### Fixed
 
+- stampa (`assign_taxonomy_stampa`) now passes `--minwordmatches 0` to
+  `vsearch --usearch_global` ([S108]). `--maxaccepts 0 --maxrejects 0`
+  alone left vsearch's k-mer pre-filter on: a reference sharing fewer
+  than 12 distinct 8-mers with the amplicon was never aligned, so short
+  or divergent amplicons could miss their best reference or come out as
+  `No_hit`. On 167 real 18S V4 amplicons against the V4 region of PR2
+  5.0.0, 10 got a better top hit (5 of them previously `No_hit`), none
+  got worse, and run time grew by about 4 %. Assignments can therefore
+  change for such amplicons.
 - `join_notmerged` wrote the join-padding quality as a fixed `I`, which
   is Q40 at `--fastq_encoding 33` but Q9 at `64`: the eight padding
   bases then added about 1.0 expected error per read, enough to drop

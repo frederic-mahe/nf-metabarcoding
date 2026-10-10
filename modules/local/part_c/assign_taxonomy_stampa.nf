@@ -8,6 +8,20 @@ process assign_taxonomy_stampa {
     // <basename>_taxonomy_stampa.tsv. --notrunclabels keeps the
     // ";size=N;" annotation in vsearch's --userout, which
     // stampa_merge.py parses directly.
+    //
+    // [S108]: --minwordmatches 0 turns off the k-mer pre-filter, so
+    // that, with --maxaccepts 0 and --maxrejects 0, every reference is
+    // aligned (vsearch's documented exhaustive search). Without it, a
+    // reference sharing fewer than 12 distinct 8-mers with the query
+    // is never considered, which drops the best hit of short or
+    // divergent amplicons.
+    //
+    // TODO: refactor with vsearch --search_global once vsearch v2.33.0
+    // is available on bioconda. That command aligns every query
+    // against every reference with no pre-filter and no early stop,
+    // and ignores --minwordmatches, --maxaccepts and --maxrejects, so
+    // it replaces --usearch_global plus these three options (and makes
+    // params.stampa_maxrejects moot).
 
     input:
     path chunk
@@ -34,6 +48,7 @@ process assign_taxonomy_stampa {
         --userfields query+id!{params.iddef}+target \
         --maxaccepts 0 \
         --maxrejects !{params.stampa_maxrejects} \
+        --minwordmatches 0 \
         --top_hits_only \
         --output_no_hits \
         --id !{params.stampa_id} \
