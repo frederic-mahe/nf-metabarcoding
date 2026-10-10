@@ -103,13 +103,14 @@ emit_paired() {
 
 emit_highqual_pair() {
     # [S106] a mergeable paired-end fixture whose every base carries the
-    # maximum Phred+33 quality score (Q93, the '~' character). vsearch's
-    # default --fastq_qmax is 41 and aborts on any higher score, so this
-    # fixture only survives the fastq-reading processes when they pass
-    # --fastq_qmax 93 (the range PacBio HiFi reads use). A single
-    # amplicon is enough to exercise the read + merge path; because the
-    # overlap of two agreeing Q93 reads has a posterior quality far above
-    # Q41, the merged output also witnesses --fastq_qmaxout 93.
+    # maximum Phred+33 quality score (Q93, the '~' character). vsearch
+    # before 2.32.0 defaulted --fastq_qmax to 41 and aborted on any higher
+    # score, so this fixture only survives the fastq-reading processes
+    # when vsearch accepts the full range (the range PacBio HiFi reads
+    # use). A single amplicon is enough to exercise the read + merge
+    # path; because the overlap of two agreeing Q93 reads has a posterior
+    # quality far above Q41, the merged output also witnesses
+    # --fastq_qmaxout 93.
     local -r prefix="highqual"
     local -r r1="${prefix}_1.fastq"
     local -r r2="${prefix}_2.fastq"

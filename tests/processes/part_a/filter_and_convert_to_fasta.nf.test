@@ -170,9 +170,9 @@ nextflow_process {
     test("accepts maximum Phred+33 quality (Q93) input") {
         // COVERAGE: [S106]
         // Feed a fastq whose every base is Q93 ('~') straight in as the
-        // "trimmed" input. vsearch --fastx_filter aborts on quality
-        // above its default --fastq_qmax 41, so a populated fasta proves
-        // --fastq_qmax 93 reached the command.
+        // "trimmed" input. vsearch --fastx_filter before 2.32.0 aborted
+        // on quality above its default --fastq_qmax 41, so a populated
+        // fasta proves the command accepts Q93.
         tag "ci"
         when {
             params {
@@ -194,7 +194,7 @@ nextflow_process {
             def lines = path(process.out.fasta.get(0)[1]).readLines()
                 .findAll { !it.trim().isEmpty() }
             assert !lines.isEmpty() :
-                "expected a non-empty fasta from Q93 input (proves --fastq_qmax 93)"
+                "expected a non-empty fasta from Q93 input (proves qmax 93 is accepted)"
             assert lines[0].startsWith(">") :
                 "expected a fasta header, got: ${lines[0]}"
         }
@@ -205,8 +205,8 @@ nextflow_process {
         // Under fastq_encoding=64 the highest representable quality is
         // 126-64=62; the all-'~' fixture reads as Q62. A hardcoded
         // --fastq_qmax 93 would abort here (64 + 93 > 126), so a
-        // populated fasta proves --fastx_filter derives qmax as
-        // 126-offset.
+        // populated fasta proves --fastx_filter uses a qmax of
+        // 126-offset (vsearch's default since 2.32.0).
         tag "ci"
         when {
             params {

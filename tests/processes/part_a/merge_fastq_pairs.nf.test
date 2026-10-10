@@ -151,14 +151,15 @@ nextflow_process {
     test("accepts and preserves maximum Phred+33 quality (Q93)") {
         // COVERAGE: [S106]
         // PacBio HiFi-style input carries per-base quality up to Q93.
-        // vsearch's default --fastq_qmax is 41 and aborts on anything
-        // higher, so success here proves --fastq_qmax 93 reached
-        // --fastq_mergepairs. Every base of the fixture is Q93 ('~');
-        // the R1/R2 overlap agrees, so its merged posterior quality is
-        // far above Q41 and — with --fastq_qmaxout 93 — is written as
-        // Q93 rather than clamped to the default 41 ('J'). Asserting
-        // that every merged quality character is '~' therefore
-        // witnesses both flags at once.
+        // vsearch before 2.32.0 defaulted --fastq_qmax to 41 and aborted
+        // on anything higher, so success here proves
+        // --fastq_mergepairs accepts Q93. Every base of the fixture is
+        // Q93 ('~'); the R1/R2 overlap agrees, so its merged posterior
+        // quality is far above Q41 and — with --fastq_qmaxout 93 — is
+        // written as Q93 rather than clamped to the default 41 ('J').
+        // Asserting that every merged quality character is '~'
+        // therefore witnesses both the input range and the output
+        // ceiling at once.
         tag "ci"
         when {
             process {
@@ -191,8 +192,9 @@ nextflow_process {
         // Under fastq_encoding=64 the highest representable quality is
         // 126-64=62, so the all-'~' fixture reads as Q62. A hardcoded
         // --fastq_qmax / --fastq_qmaxout of 93 would abort here because
-        // 64 + 93 > 126; success proves the ceiling is derived as
-        // 126-offset. With the derived --fastq_qmaxout 62 the agreeing
+        // 64 + 93 > 126; success proves the ceiling is 126-offset
+        // (vsearch's --fastq_qmax default since 2.32.0, and the derived
+        // --fastq_qmaxout). With the derived --fastq_qmaxout 62 the agreeing
         // overlap is written at Q62 — again '~' at offset 64 — so every
         // merged quality character is '~'.
         tag "ci"

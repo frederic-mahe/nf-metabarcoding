@@ -9,6 +9,23 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+### Changed
+
+- Require `vsearch` 2.32.0: the exact pins in `environment.yml` and the
+  CI workflow (`.github/workflows/test.yml`) move from `2.31.0` to
+  `2.32.0` ([S69]). The modules-profile examples in `README.md` and
+  `conf/site.config.example` are bumped to match.
+- `merge_fastq_pairs`, `strip_reads` and `filter_and_convert_to_fasta`
+  no longer pass `--fastq_qmax`: vsearch 2.32.0 defaults it to the
+  highest quality the encoding can represent, which is the value the
+  modules derived (`[S106]`). `merge_fastq_pairs` keeps its derived
+  `--fastq_qmaxout`, whose default stays at 41 for `--fastq_mergepairs`.
+- sintax classifications with a non-zero `--sintax_randseed` are now
+  identical whatever the thread count (`[S91]`). vsearch 2.32.0 seeds a
+  random substream per query, so bootstrap values, and occasionally the
+  assignment retained at `--sintax_cutoff`, differ from those produced
+  with vsearch 2.31.0 for the same seed.
+
 ## [0.5.0] - 2026-07-23
 
 ### Changed

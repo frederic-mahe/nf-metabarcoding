@@ -16,16 +16,13 @@ process strip_reads {
     #!/bin/bash
 
     readonly OFFSET=!{params.fastq_encoding}
-    # [S106] vsearch requires offset + qmax <= 126 (126 = last printable
-    # ASCII); 126 - offset is the highest representable quality, so this
-    # accepts the full range for either encoding (93 at offset 33, 62 at
-    # offset 64).
-    readonly QMAX=$((126 - OFFSET))
+    # [S106] since vsearch 2.32.0, --fastq_qmax defaults to the highest
+    # quality the offset can represent (93 at offset 33, 62 at offset
+    # 64), so the full range is accepted without a flag.
 
     vsearch \
         --fastx_filter !{notmerged_fwd} \
         --fastq_ascii "${OFFSET}" \
-        --fastq_qmax "${QMAX}" \
         --fastq_stripright !{params.stripright} \
         --quiet \
         --fastqout stripped_fwd
@@ -33,7 +30,6 @@ process strip_reads {
     vsearch \
         --fastx_filter !{notmerged_rev} \
         --fastq_ascii "${OFFSET}" \
-        --fastq_qmax "${QMAX}" \
         --fastq_stripright !{params.stripright} \
         --quiet \
         --fastqout stripped_rev
