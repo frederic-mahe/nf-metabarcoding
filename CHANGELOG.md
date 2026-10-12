@@ -9,6 +9,8 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-10
+
 ### Changed
 
 - Require `vsearch` 2.32.0: the exact pins in `environment.yml` and the
