@@ -36,6 +36,19 @@ version here must match `manifest.version` in
   assignment retained at `--sintax_cutoff`, differ from those produced
   with vsearch 2.31.0 for the same seed.
 
+### Added
+
+- Every `bin/*.py` helper now checks the Python version before anything
+  else and, on Python < 3.10, exits with status 1 and a one-line message
+  naming the script, the required and the found version, and suggesting
+  an engine profile (`[S109]`). Previously such a run crashed with a
+  `SyntaxError` or `TypeError` deep in the file. This happens when no
+  container or conda profile is enabled and tasks use the host's
+  `python3`, e.g. `-profile genotoul,demo`, where the compute nodes ship
+  Python 3.6. The helpers no longer use
+  `from __future__ import annotations`, which is itself a `SyntaxError`
+  on Python < 3.7 and would hide the check.
+
 ### Fixed
 
 - stampa (`assign_taxonomy_stampa`) now passes `--minwordmatches 0` to
