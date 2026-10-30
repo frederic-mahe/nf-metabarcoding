@@ -2334,3 +2334,13 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
     __future__ import annotations`; running it with `sys.version_info`
     patched to 3.6 exits 1 with `Python >= 3.10 required` and the
     script name on stderr.
+- `[S110]` `main.nf` compiles on every Nextflow release covered by
+  `manifest.nextflowVersion` (`>=25.04.0`), including the strict parser
+  of Nextflow 26.10+, which rejects a `return` statement in a workflow
+  body. The entry workflow therefore selects its run mode ([S57] help,
+  [S97] fetch, [S47]/[S48] Part C, [S27] Part B, [S18] Part A) with an
+  `if` / `else if` / `else` chain, not with early `return`s.
+  - **Pass when:** `nextflow run main.nf --help` exits 0 and prints the
+    usage banner, without `Script compilation failed`, on both the
+    pinned 25.10.x and the latest stable Nextflow (CI `config-checks`
+    matrix).

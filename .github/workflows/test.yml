@@ -98,6 +98,8 @@ jobs:
         run: bash tests/check-stub-run.sh
       - name: Validate demo profile wiring
         run: bash tests/check-demo-profile.sh
+      - name: Validate main.nf compiles (strict parser on 26.10+) [S110]
+        run: bash tests/check-compile.sh
 
   shellcheck:
     runs-on: ubuntu-latest
