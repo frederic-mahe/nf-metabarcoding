@@ -154,7 +154,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            assert (workflow.stdout + workflow.errorReport).toString().contains("forward_primer")
+            assert (workflow.stdout + workflow.stderr + workflow.errorReport).toString().contains("forward_primer")
         }
     }
 
@@ -179,7 +179,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def out = workflow.stdout.toString()
+            def out = workflow.trace.tasks().collect { it.name }.toString()
             assert !out.contains("trim_primers") :
                 "trim_primers should not run when --no_trimming is set, got: ${out}"
             // the other Part A processes still run
@@ -206,7 +206,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("forward_primer") || msg.contains("reverse_primer") :
                 "expected error to name the conflicting primer parameter, got: ${msg}"
             assert msg.contains("no_trimming") :
@@ -232,7 +232,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("forward_primer") && msg.contains("IUPAC") :
                 "expected an IUPAC-format error naming forward_primer, got: ${msg}"
         }
@@ -260,7 +260,7 @@ nextflow_pipeline {
             // (the console / errorReport carry only the summary line), so
             // follow the log pointer the error prints and assert the detail
             // names the parameter.
-            def report = (workflow.stdout + workflow.errorReport).toString()
+            def report = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             def hit = (report =~ /Check '([^']+nextflow\.log)'/)
             assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
             def detail = file(hit.group(1)).text
@@ -296,7 +296,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def out = workflow.stdout.toString()
+            def out = workflow.trace.tasks().collect { it.name }.toString()
             assert !out.contains("trim_primers") :
                 "trim_primers must not run when --no_trimming is set (shadow path), got: ${out}"
             // shadow-only processes still run on the _notmerged stream
@@ -328,7 +328,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def out = workflow.stdout.toString()
+            def out = workflow.trace.tasks().collect { it.name }.toString()
             assert !out.contains("merge_fastq_pairs") :
                 "merge_fastq_pairs must not run when no paired files are present, got: ${out}"
             // downstream Part A processes still run on the unpaired sample
@@ -429,7 +429,7 @@ nextflow_pipeline {
             assert workflow.success
             // Both samples — one paired (miseq), one single-end
             // (unpaired_only) — appear in the trace.
-            def out = workflow.stdout.toString()
+            def out = workflow.trace.tasks().collect { it.name }.toString()
             assert out.contains("merge_fastq_pairs") :
                 "expected merge_fastq_pairs to run on the MiSeq pair, got: ${out}"
             // Per-sample log probes ([S19]/D15: under logs/part_a/per_sample/)
@@ -462,7 +462,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def out = workflow.stdout.toString()
+            def out = workflow.trace.tasks().collect { it.name }.toString()
             assert out.contains("merge_fastq_pairs") :
                 "expected merge_fastq_pairs to run on the MiSeq pair, got: ${out}"
             assert file("${outputDir}/a_list/logs/part_a/per_sample/SampleX_S1_merging.log").exists()
@@ -622,7 +622,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def out = workflow.stdout.toString()
+            def out = workflow.trace.tasks().collect { it.name }.toString()
             // the shadow-only Part A processes must not run
             ["join_notmerged", "strip_reads"].each { proc ->
                 assert !out.contains(proc) :
@@ -694,7 +694,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             // error names the colliding sample ID and lists every
             // duplicated fastq path
             assert msg.toLowerCase().contains("duplicate") :
@@ -720,7 +720,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.toLowerCase().contains("notmerged") :
                 "expected error to mention the reserved suffix, got: ${msg}"
         }
@@ -942,7 +942,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            assert (workflow.stdout + workflow.errorReport).toString()
+            assert (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
                 .contains("mutually exclusive") :
                 "expected mutual-exclusion error for --input + --fastq_folder"
         }
@@ -964,7 +964,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("mutually exclusive") :
                 "expected a mutual-exclusion error, got: ${msg}"
             assert msg.contains("--occurrence_table") && msg.contains("--fastq_folder") :
@@ -1193,7 +1193,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("project_name") :
                 "expected error to name project_name, got: ${msg}"
         }
@@ -1241,7 +1241,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.toLowerCase().contains("duplicate") :
                 "expected error to mention duplicates, got: ${msg}"
         }
@@ -1260,7 +1260,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("reference_dataset") :
                 "expected error to name reference_dataset, got: ${msg}"
         }
@@ -1414,7 +1414,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("mutually exclusive") :
                 "expected a mutual-exclusivity abort, got: ${msg}"
             assert msg.contains("--representatives_fasta") && msg.contains("--occurrence_table") :
@@ -1438,7 +1438,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("majority_assignment") :
                 "expected an abort naming majority_assignment, got: ${msg}"
         }
@@ -1557,7 +1557,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("majority_assignment") :
                 "error should mention 'majority_assignment', got: ${msg}"
         }
@@ -1796,7 +1796,7 @@ nextflow_pipeline {
             // nf-schema writes the per-parameter detail to .nextflow.log
             // (the console / errorReport carry only the summary line), so
             // follow the log pointer and assert the detail names the param.
-            def report = (workflow.stdout + workflow.errorReport).toString()
+            def report = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             def hit = (report =~ /Check '([^']+nextflow\.log)'/)
             assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
             def detail = file(hit.group(1)).text
@@ -1917,7 +1917,7 @@ nextflow_pipeline {
             // nf-schema writes the per-parameter detail to .nextflow.log
             // (the console / errorReport carry only the summary line), so
             // follow the log pointer and assert the detail names the param.
-            def report = (workflow.stdout + workflow.errorReport).toString()
+            def report = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             def hit = (report =~ /Check '([^']+nextflow\.log)'/)
             assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
             def detail = file(hit.group(1)).text
@@ -1943,7 +1943,7 @@ nextflow_pipeline {
             // nf-schema writes the per-parameter detail to .nextflow.log
             // (the console / errorReport carry only the summary line), so
             // follow the log pointer and assert the detail names the param.
-            def report = (workflow.stdout + workflow.errorReport).toString()
+            def report = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             def hit = (report =~ /Check '([^']+nextflow\.log)'/)
             assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
             def detail = file(hit.group(1)).text
@@ -1976,7 +1976,7 @@ nextflow_pipeline {
             // nf-schema writes the per-parameter detail to .nextflow.log
             // (the console / errorReport carry only the summary line), so
             // follow the log pointer and assert the detail names the param.
-            def report = (workflow.stdout + workflow.errorReport).toString()
+            def report = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             def hit = (report =~ /Check '([^']+nextflow\.log)'/)
             assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
             def detail = file(hit.group(1)).text
@@ -2006,7 +2006,7 @@ nextflow_pipeline {
             // nf-schema writes the per-parameter detail to .nextflow.log
             // (the console / errorReport carry only the summary line), so
             // follow the log pointer and assert the detail names the param.
-            def report = (workflow.stdout + workflow.errorReport).toString()
+            def report = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             def hit = (report =~ /Check '([^']+nextflow\.log)'/)
             assert hit.find() : "no .nextflow.log path in error output, got: ${report}"
             def detail = file(hit.group(1)).text
@@ -2357,7 +2357,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("reference_dataset_sintax") :
                 "expected error to name reference_dataset_sintax, got: ${msg}"
         }
@@ -2386,7 +2386,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("reference_dataset") && msg.contains("stampa-formatted") :
                 "expected a stampa-format error naming reference_dataset, got: ${msg}"
         }
@@ -2413,7 +2413,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("reference_dataset_sintax") && msg.contains("sintax-formatted") :
                 "expected a sintax-format error naming reference_dataset_sintax, got: ${msg}"
         }
@@ -2444,7 +2444,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("sintax-formatted") :
                 "expected the gzip reference to be decoded and sniffed, got: ${msg}"
         }
@@ -2516,7 +2516,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def out = workflow.stdout.toString()
+            def out = workflow.trace.tasks().collect { it.name }.toString()
 
             // Every Part A process appears in the trace.
             ["merge_fastq_pairs",
@@ -2647,7 +2647,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("SRR1234567") :
                 "[S98] the abort message must name the offending accession"
         }
@@ -2665,7 +2665,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("mutually exclusive") &&
                 msg.contains("--accession") :
                 "[S02] setting --accession with another selector must abort"
@@ -2731,7 +2731,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert msg.contains("recluster_id") :
                 "expected error to name --recluster_id, got: ${msg}"
         }
@@ -2855,7 +2855,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def out = (workflow.stdout + workflow.errorReport).toString()
+            def out = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert !out.contains("Usage:") :
                 "help='false' must not print the usage banner, got: ${out}"
             assert out.contains("fastq_folder") :
@@ -2883,7 +2883,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def out = workflow.stdout.toString()
+            def out = workflow.trace.tasks().collect { it.name }.toString()
             assert out.contains("trim_primers") :
                 "trim_primers must run when --no_trimming is 'false', got: ${out}"
         }
@@ -2910,7 +2910,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def out = workflow.stdout.toString()
+            def out = workflow.trace.tasks().collect { it.name }.toString()
             ["join_notmerged", "strip_reads"].each { proc ->
                 assert !out.contains(proc) :
                     "${proc} must not run when --recover_unmerged is 'false', got: ${out}"
@@ -2938,7 +2938,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert !msg.contains("majority_assignment requires") :
                 "majority_assignment='false' must not trigger the [S66] sintax guard, got: ${msg}"
             assert msg.contains("fastq_folder") :
@@ -2964,7 +2964,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.failed
-            def msg = (workflow.stdout + workflow.errorReport).toString()
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
             assert !msg.contains("slurm_account is required") :
                 "require_slurm_account='false' must not force --slurm_account, got: ${msg}"
             assert msg.contains("fastq_folder") :
