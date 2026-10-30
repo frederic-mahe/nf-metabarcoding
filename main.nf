@@ -215,129 +215,13 @@ workflow fetch {
 }
 
 
-workflow {
-    // [S57]: --help short-circuits before any required-param assert.
-    // print() (not log.info) so the usage block lands on stdout —
-    // the conventional channel for help output and what nf-test
-    // captures in workflow.stdout.
-    if ( coerce_bool(params.help) ) {
-        // [S57]: a small hand-written banner carries the two things the
-        // parameter schema cannot express — the three entry points and
-        // the README/SPECIFICATIONS pointer — wrapped around the
-        // schema-generated parameter listing from paramsHelp() (every
-        // params.* flag grouped by part, with type and default).
-        print """\
-            nf-metabarcoding — swarm-based metabarcoding pipeline
-
-            Usage:
-              nextflow run main.nf --fastq_folder PATH         [Part A → B [→ C]]
-              nextflow run main.nf --fasta_folder PATH         [Part B standalone]
-              nextflow run main.nf --occurrence_table PATH     [Part C standalone]
-              nextflow run main.nf --representatives_fasta PATH [Part C, fasta input]
-
-            """.stripIndent()
-        print paramsHelp(
-            command: "nextflow run main.nf --fastq_folder PATH " +
-                     "--forward_primer SEQ --reverse_primer SEQ"
-        )
-        print """\
-
-            See README.md for examples and SPECIFICATIONS.md for the behaviour
-            contract ([Sxx] IDs).
-            """.stripIndent()
-        return
-    }
-
-    // [S58]/[S61]/[S65]/[S63]/[S72]: per-value type / enum / range checks,
-    // declared in nextflow_schema.json and enforced here. Runs first so a
-    // bad scalar aborts naming the parameter before validate_params()'
-    // file-content check ([S73]) — which reads a reference header — gets a
-    // chance to fire on an otherwise-doomed run.
-    validateParameters()
-
-    // [S02]/[S66]/[S71]: cross-parameter and file-content guards the
-    // schema cannot express (input-mode exclusivity, the majority/sintax
-    // incompatibility, reference-format sniffing, the --results_folder
-    // deprecation warning). Mode-specific requirements (fastq_folder /
-    // primers / reference) stay inline below because they depend on the
-    // selected run mode.
-    validate_params()
-
-    // [S92]: a cluster profile may require --slurm_account
-    // (params.require_slurm_account, set by e.g. the abims profile whose
-    // site charges every job to a project). Abort at startup when the
-    // requirement is in force but no account is supplied, rather than
-    // letting every sbatch be rejected mid-run. Silent when the flag is
-    // off (the default) or an account is given.
-    def slurm_account_error = slurm_account_requirement_error(
-        coerce_bool(params.require_slurm_account),
-        params.slurm_account
-    )
-    assert slurm_account_error == null : slurm_account_error
-
-    // [S79]: under -profile slurm, warn (don't abort) when the dataset /
-    // reference size hints are unset so a forgotten --dataset_size_gb
-    // surfaces here rather than as an OOM kill deep in a large run. The
-    // resource tiers only apply under slurm, so the helper is silent
-    // otherwise; `workflow.profile` is the active comma-joined profile
-    // list.
-    resource_size_warnings(
-        workflow.profile,
-        params.dataset_size_gb,
-        params.reference_size_gb,
-        (params.reference_dataset || params.reference_dataset_sintax) as boolean
-    ).each { System.err.println("WARNING: ${it}") }
-
-    // [S68]/[S71]: record tool versions under <outdir>/pipeline_info/ on
-    // every entry point — including a Part A-only run. --outdir always
-    // resolves (default 'results'), so the report is published regardless
-    // of the selected mode. Invoked once here (not per router/branch) so
-    // the single-host process is never scheduled twice in one run.
-    dump_software_versions()
-
-    // [S60]: every path-typed param is read through `normalize_path()`
-    // at its use site (file(), publishDir, etc.) — see the helper at the
-    // top of this file. Nextflow 25's `params` map is read-only from
-    // inside a workflow body, so a one-shot mutation here is silently
-    // dropped; the wrap-at-use-site pattern is the workaround.
-
-    // [S97]: --accession selects the standalone fetch mode. Dispatch by
-    // param presence (Nextflow's strict parser drops -entry), calling the
-    // named `fetch` workflow above — the same shape as the part_b /
-    // part_c dispatch below. --accession is mutually exclusive with the
-    // other selectors ([S02], enforced in validate_params()).
-    if ( params.accession ) {
-        fetch()
-        return
-    }
-
-    // [S47]/[S48]: --occurrence_table switches the pipeline into
-    // Part C standalone mode (Parts A and B do not run). The
-    // mode also requires --reference_dataset and --results_folder.
-    if ( params.occurrence_table ) {
-        part_c()
-        return
-    }
-
-    // [S48]: --representatives_fasta switches the pipeline into
-    // fasta-input Part C mode (Parts A and B do not run; no
-    // occurrence-table join). Requires the reference matching
-    // --taxonomy_method; the deliverable is <basename>_taxonomy_<method>.tsv.
-    if ( params.representatives_fasta ) {
-        part_c_fasta()
-        return
-    }
-
-    // [S27]/[S70]: --fasta_folder, or an --input samplesheet in the
-    // fasta profile, switches the pipeline into Part B standalone mode.
-    // Part A's --fastq_folder requirement is lifted in that mode (Part A
-    // does not run). When --reference_dataset is also set, `workflow
-    // part_b` chains Part C onto Part B's regular output.
-    def input_profile = samplesheet_profile()
-    if ( params.fasta_folder || input_profile == 'fasta' ) {
-        part_b()
-        return
-    }
+workflow part_a {
+    // Part A end-to-end ([S18]/[S70]), chained to Part B ([S27]/[S56])
+    // when --project_name is set and to Part C ([S47]) when the matching
+    // reference is also set. The default mode: selected by the entry
+    // workflow below when no other input-mode selector is given ([S110]:
+    // an if/else chain, since Nextflow 26.10 forbids `return` in a
+    // workflow body).
 
     // [S18]/[S70]: Part A end-to-end runs from --fastq_folder or from an
     // --input samplesheet (fastq profile). forward_primer / reverse_primer
@@ -435,6 +319,122 @@ workflow {
                 }
                 part_C_shadow(part_B_shadow.out.table, shadow_basename_ch)
             }
+        }
+    }
+}
+
+
+workflow {
+    // [S57]: --help short-circuits before any required-param assert.
+    // print() (not log.info) so the usage block lands on stdout —
+    // the conventional channel for help output and what nf-test
+    // captures in workflow.stdout.
+    if ( coerce_bool(params.help) ) {
+        // [S57]: a small hand-written banner carries the two things the
+        // parameter schema cannot express — the three entry points and
+        // the README/SPECIFICATIONS pointer — wrapped around the
+        // schema-generated parameter listing from paramsHelp() (every
+        // params.* flag grouped by part, with type and default).
+        print """\
+            nf-metabarcoding — swarm-based metabarcoding pipeline
+
+            Usage:
+              nextflow run main.nf --fastq_folder PATH         [Part A → B [→ C]]
+              nextflow run main.nf --fasta_folder PATH         [Part B standalone]
+              nextflow run main.nf --occurrence_table PATH     [Part C standalone]
+              nextflow run main.nf --representatives_fasta PATH [Part C, fasta input]
+
+            """.stripIndent()
+        print paramsHelp(
+            command: "nextflow run main.nf --fastq_folder PATH " +
+                     "--forward_primer SEQ --reverse_primer SEQ"
+        )
+        print """\
+
+            See README.md for examples and SPECIFICATIONS.md for the behaviour
+            contract ([Sxx] IDs).
+            """.stripIndent()
+    } else {
+        // [S58]/[S61]/[S65]/[S63]/[S72]: per-value type / enum / range checks,
+        // declared in nextflow_schema.json and enforced here. Runs first so a
+        // bad scalar aborts naming the parameter before validate_params()'
+        // file-content check ([S73]) — which reads a reference header — gets a
+        // chance to fire on an otherwise-doomed run.
+        validateParameters()
+
+        // [S02]/[S66]/[S71]: cross-parameter and file-content guards the
+        // schema cannot express (input-mode exclusivity, the majority/sintax
+        // incompatibility, reference-format sniffing, the --results_folder
+        // deprecation warning). Mode-specific requirements (fastq_folder /
+        // primers / reference) stay inline below because they depend on the
+        // selected run mode.
+        validate_params()
+
+        // [S92]: a cluster profile may require --slurm_account
+        // (params.require_slurm_account, set by e.g. the abims profile whose
+        // site charges every job to a project). Abort at startup when the
+        // requirement is in force but no account is supplied, rather than
+        // letting every sbatch be rejected mid-run. Silent when the flag is
+        // off (the default) or an account is given.
+        def slurm_account_error = slurm_account_requirement_error(
+            coerce_bool(params.require_slurm_account),
+            params.slurm_account
+        )
+        assert slurm_account_error == null : slurm_account_error
+
+        // [S79]: under -profile slurm, warn (don't abort) when the dataset /
+        // reference size hints are unset so a forgotten --dataset_size_gb
+        // surfaces here rather than as an OOM kill deep in a large run. The
+        // resource tiers only apply under slurm, so the helper is silent
+        // otherwise; `workflow.profile` is the active comma-joined profile
+        // list.
+        resource_size_warnings(
+            workflow.profile,
+            params.dataset_size_gb,
+            params.reference_size_gb,
+            (params.reference_dataset || params.reference_dataset_sintax) as boolean
+        ).each { System.err.println("WARNING: ${it}") }
+
+        // [S68]/[S71]: record tool versions under <outdir>/pipeline_info/ on
+        // every entry point — including a Part A-only run. --outdir always
+        // resolves (default 'results'), so the report is published regardless
+        // of the selected mode. Invoked once here (not per router/branch) so
+        // the single-host process is never scheduled twice in one run.
+        dump_software_versions()
+
+        // [S60]: every path-typed param is read through `normalize_path()`
+        // at its use site (file(), publishDir, etc.) — see the helper at the
+        // top of this file. Nextflow 25's `params` map is read-only from
+        // inside a workflow body, so a one-shot mutation here is silently
+        // dropped; the wrap-at-use-site pattern is the workaround.
+
+        if ( params.accession ) {
+            // [S97]: --accession selects the standalone fetch mode. Dispatch by
+            // param presence (Nextflow's strict parser drops -entry), calling the
+            // named `fetch` workflow above — the same shape as the part_b /
+            // part_c dispatch below. --accession is mutually exclusive with the
+            // other selectors ([S02], enforced in validate_params()).
+            fetch()
+        } else if ( params.occurrence_table ) {
+            // [S47]/[S48]: --occurrence_table switches the pipeline into
+            // Part C standalone mode (Parts A and B do not run). The
+            // mode also requires --reference_dataset and --results_folder.
+            part_c()
+        } else if ( params.representatives_fasta ) {
+            // [S48]: --representatives_fasta switches the pipeline into
+            // fasta-input Part C mode (Parts A and B do not run; no
+            // occurrence-table join). Requires the reference matching
+            // --taxonomy_method; the deliverable is <basename>_taxonomy_<method>.tsv.
+            part_c_fasta()
+        } else if ( params.fasta_folder || samplesheet_profile() == 'fasta' ) {
+            // [S27]/[S70]: --fasta_folder, or an --input samplesheet in the
+            // fasta profile, switches the pipeline into Part B standalone mode.
+            // Part A's --fastq_folder requirement is lifted in that mode (Part A
+            // does not run). When --reference_dataset is also set, `workflow
+            // part_b` chains Part C onto Part B's regular output.
+            part_b()
+        } else {
+            part_a()
         }
     }
 }

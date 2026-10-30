@@ -9,6 +9,15 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+### Fixed
+
+- `main.nf` failed to compile on Nextflow 26.10+ (`Return statement
+  cannot be used in a workflow body`). The entry workflow now selects
+  its run mode with an `if` / `else if` / `else` chain, and the Part A
+  end-to-end path moves into a named `workflow part_a` ([S110]). A new
+  CI check (`tests/check-compile.sh`) compiles `main.nf` on Nextflow
+  25.10.2 and on the latest stable release.
+
 ## [0.6.0] - 2026-10-10
 
 ### Changed
