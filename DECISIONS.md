@@ -1129,9 +1129,10 @@ their COVERAGE rows are `done`.
 
 ## D22 — full-reference check before Part C assignment
 
-**Blocks:** nothing yet; future `[Sxx]` bullets for a `check_reference`
-process. Related: `[S73]`, `[S94]`, `[S111]`, `[S112]`, `D08`.
-**Status:** `open`
+**Blocks:** `[S114]`, `[S115]`, `[S116]`, `[S117]`. Related: `[S73]`,
+`[S94]`, `[S111]`, `[S112]`, `[S113]`, `D08`.
+**Status:** `resolved` — answers recorded (2026-10-31); spec bullets
+`[S114]`–`[S117]` added, tests and code pending
 
 Raised 2026-10-31. The startup checks (`[S73]` format sniff, `[S111]`
 majority guard) read only the **first** header of a reference, by
@@ -1200,3 +1201,25 @@ this check by construction.
 5. Does the check run on every Part C run, or can it be skipped
    (`--skip_reference_check`) for references already known to be
    clean, given that `-resume` already caches it?
+
+**Resolution (2026-10-31, confirmed by the developer):**
+
+1. **Error / warning split.** Extra or trailing whitespace around the
+   lineage becomes an **error**: it changes results silently, and the
+   fix is easy for the user. Empty ranks stay a **warning**: tested
+   (`[S113]`), they neither crash nor shift columns; the only oddity is
+   a nameless majority winner (` (2/3)`). A `*` inside a lineage stays
+   a **warning**: users may use it. Uneven lineage depth is expected
+   and is **not reported** at all.
+2. **No `--strict_reference`.** Warnings stay advisory; anything that
+   changes results is an error by definition (answer 1).
+3. **Report:** a TSV (`line`, `accession`, `issue`) under
+   `logs/part_c/`, plus a short summary (counts, first few offending
+   headers) in the abort or warning message.
+4. **Shadow reference:** checked by the same process, with the sintax
+   rules; a file passed to both flags is checked once per grammar.
+5. **No `--skip_reference_check`.** The check runs on every Part C run;
+   `-resume` caches it, so its cost is paid once per reference.
+
+Specified as `[S114]` (process, scope, gating), `[S115]` (errors),
+`[S116]` (warnings) and `[S117]` (report and messages).

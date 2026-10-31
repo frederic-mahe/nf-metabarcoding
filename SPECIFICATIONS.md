@@ -1751,6 +1751,81 @@ from placeholder values to real taxonomic assignments.
     `A|B|C|` for two hits on `A|B|C|`; `majority_assignment.py`
     reports `A (3/3)| (2/3)|C (3/3)|D (3/3)` for references
     `A||C|D`, `A||C|D`, `A|B|C|D`.
+- `[S114]` Part C checks its whole reference before any assignment
+  (`D22`). A `check_reference` process (`bin/check_reference.py`)
+  reads every header of the reference once (plain, `.gz` or `.bz2`),
+  as an ordinary task, not at parse time (`D08`), and the assignment
+  process consumes its output, so no assignment task starts until the
+  check has passed. Each file is checked against the grammar of the
+  method that reads it: `--reference_dataset` with the stampa grammar
+  when `--taxonomy_method=stampa`; `--reference_dataset_sintax` with
+  the sintax grammar when `--taxonomy_method=sintax` and on the shadow
+  path (`[S50]`, `[S64]`). A hybrid file passed to both flags is
+  therefore checked once per grammar. The check runs on every Part C
+  run (regular, standalone `--occurrence_table` and
+  `--representatives_fasta`, shadow); no parameter skips it or changes
+  its severities, and `-resume` reuses its result. Grammars:
+    - stampa: `>accession<SPACE>lineage`, the accession being the text
+      before the first whitespace and the lineage the `|`-separated
+      text after it (`[S73]`);
+    - sintax: `>accession;tax=…`, the accession being the text before
+      the first `;`, followed by one or more comma-separated
+      `rank:name` fields, terminated by `;` or by the end of the
+      header (`[S73]`).
+  - **Pass when:** a reference with an error (`[S115]`) on its last
+    header aborts the run before any assignment task starts; the same
+    reference with that header fixed runs to completion; plain, `.gz`
+    and `.bz2` references are checked the same way; a shadow-path run
+    checks `--reference_dataset_sintax` with the sintax grammar.
+- `[S115]` errors found by `check_reference` (`[S114]`) abort the run.
+  The issue codes are:
+    - `format`: a header that does not match the grammar (no lineage
+      after the accession; no `;tax=` annotation), on any line;
+    - `invalid_utf8`: a header that is not valid UTF-8;
+    - `control_char`: a tab or another control character in a header;
+      a carriage return ending the line (CRLF file) is allowed;
+    - `duplicate_accession`: an accession already seen on an earlier
+      header (the majority step would silently keep only one);
+    - `comma_in_accession`: with `--majority_assignment`, a comma in
+      any accession (`[S111]`, extended to the whole file);
+    - `whitespace` (stampa grammar): whitespace at the start or end of
+      the lineage, e.g. two spaces after the accession or a trailing
+      space after the last rank, which `bin/stampa_merge.py` would
+      otherwise keep and so change the last common ancestor (`[S49]`)
+      without any signal.
+  - **Pass when:** `bin/check_reference.py` reports each code above on
+    a minimal reference that carries it, on a header other than the
+    first, and reports nothing on a clean stampa, sintax and hybrid
+    reference; a CRLF reference is clean; `comma_in_accession` is
+    reported only with `--majority_assignment`.
+- `[S116]` warnings found by `check_reference` (`[S114]`) are reported
+  and the run continues. The issue codes are:
+    - `empty_rank`: an empty rank (stampa `A||C`, or a trailing `|`;
+      sintax `p:` or an empty field), kept as an empty name downstream
+      (`[S113]`);
+    - `star_in_lineage`: a `*` in a lineage, which cannot be told
+      apart from the stampa last-common-ancestor wildcard (`[S49]`).
+  Uneven lineage depth across the file is expected and not reported.
+  - **Pass when:** `bin/check_reference.py` reports `empty_rank` and
+    `star_in_lineage` as warnings on minimal references that carry
+    them, and a run with such a reference completes the assignment.
+- `[S117]` `check_reference` (`[S114]`) writes a TSV report with a
+  header row and the columns `line`, `accession` and `issue` (the
+  codes of `[S115]` and `[S116]`), one row per finding, published to
+  `<outdir>/logs/part_c/` as `<basename>_reference_check.tsv` (shadow
+  path: `<basename>_notmerged_reference_check.tsv`). A clean reference
+  gives a header-only report. The report is published even when the
+  run aborts. When errors are found, the abort message names the
+  parameter (`reference_dataset` or `reference_dataset_sintax`), gives
+  the count per issue code and the first five offending headers (line
+  number and accession), and points to the report. When only warnings
+  are found, a warning with the same summary is logged and the run
+  continues.
+  - **Pass when:** a reference with errors leaves a published report
+    listing each finding with its line and accession, and the abort
+    message names the parameter, the counts and the report path; a
+    reference with only warnings logs a warning naming the report; a
+    clean reference publishes a header-only report.
 
 ## Fetch — download from ENA/SRA
 
