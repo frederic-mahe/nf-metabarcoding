@@ -9,6 +9,44 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+### Added
+
+- Part C checks every header of its reference before any assignment
+  (`[S114]`–`[S117]`, `D22`). A new `check_reference` task reads the
+  whole file (plain, `.gz` or `.bz2`) with the rules of the method that
+  uses it (stampa or sintax, shadow path included). Errors stop the run
+  before the assignment: `format`, `invalid_utf8`, `control_char`,
+  `duplicate_accession`, `comma_in_accession` (with
+  `--majority_assignment`) and `whitespace` (extra or trailing spaces
+  around a stampa lineage, which used to change results silently).
+  Warnings (`empty_rank`, `star_in_lineage`) are printed and the run
+  continues. Every finding goes to
+  `logs/part_c/<basename>_reference_check.tsv`, published even when the
+  run stops. Previously, a bad header after the first one crashed the
+  run after the vsearch search, or silently changed the results. The
+  check cannot be turned off; `-resume` reuses its result.
+- `--majority_assignment` aborts at startup when the `--reference_dataset`
+  accessions contain commas, as in a hybrid `>id;tax=...; lineage`
+  header (`[S111]`). The majority step used to crash at the very end of
+  the run.
+- README: a "Reference datasets and the reference check" section
+  describes the two reference formats, hybrid files and the check.
+
+### Changed
+
+- An empty rank in a stampa lineage (`A||C`) is now specified: it stays
+  an empty name, `*` when the top hits disagree, and the majority step
+  counts it like any other name (`[S113]`). Behaviour is unchanged.
+- `[S64]` now explains why two reference flags exist and documents
+  hybrid references.
+
+### Fixed
+
+- `stampa_merge.py`, `update_occurrence_table.py` and
+  `majority_assignment.py` no longer crash on reference headers that
+  are not valid UTF-8 (e.g. a Latin-1 `é`); they pass those bytes
+  through unchanged, whatever the locale (`[S112]`).
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

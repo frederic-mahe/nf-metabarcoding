@@ -83,7 +83,9 @@ def parse_hits(path: str) -> Iterator[tuple[str, str, str, list[str], str]]:
     ``taxonomy`` is the ``|``-split lineage; ``accession`` is the
     reference accession (or ``"No_hit"``).
     """
-    with open(path) as handle:
+    # [S112]: UTF-8 + surrogateescape, independent of the locale, so
+    # header bytes that are not valid UTF-8 pass through unchanged.
+    with open(path, encoding="utf-8", errors="surrogateescape") as handle:
         for line in handle:
             line = line.rstrip("\n")
             if not line:
@@ -152,6 +154,8 @@ def emit_results(path: str, out) -> None:
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
+    # [S112]: write back the bytes read by parse_hits(), unchanged.
+    sys.stdout.reconfigure(encoding="utf-8", errors="surrogateescape")
     emit_results(args.hits, sys.stdout)
     return 0
 

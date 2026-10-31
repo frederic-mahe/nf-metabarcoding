@@ -1,0 +1,59 @@
+nextflow_function {
+
+    name "check_majority_reference"
+    script "modules/local/functions.nf"
+    function "check_majority_reference"
+
+    // [S111]: --majority_assignment looks up each accession of the
+    // comma-separated `references` column, so a comma inside the
+    // --reference_dataset accession (a hybrid `id;tax=...;` token) is
+    // rejected at startup. First header only, like [S73].
+
+    test("a plain stampa header passes") {
+        // COVERAGE: [S111]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/stampa.fas")
+            f.parentFile.mkdirs()
+            f.text = ">refA Bacteria|Proteobacteria\nACGTACGT\n"
+        }
+        when { function { """
+            input[0] = '${outputDir}/stampa.fas'
+        """ } }
+        then { assert function.success }
+    }
+
+    test("a hybrid header is rejected") {
+        // COVERAGE: [S111]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/hybrid.fas")
+            f.parentFile.mkdirs()
+            f.text = ">refA;tax=d:Bacteria,p:Proteobacteria; Bacteria|Proteobacteria\nACGTACGT\n"
+        }
+        when { function { """
+            input[0] = '${outputDir}/hybrid.fas'
+        """ } }
+        then {
+            // the message is asserted at the workflow level in
+            // tests/main_majority_reference.nf.test.
+            assert function.failed
+        }
+    }
+
+    test("a gzip-compressed hybrid header aborts too") {
+        // COVERAGE: [S111]
+        tag "ci"
+        setup {
+            def f = file("${outputDir}/hybrid.fas.gz")
+            f.parentFile.mkdirs()
+            def out = new java.util.zip.GZIPOutputStream(f.newOutputStream())
+            out.write(">refA;tax=d:Bacteria,p:Proteobacteria; Bacteria|Proteobacteria\nACGTACGT\n".bytes)
+            out.close()
+        }
+        when { function { """
+            input[0] = '${outputDir}/hybrid.fas.gz'
+        """ } }
+        then { assert function.failed }
+    }
+}

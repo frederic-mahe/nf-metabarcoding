@@ -1606,20 +1606,37 @@ from placeholder values to real taxonomic assignments.
        `vsearch --sintax`; and
     2. the regular Part C path ([S49] / [S61]) when
        `--taxonomy_method=sintax`, where it replaces
-       `--reference_dataset` (stampa- and sintax-formatted
-       references differ in incompatible ways; a single file
-       cannot satisfy both methods in production use).
+       `--reference_dataset`.
+  The two flags name the two formats ([S47]); public databases ship
+  neither, and a reference prepared for one method does not carry
+  the header annotation the other method reads.
   When `--recover_unmerged` is **unset** (the default, [S78]) or
   `--reference_dataset_sintax` is **unset**, the shadow Part
   C workflow is silently skipped from every entry point (no
   error, no published shadow artefact) and the regular path
   must run through stampa. Path-typed normalisation ([S60])
-  applies — a leading `~` is expanded at workflow startup. This
-  parameter is a stop-gap exposed to give users a way out of the
-  one-format-fits-all bind until a better solution is identified
-  (e.g. an on-the-fly format converter or a multi-format reference
-  loader); the existence of two separate flags is the visible
-  workaround.
+  applies — a leading `~` is expanded at workflow startup.
+  Two flags are needed because a single run can consume both
+  formats at once: the default stampa assignment (and
+  `--majority_assignment`, [S66]) reads `--reference_dataset`, while
+  the shadow path (enabled by `--recover_unmerged`) always reads the
+  sintax-formatted file. A *hybrid* reference whose headers carry
+  both annotations (`>id;tax=d:…,p:…; Dom|Phy|…`) passes both
+  `[S73]` checks and is read correctly by both methods, so the same
+  file may be passed to both flags; on the stampa path the
+  `references` column then shows the full `id;tax=…;` token instead
+  of the bare `id`. The `tax=` part must contain no space, since
+  stampa splits the header at the first space. Hybrid references
+  are **not** supported with `--majority_assignment` ([S66]; rejected
+  at startup by [S111]): the
+  `tax=` token's commas collide with the comma-separated
+  `references` list, so the majority step cannot look the
+  accessions up.
+  - **Pass when (hybrid):** `stampa_merge.py` on a hit against a
+    hybrid header reports the `|`-separated lineage in `taxonomy`
+    and the full `id;tax=…;` token in `references`; and
+    `assign_taxonomy_sintax` against a hybrid reference reports the
+    `tax=` lineage.
   - **Pass when:** an end-to-end run that produces at least one
     `_notmerged` sample publishes
     `<basename>_notmerged_table_assigned.tsv` only when
@@ -1701,7 +1718,125 @@ from placeholder values to real taxonomic assignments.
     publishes no majority table; running with
     `--majority_assignment true --taxonomy_method sintax` aborts at
     startup with stderr naming `majority_assignment`.
-
+- `[S111]` `--majority_assignment` aborts at startup when the
+  `--reference_dataset` accession (the first header's text before the
+  first whitespace) contains a comma, as a hybrid reference's
+  `id;tax=d:…,p:…;` token does ([S64]). The majority step looks up
+  each accession of the comma-separated `references` column, so a
+  comma inside an accession cannot be looked up and would otherwise
+  crash the run at its last step. Like `[S73]`, the check reads only
+  the first header (bounded read, gzip decoded, `.bz2` skipped); the
+  message names `majority_assignment` and `reference_dataset`.
+  - **Pass when:** the check rejects a hybrid first header and
+    accepts a plain stampa header (plain and `.gz`); a run with
+    `--majority_assignment true` and a hybrid `--reference_dataset`
+    exits non-zero before any process runs, with stderr naming
+    `majority_assignment`.
+- `[S112]` Part C's Python helpers that handle reference taxonomy
+  text — `bin/stampa_merge.py`, `bin/update_occurrence_table.py` and
+  `bin/majority_assignment.py` — pass header bytes through unchanged.
+  They read and write UTF-8 with Python's `surrogateescape` error
+  handler, set explicitly rather than taken from the locale, so a
+  reference whose headers are not valid UTF-8 (e.g. a Latin-1 `é`,
+  byte `0xE9`) is neither rejected nor altered, and valid UTF-8 is
+  written back byte for byte, under any locale (including
+  `LC_ALL=C`). Detecting such headers is left to a full-reference
+  check (see `D22`); this bullet only guarantees that the helpers do
+  not crash on them or change them.
+  - **Pass when:** run as subprocesses under `LC_ALL=C`, each helper
+    copies a Latin-1 byte and a UTF-8 `é` from its input to its output
+    unchanged (stampa_merge.py: in the lineage; update_occurrence_table.py:
+    in the taxonomy column; majority_assignment.py: in the reference
+    lineage, plain and `.gz`).
+- `[S113]` An empty rank in a stampa reference lineage (`A||C|D`, or a
+  trailing `A|B|C|`) is an ordinary, empty name: the Python helpers
+  neither reject nor repair it. `bin/stampa_merge.py` keeps it when
+  every top hit agrees, and writes `*` when top hits disagree on that
+  rank (`[S49]`). `bin/majority_assignment.py` counts the empty name
+  like any other, so it can win a rank and is written with an empty
+  name, e.g. ` (2/3)` (`[S66]`); unlike a missing deeper rank, it is
+  not replaced with `NA`. A full-reference check may report empty
+  ranks as a warning (`D22`).
+  - **Pass when:** `stampa_merge.py` emits `A||C|D` for two hits on
+    `A||C|D`, `A|*|C|D` for hits on `A||C|D` and `A|B|C|D`, and
+    `A|B|C|` for two hits on `A|B|C|`; `majority_assignment.py`
+    reports `A (3/3)| (2/3)|C (3/3)|D (3/3)` for references
+    `A||C|D`, `A||C|D`, `A|B|C|D`.
+- `[S114]` Part C checks its whole reference before any assignment
+  (`D22`). A `check_reference` process (`bin/check_reference.py`)
+  reads every header of the reference once (plain, `.gz` or `.bz2`),
+  as an ordinary task, not at parse time (`D08`), and the assignment
+  process consumes its output, so no assignment task starts until the
+  check has passed. Each file is checked against the grammar of the
+  method that reads it: `--reference_dataset` with the stampa grammar
+  when `--taxonomy_method=stampa`; `--reference_dataset_sintax` with
+  the sintax grammar when `--taxonomy_method=sintax` and on the shadow
+  path (`[S50]`, `[S64]`). A hybrid file passed to both flags is
+  therefore checked once per grammar. The check runs on every Part C
+  run (regular, standalone `--occurrence_table` and
+  `--representatives_fasta`, shadow); no parameter skips it or changes
+  its severities, and `-resume` reuses its result. Grammars:
+    - stampa: `>accession<SPACE>lineage`, the accession being the text
+      before the first whitespace and the lineage the `|`-separated
+      text after it (`[S73]`);
+    - sintax: `>accession;tax=…`, the accession being the text before
+      the first `;`, followed by one or more comma-separated
+      `rank:name` fields, terminated by `;` or by the end of the
+      header (`[S73]`).
+  - **Pass when:** a reference with an error (`[S115]`) on its last
+    header aborts the run before any assignment task starts; the same
+    reference with that header fixed runs to completion; plain, `.gz`
+    and `.bz2` references are checked the same way; a shadow-path run
+    checks `--reference_dataset_sintax` with the sintax grammar.
+- `[S115]` errors found by `check_reference` (`[S114]`) abort the run.
+  The issue codes are:
+    - `format`: a header that does not match the grammar (no lineage
+      after the accession; no `;tax=` annotation), on any line;
+    - `invalid_utf8`: a header that is not valid UTF-8;
+    - `control_char`: a tab or another control character in a header;
+      a carriage return ending the line (CRLF file) is allowed;
+    - `duplicate_accession`: an accession already seen on an earlier
+      header (the majority step would silently keep only one);
+    - `comma_in_accession`: with `--majority_assignment`, a comma in
+      any accession (`[S111]`, extended to the whole file);
+    - `whitespace` (stampa grammar): whitespace at the start or end of
+      the lineage, e.g. two spaces after the accession or a trailing
+      space after the last rank, which `bin/stampa_merge.py` would
+      otherwise keep and so change the last common ancestor (`[S49]`)
+      without any signal.
+  - **Pass when:** `bin/check_reference.py` reports each code above on
+    a minimal reference that carries it, on a header other than the
+    first, and reports nothing on a clean stampa, sintax and hybrid
+    reference; a CRLF reference is clean; `comma_in_accession` is
+    reported only with `--majority_assignment`.
+- `[S116]` warnings found by `check_reference` (`[S114]`) are reported
+  and the run continues. The issue codes are:
+    - `empty_rank`: an empty rank (stampa `A||C`, or a trailing `|`;
+      sintax `p:` or an empty field), kept as an empty name downstream
+      (`[S113]`);
+    - `star_in_lineage`: a `*` in a lineage, which cannot be told
+      apart from the stampa last-common-ancestor wildcard (`[S49]`).
+  Uneven lineage depth across the file is expected and not reported.
+  - **Pass when:** `bin/check_reference.py` reports `empty_rank` and
+    `star_in_lineage` as warnings on minimal references that carry
+    them, and a run with such a reference completes the assignment.
+- `[S117]` `check_reference` (`[S114]`) writes a TSV report with a
+  header row and the columns `line`, `accession` and `issue` (the
+  codes of `[S115]` and `[S116]`), one row per finding, published to
+  `<outdir>/logs/part_c/` as `<basename>_reference_check.tsv` (shadow
+  path: `<basename>_notmerged_reference_check.tsv`). A clean reference
+  gives a header-only report. The report is published even when the
+  run aborts. When errors are found, the abort message names the
+  parameter (`reference_dataset` or `reference_dataset_sintax`), gives
+  the count per issue code and the first five offending headers (line
+  number and accession), and points to the report. When only warnings
+  are found, a warning with the same summary is logged and the run
+  continues.
+  - **Pass when:** a reference with errors leaves a published report
+    listing each finding with its line and accession, and the abort
+    message names the parameter, the counts and the report path; a
+    reference with only warnings logs a warning naming the report; a
+    clean reference publishes a header-only report.
 
 ## Fetch — download from ENA/SRA
 

@@ -357,6 +357,61 @@ def check_reference_format(value, String expected) {
 }
 
 
+def check_majority_reference(value) {
+    // [S111]: the majority step looks up each accession of the
+    // comma-separated `references` column, so a comma inside a
+    // --reference_dataset accession (the header text before the first
+    // whitespace, e.g. a hybrid `id;tax=d:...,p:...;` token, [S64])
+    // cannot be resolved and would crash the run at its last step.
+    // Reads only the first header, like check_reference_format() [S73];
+    // a missing file or a `.bz2` reference is left alone (the [S73]
+    // check already warned about the latter). Returns the value
+    // unchanged when valid; throws IllegalArgumentException otherwise.
+    def path_str
+    path_str = normalize_path(value).toString()
+    def ref_file
+    ref_file = file(path_str)
+    if ( !ref_file.exists() || path_str.endsWith('.bz2') ) {
+        return value
+    }
+    def header
+    header = reference_first_header(ref_file, path_str.endsWith('.gz'))
+    if ( header == null || !header.startsWith('>') ) {
+        return value
+    }
+    def accession
+    accession = header.substring(1).split(/\s/, 2)[0]
+    if ( accession.contains(',') ) {
+        throw new IllegalArgumentException(
+            "--majority_assignment cannot use this --reference_dataset: " +
+            "its accessions contain commas (a hybrid 'id;tax=...; " +
+            "lineage' header?), which the majority step cannot look up " +
+            "in the comma-separated references list. Use a plain " +
+            "stampa-formatted reference: ${header}")
+    }
+    return value
+}
+
+
+def reference_check_gate(report, summary) {
+    // [S117] (D22): publish the check_reference report to logs/part_c/
+    // ourselves, synchronously, so it is on disk even when the caller
+    // then stops the run (a publishDir copy could be cut short by the
+    // abort). Returns [status, message]: status is the summary's first
+    // line ('clean' | 'warning' | 'error'), message the rest, with the
+    // report's task-local name replaced by its published path.
+    def target
+    target = file("${log_dir('part_c')}/${report.name}")
+    target.parent.mkdirs()
+    report.copyTo(target)
+    def lines
+    lines = summary.readLines()
+    def message
+    message = lines.drop(1).join('\n').replace(report.name, target.toString())
+    return [lines[0], message]
+}
+
+
 def validate_params() {
     // Order-independent parameter guards, run once at the top of the
     // entry workflow (after the --help short-circuit) so an invalid value
@@ -455,6 +510,10 @@ def validate_params() {
     }
     if ( params.reference_dataset_sintax ) {
         check_reference_format(params.reference_dataset_sintax, 'sintax')
+    }
+    // [S111]: majority assignment needs comma-free accessions.
+    if ( coerce_bool(params.majority_assignment) && params.reference_dataset ) {
+        check_majority_reference(params.reference_dataset)
     }
 }
 

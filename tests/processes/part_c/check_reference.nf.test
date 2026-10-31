@@ -1,0 +1,123 @@
+nextflow_process {
+
+    name "check_reference"
+    script "modules/local/part_c/check_reference.nf"
+    process "check_reference"
+
+    // Inputs: reference, grammar (stampa | sintax), parameter name for
+    // the messages, majority flag, basename of the published report.
+
+    test("an error on the last header is reported, and the task still succeeds") {
+        // COVERAGE: [S114], [S117]
+        // [S114]: every header is read, not only the first.
+        // [S117]: the task succeeds and emits its report and summary, so
+        // the report is published even though the run will then abort.
+        tag "ci"
+        when {
+            process {
+                """
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>refA Bacteria|Proteobacteria\\nACGTACGT\\n' +
+                           '>refB Bacteria|Firmicutes \\nACGTACGT\\n'
+                input[0] = file(ref.toString())
+                input[1] = "stampa"
+                input[2] = "reference_dataset"
+                input[3] = false
+                input[4] = "proj"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def report = path(process.out.report.get(0))
+            assert report.fileName.toString() == "proj_reference_check.tsv"
+            assert report.readLines() == [
+                "line\taccession\tissue",
+                "3\trefB\twhitespace",
+            ]
+            def summary = path(process.out.summary.get(0)).readLines()
+            assert summary[0] == "error"
+            assert summary.join("\n").contains("reference_dataset")
+        }
+    }
+
+    test("a clean reference gives a header-only report") {
+        // COVERAGE: [S117]
+        tag "ci"
+        when {
+            process {
+                """
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>refA Bacteria|Proteobacteria\\nACGTACGT\\n'
+                input[0] = file(ref.toString())
+                input[1] = "stampa"
+                input[2] = "reference_dataset"
+                input[3] = false
+                input[4] = "proj"
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert path(process.out.report.get(0)).readLines() ==
+                ["line\taccession\tissue"]
+            assert path(process.out.summary.get(0)).readLines() == ["clean"]
+        }
+    }
+
+    test("a .bz2 reference is checked with the sintax grammar") {
+        // COVERAGE: [S114]
+        // .bz2 cannot be read at parse time ([S73]); the task reads it.
+        tag "ci"
+        when {
+            process {
+                """
+                def ref = workDir.resolve("reference.fas.bz2")
+                def text = '>refA;tax=d:Bacteria,p:Proteobacteria;\\nACGTACGT\\n' +
+                           '>refB;tax=d:Bacteria,p:;\\nACGTACGT\\n'
+                def proc = ['bzip2', '-c'].execute()
+                proc.outputStream.withStream { it << text.bytes }
+                ref.bytes = proc.inputStream.bytes
+                proc.waitFor()
+                input[0] = file(ref.toString())
+                input[1] = "sintax"
+                input[2] = "reference_dataset_sintax"
+                input[3] = false
+                input[4] = "proj"
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert path(process.out.report.get(0)).readLines() == [
+                "line\taccession\tissue",
+                "3\trefB\tempty_rank",
+            ]
+            assert path(process.out.summary.get(0)).readLines()[0] == "warning"
+        }
+    }
+
+    test("the majority flag turns on the comma check") {
+        // COVERAGE: [S114]
+        tag "ci"
+        when {
+            process {
+                """
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>refA Bacteria\\nACGTACGT\\n' +
+                           '>refB;tax=d:Bacteria,p:Firmicutes; Bacteria|Firmicutes\\nACGTACGT\\n'
+                input[0] = file(ref.toString())
+                input[1] = "stampa"
+                input[2] = "reference_dataset"
+                input[3] = true
+                input[4] = "proj"
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert path(process.out.report.get(0)).readLines().contains(
+                "3\trefB;tax=d:Bacteria,p:Firmicutes;\tcomma_in_accession")
+        }
+    }
+}
