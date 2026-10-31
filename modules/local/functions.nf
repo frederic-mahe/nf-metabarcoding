@@ -393,6 +393,25 @@ def check_majority_reference(value) {
 }
 
 
+def reference_check_gate(report, summary) {
+    // [S117] (D22): publish the check_reference report to logs/part_c/
+    // ourselves, synchronously, so it is on disk even when the caller
+    // then stops the run (a publishDir copy could be cut short by the
+    // abort). Returns [status, message]: status is the summary's first
+    // line ('clean' | 'warning' | 'error'), message the rest, with the
+    // report's task-local name replaced by its published path.
+    def target
+    target = file("${log_dir('part_c')}/${report.name}")
+    target.parent.mkdirs()
+    report.copyTo(target)
+    def lines
+    lines = summary.readLines()
+    def message
+    message = lines.drop(1).join('\n').replace(report.name, target.toString())
+    return [lines[0], message]
+}
+
+
 def validate_params() {
     // Order-independent parameter guards, run once at the top of the
     // entry workflow (after the --help short-circuit) so an invalid value

@@ -1,0 +1,214 @@
+nextflow_pipeline {
+
+    name "nf-metabarcoding: full-reference check before Part C assignment"
+    script "main.nf"
+
+    test("an error on the last reference header aborts before any assignment") {
+        // COVERAGE: [S114], [S115], [S117]
+        // [S114]: the whole reference is read, so a defect on the last
+        // header is caught; the assignment waits for the check.
+        // [S117]: the report is published even though the run aborts,
+        // and the abort message names the parameter, the counts, the
+        // offending header and the report.
+        tag "ci"
+        when {
+            params {
+                threads               = 1
+                outdir                = "${outputDir}/refcheck_error"
+                reference_dataset     = "${outputDir}/refcheck_error_ref.fas"
+                representatives_fasta = "${outputDir}/refcheck_error_reps.fas"
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/refcheck_error_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA Kingdom|Phylum|Class\nACGTACGTACGTACGTACGTACGTACGTACGT\n" +
+                ">refB Kingdom|Phylum|Other \nACGTACGTACGTACGTACGTACGTACGTACGA\n"
+            )
+            file("${outputDir}/refcheck_error_reps.fas").text =
+                ">amp1;size=10;\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+        }
+        then {
+            assert workflow.failed
+            def tasks = workflow.trace.tasks().collect { it.name }
+            assert !tasks.any { it.contains("assign_taxonomy") } :
+                "no assignment task may run, got: ${tasks}"
+            def report = file(
+                "${outputDir}/refcheck_error/logs/part_c/refcheck_error_reps_reference_check.tsv"
+            )
+            assert report.exists() :
+                "the report must be published even when the run aborts"
+            assert report.readLines() == [
+                "line\taccession\tissue",
+                "3\trefB\twhitespace",
+            ]
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
+            assert msg.contains("reference_dataset") :
+                "expected the abort to name the parameter, got: ${msg}"
+            assert msg.contains("whitespace: 1") :
+                "expected the count per issue code, got: ${msg}"
+            assert msg.contains("line 3: refB") :
+                "expected the offending header, got: ${msg}"
+            assert msg.contains("refcheck_error_reps_reference_check.tsv") :
+                "expected the report path, got: ${msg}"
+        }
+    }
+
+    test("the same reference with the header fixed runs to completion") {
+        // COVERAGE: [S114], [S117]
+        tag "ci"
+        when {
+            params {
+                threads               = 1
+                outdir                = "${outputDir}/refcheck_clean"
+                reference_dataset     = "${outputDir}/refcheck_clean_ref.fas"
+                representatives_fasta = "${outputDir}/refcheck_clean_reps.fas"
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/refcheck_clean_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA Kingdom|Phylum|Class\nACGTACGTACGTACGTACGTACGTACGTACGT\n" +
+                ">refB Kingdom|Phylum|Other\nACGTACGTACGTACGTACGTACGTACGTACGA\n"
+            )
+            file("${outputDir}/refcheck_clean_reps.fas").text =
+                ">amp1;size=10;\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+        }
+        then {
+            assert workflow.success
+            def tasks = workflow.trace.tasks().collect { it.name }
+            assert tasks.any { it.contains("check_reference") } :
+                "check_reference must run on every Part C run, got: ${tasks}"
+            assert file(
+                "${outputDir}/refcheck_clean/occurrence_table/refcheck_clean_reps_taxonomy_stampa.tsv"
+            ).exists()
+            assert file(
+                "${outputDir}/refcheck_clean/logs/part_c/refcheck_clean_reps_reference_check.tsv"
+            ).readLines() == ["line\taccession\tissue"]
+        }
+    }
+
+    test("warnings are reported and the assignment still runs") {
+        // COVERAGE: [S116], [S117]
+        tag "ci"
+        when {
+            params {
+                threads               = 1
+                outdir                = "${outputDir}/refcheck_warn"
+                reference_dataset     = "${outputDir}/refcheck_warn_ref.fas"
+                representatives_fasta = "${outputDir}/refcheck_warn_reps.fas"
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/refcheck_warn_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA Kingdom|Phylum|Class\nACGTACGTACGTACGTACGTACGTACGTACGT\n" +
+                ">refB Kingdom||Other\nACGTACGTACGTACGTACGTACGTACGTACGA\n"
+            )
+            file("${outputDir}/refcheck_warn_reps.fas").text =
+                ">amp1;size=10;\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+        }
+        then {
+            assert workflow.success
+            assert file(
+                "${outputDir}/refcheck_warn/occurrence_table/refcheck_warn_reps_taxonomy_stampa.tsv"
+            ).exists() : "warnings must not stop the assignment"
+            assert file(
+                "${outputDir}/refcheck_warn/logs/part_c/refcheck_warn_reps_reference_check.tsv"
+            ).readLines() == [
+                "line\taccession\tissue",
+                "3\trefB\tempty_rank",
+            ]
+            def msg = (workflow.stdout + workflow.stderr).toString()
+            assert msg.contains("empty_rank: 1") &&
+                msg.contains("refcheck_warn_reps_reference_check.tsv") :
+                "expected a warning naming the counts and the report, got: ${msg}"
+        }
+    }
+
+    test("--taxonomy_method=sintax checks --reference_dataset_sintax with the sintax grammar") {
+        // COVERAGE: [S114], [S115]
+        // A stampa header in a sintax reference is a format error.
+        tag "ci"
+        when {
+            params {
+                threads                  = 1
+                taxonomy_method          = "sintax"
+                outdir                   = "${outputDir}/refcheck_sintax"
+                reference_dataset_sintax = "${outputDir}/refcheck_sintax_ref.fas"
+                representatives_fasta    = "${outputDir}/refcheck_sintax_reps.fas"
+            }
+        }
+        setup {
+            def SEQ = "ACGGAATTCAGTATTCGATGCAATCAGTAGCATGCAGTTAATCGATGCATTAGCATGCAGTCATGCAATCGAGCATTAGC"
+            def ref = file("${outputDir}/refcheck_sintax_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA;tax=d:Bacteria,p:Proteobacteria;\n${SEQ}\n" +
+                ">refB Bacteria|Firmicutes\n${SEQ}\n"
+            )
+            file("${outputDir}/refcheck_sintax_reps.fas").text =
+                ">amp1;size=10;\n${SEQ}\n"
+        }
+        then {
+            assert workflow.failed
+            def tasks = workflow.trace.tasks().collect { it.name }
+            assert !tasks.any { it.contains("assign_taxonomy") } :
+                "no assignment task may run, got: ${tasks}"
+            assert file(
+                "${outputDir}/refcheck_sintax/logs/part_c/refcheck_sintax_reps_reference_check.tsv"
+            ).readLines().contains("3\trefB\tformat")
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
+            assert msg.contains("reference_dataset_sintax") :
+                "expected the abort to name the parameter, got: ${msg}"
+        }
+    }
+
+    test("the shadow path checks --reference_dataset_sintax with the sintax grammar") {
+        // COVERAGE: [S114], [S117]
+        // Regular path: stampa reference, clean. Shadow path: sintax
+        // reference with an empty rank (warning), reported in the
+        // shadow report <basename>_notmerged_reference_check.tsv.
+        tag "ci"
+        when {
+            params {
+                threads                  = 1
+                outdir                   = "${outputDir}/refcheck_shadow"
+                reference_dataset        = "${outputDir}/refcheck_shadow_ref.fas"
+                reference_dataset_sintax = "${outputDir}/refcheck_shadow_ref_sintax.fas"
+                occurrence_table         = "${outputDir}/refcheck_shadow_table.tsv"
+                sintax_cutoff            = 0.5
+                recover_unmerged         = true   // [S78]: opt in to the shadow path
+            }
+        }
+        setup {
+            def SEQ = "ACGGAATTCAGTATTCGATGCAATCAGTAGCATGCAGTTAATCGATGCATTAGCATGCAGTCATGCAATCGAGCATTAGC"
+            def ref = file("${outputDir}/refcheck_shadow_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = ">refA Bacteria|Proteobacteria\n${SEQ}\n"
+            file("${outputDir}/refcheck_shadow_ref_sintax.fas").text = (
+                ">refA;tax=d:Bacteria,p:Proteobacteria;\n${SEQ}\n" +
+                ">refB;tax=d:Bacteria,p:;\n${SEQ}A\n"
+            )
+            def header = "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n"
+            file("${outputDir}/refcheck_shadow_table.tsv").text = header +
+                "1\t10\tNA\tamp1\t80\t10\tN\t1\t0.001\t${SEQ}\t0.0\tNA\tNA\t10\n"
+            file("${outputDir}/refcheck_shadow_notmerged_table.tsv").text = header +
+                "1\t7\tNA\tampS\t80\t7\tN\t1\t0.001\t${SEQ}\t0.0\tNA\tNA\t7\n"
+        }
+        then {
+            assert workflow.success
+            def logs = "${outputDir}/refcheck_shadow/logs/part_c"
+            assert file("${logs}/refcheck_shadow_reference_check.tsv").readLines() ==
+                ["line\taccession\tissue"]
+            assert file("${logs}/refcheck_shadow_notmerged_reference_check.tsv").readLines() == [
+                "line\taccession\tissue",
+                "3\trefB\tempty_rank",
+            ]
+        }
+    }
+}

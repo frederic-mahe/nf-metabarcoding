@@ -16,7 +16,45 @@ include { sort_taxonomy }                                  from '../../modules/l
 include { assign_taxonomy_sintax }                         from '../../modules/local/part_c/assign_taxonomy_sintax.nf'
 include { update_occurrence_table }                        from '../../modules/local/part_c/update_occurrence_table.nf'
 include { compute_majority_assignment }                    from '../../modules/local/part_c/compute_majority_assignment.nf'
-include { normalize_path; log_dir; coerce_bool }             from '../../modules/local/functions.nf'
+include { check_reference }                                from '../../modules/local/part_c/check_reference.nf'
+include { normalize_path; log_dir; coerce_bool; reference_check_gate } from '../../modules/local/functions.nf'
+
+
+workflow checked_reference {
+    // [S114]-[S117] (D22): check every header of `reference` against
+    // `grammar`, publish the report, then stop the run on errors or
+    // print a warning on stderr (like the startup warnings). Emits the reference itself once the check has passed:
+    // the assignment consumes this channel instead of the bare file, so
+    // no assignment task starts before the check is done.
+
+    take:
+    reference   // value channel: Path to the reference fasta
+    grammar     // 'stampa' | 'sintax'
+    parameter   // 'reference_dataset' | 'reference_dataset_sintax'
+    majority    // boolean: reject commas in accessions ([S111])
+    basename    // value channel: <basename>
+
+    main:
+    check_reference(reference, grammar, parameter, majority, basename)
+
+    def passed = check_reference.out.report
+        .combine(check_reference.out.summary)
+        .combine(reference)
+        .map { report, summary, reference_path ->
+            def gate = reference_check_gate(report, summary)
+            if ( gate[0] == 'error' ) {
+                error(gate[1])
+            }
+            if ( gate[0] == 'warning' ) {
+                System.err.println("WARNING: ${gate[1]}")
+            }
+            reference_path
+        }
+        .first()   // value channel: reused by every stampa chunk
+
+    emit:
+    reference = passed
+}
 
 
 workflow part_C_assign {
@@ -40,9 +78,19 @@ workflow part_C_assign {
     // space-separated lineage in the header and sintax expects a
     // `;tax=...;` annotation. The relevant assert in the entry point
     // already guarantees the matching flag is set before we land here.
-    def reference = ( params.taxonomy_method == 'sintax' )
+    def reference_file = channel.value(( params.taxonomy_method == 'sintax' )
         ? file(normalize_path(params.reference_dataset_sintax))
-        : file(normalize_path(params.reference_dataset))
+        : file(normalize_path(params.reference_dataset)))
+
+    // [S114]: check the whole reference with the grammar of the
+    // selected method; the assignment waits for the check.
+    if ( params.taxonomy_method == 'sintax' ) {
+        checked_reference(reference_file, 'sintax', 'reference_dataset_sintax', false, basename)
+    } else {
+        checked_reference(reference_file, 'stampa', 'reference_dataset',
+            coerce_bool(params.majority_assignment), basename)
+    }
+    def reference = checked_reference.out.reference
 
     def assignments
     if ( params.taxonomy_method == 'sintax' ) {
@@ -209,7 +257,13 @@ workflow part_C_shadow {
     // Entry points gate this workflow on params.reference_dataset_sintax
     // being non-null, so the file() call below is safe by the time the
     // workflow is invoked.
-    def reference = file(normalize_path(params.reference_dataset_sintax))
+    // [S114]: check the sintax reference before the shadow assignment;
+    // it runs even when there is nothing to assign (every Part C run).
+    checked_reference(
+        channel.value(file(normalize_path(params.reference_dataset_sintax))),
+        'sintax', 'reference_dataset_sintax', false, basename,
+    )
+    def reference = checked_reference.out.reference
 
     def populated = occurrence_table.filter { tbl ->
         // any non-empty line after the header → there is at least one
