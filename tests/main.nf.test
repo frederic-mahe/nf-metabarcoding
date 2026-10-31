@@ -123,9 +123,10 @@ nextflow_pipeline {
                     "--help output should contain '${marker}', got: ${out}"
             }
 
-            // no process should run on --help — workflow.stdout
-            // lists every executed process, so an empty intersection
+            // no process should run on --help — workflow.trace
+            // lists every executed task, so an empty intersection
             // with the process names confirms nothing fired.
+            def tasks = workflow.trace.tasks().collect { it.name }.toString()
             ["merge_fastq_pairs",
              "trim_primers",
              "filter_and_convert_to_fasta",
@@ -135,8 +136,8 @@ nextflow_pipeline {
              "global_clustering",
              "discover_inputs",
              "discover_part_b_fasta"].each { proc ->
-                assert !out.contains(proc) :
-                    "--help must not trigger ${proc}, got: ${out}"
+                assert !tasks.contains(proc) :
+                    "--help must not trigger ${proc}, got: ${tasks}"
             }
         }
     }
@@ -161,7 +162,7 @@ nextflow_pipeline {
     test("--no_trimming true skips the trim_primers step") {
         // COVERAGE: [S20]
         // The trim_primers process must not appear in the workflow
-        // trace. We check workflow.stdout (which lists every process
+        // trace. We check workflow.trace (which lists every task
         // run) rather than the absence of the
         // paired_merge_ok_trimming_forward/_reverse.log files
         // — `tests/data/` is shared across cases, so other tests in
@@ -277,8 +278,8 @@ nextflow_pipeline {
         // trim_primers is entirely absent from the trace while the
         // shadow-only join_notmerged / strip_reads still run proves
         // --no_trimming reaches the shadow pipeline too.
-        // As in the sibling [S20] test, we check workflow.stdout (the
-        // process trace) rather than the absence of a published
+        // As in the sibling [S20] test, we check workflow.trace (the
+        // task list) rather than the absence of a published
         // _notmerged_trimming_forward/_reverse.log — tests/data/ is
         // shared across cases and the [S04] test may have just
         // published those.
