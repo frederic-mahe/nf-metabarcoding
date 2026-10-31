@@ -1616,7 +1616,8 @@ from placeholder values to real taxonomic assignments.
   `references` column then shows the full `id;tax=…;` token instead
   of the bare `id`. The `tax=` part must contain no space, since
   stampa splits the header at the first space. Hybrid references
-  are **not** supported with `--majority_assignment` ([S66]): the
+  are **not** supported with `--majority_assignment` ([S66]; rejected
+  at startup by [S111]): the
   `tax=` token's commas collide with the comma-separated
   `references` list, so the majority step cannot look the
   accessions up.
@@ -1706,6 +1707,20 @@ from placeholder values to real taxonomic assignments.
     publishes no majority table; running with
     `--majority_assignment true --taxonomy_method sintax` aborts at
     startup with stderr naming `majority_assignment`.
+- `[S111]` `--majority_assignment` aborts at startup when the
+  `--reference_dataset` accession (the first header's text before the
+  first whitespace) contains a comma, as a hybrid reference's
+  `id;tax=d:…,p:…;` token does ([S64]). The majority step looks up
+  each accession of the comma-separated `references` column, so a
+  comma inside an accession cannot be looked up and would otherwise
+  crash the run at its last step. Like `[S73]`, the check reads only
+  the first header (bounded read, gzip decoded, `.bz2` skipped); the
+  message names `majority_assignment` and `reference_dataset`.
+  - **Pass when:** the check rejects a hybrid first header and
+    accepts a plain stampa header (plain and `.gz`); a run with
+    `--majority_assignment true` and a hybrid `--reference_dataset`
+    exits non-zero before any process runs, with stderr naming
+    `majority_assignment`.
 
 
 ## Fetch — download from ENA/SRA

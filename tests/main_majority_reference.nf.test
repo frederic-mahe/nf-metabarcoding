@@ -1,0 +1,46 @@
+nextflow_pipeline {
+
+    name "nf-metabarcoding: --majority_assignment reference guard"
+    script "main.nf"
+
+    test("--majority_assignment with a hybrid --reference_dataset aborts at startup") {
+        // COVERAGE: [S111]
+        // [S111]: a hybrid header's `id;tax=d:...,p:...;` accession holds
+        // commas, which the majority step cannot look up in the
+        // comma-separated `references` column. The run must abort before
+        // any process runs, naming both flags.
+        tag "ci"
+        when {
+            params {
+                threads             = 1
+                outdir              = "${outputDir}/majority_hybrid"
+                reference_dataset   = "${outputDir}/majority_hybrid_ref.fas"
+                occurrence_table    = "${outputDir}/majority_hybrid_table.tsv"
+                majority_assignment = true
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/majority_hybrid_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = (
+                ">refA;tax=d:Bacteria,p:Proteobacteria; Bacteria|Proteobacteria\n" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            )
+            def tab = file("${outputDir}/majority_hybrid_table.tsv")
+            tab.text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t32\t10\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t10\n"
+            )
+        }
+        then {
+            assert workflow.failed
+            assert workflow.trace.tasks().isEmpty() :
+                "no process may run, got: ${workflow.trace.tasks().collect { it.name }}"
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
+            assert msg.contains("majority_assignment") && msg.contains("reference_dataset") :
+                "expected an abort naming both flags, got: ${msg}"
+        }
+    }
+}
