@@ -228,15 +228,26 @@ the latter case.
     required parameters ("supplying the parameter via either
     `-params-file` or `--key value` lets the run proceed").
   - Booleans are the exception. A boolean set in a config file or
-    `-params-file` arrives as a real Boolean, but the same flag
-    overridden on the command line (`--flag false`) arrives as the
-    String `'false'` — which is truthy, so a bare `params.flag ? ..` /
-    `if (params.flag)` test would read `--flag false` as ON (and a
-    default-true flag such as `--fastidious` could not be turned off
-    from the command line at all). Every boolean param is therefore
+    `-params-file` arrives as a real Boolean, but on Nextflow 26.x the
+    same flag overridden on the command line (`--flag false`) arrives
+    as the String `'false'` — which is truthy, so a bare
+    `params.flag ? ..` / `if (params.flag)` test would read
+    `--flag false` as ON (and a default-true flag such as
+    `--fastidious` could not be turned off from the command line at
+    all). Nextflow 25.10 converts `--flag false` to a real Boolean
+    itself. Every boolean param is therefore
     read through `coerce_bool()` (`modules/local/functions.nf`), which
     normalises both forms to a real Boolean so a CLI `--flag false` and
-    a config `flag = false` behave identically. Covered by
+    a config `flag = false` behave identically on every supported
+    version.
+  - The per-flag `tests/main.nf.test` cases simulate the 26.x
+    command line: nf-test passes `params { flag = 'false' }` through a
+    JSON `-params-file`, so the value arrives as the String `'false'`.
+    On Nextflow 25.10, `validateParameters()` rejects a String for a
+    boolean-typed parameter (`Value is [string] but should be
+    [boolean]`) before `coerce_bool()` runs, so these cases only hold
+    on Nextflow >= 26.04 (the version the CI nf-test job runs). A real
+    `--flag false` on the 25.10 command line is unaffected. Covered by
     `tests/functions/coerce_bool.nf.test`, the per-flag cases in
     `tests/main.nf.test` (`--help`, `--no_trimming`,
     `--recover_unmerged`, `--majority_assignment`,
