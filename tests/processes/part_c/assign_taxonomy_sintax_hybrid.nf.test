@@ -1,0 +1,45 @@
+nextflow_process {
+
+    name "assign_taxonomy_sintax (hybrid reference)"
+    script "modules/local/part_c/assign_taxonomy_sintax.nf"
+    process "assign_taxonomy_sintax"
+
+    test("reads the tax= lineage of a hybrid reference header") {
+        // COVERAGE: [S64]
+        // [S64]: a hybrid header (`>id;tax=...; stampa|lineage`) can be
+        // passed to --reference_dataset_sintax; vsearch --sintax reads
+        // the `tax=` annotation and ignores the stampa lineage after
+        // the space.
+        tag "ci"
+        when {
+            params {
+                threads       = 1
+                sintax_cutoff = 0.9
+            }
+            process {
+                """
+                def SEQ = 'ACGGAATTCAGTATTCGATGCAATCAGTAGCATGCAGTTAATCGATGCATTAGCATGCAGTCATGCAATCGAGCATTAGC'
+                def reps = workDir.resolve("reps.fas")
+                reps.text = '>amp1;size=10;\\n' + SEQ + '\\n'
+                def ref = workDir.resolve("reference.fas")
+                ref.text = '>refA;tax=d:Bacteria,p:Proteobacteria,c:Gammaproteobacteria; Bacteria|Proteobacteria|Gammaproteobacteria\\n' + SEQ + '\\n'
+                input[0] = file(reps.toString())
+                input[1] = file(ref.toString())
+                input[2] = "proj_1_samples"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def rows = path(process.out.taxonomy.get(0)).readLines()
+            assert rows.size() == 1 :
+                "expected one row per query, got: ${rows}"
+            def taxonomy = rows[0].split("\t", -1)[3]
+            assert taxonomy.contains("d:Bacteria") &&
+                taxonomy.contains("c:Gammaproteobacteria") :
+                "expected the tax= lineage, got: ${taxonomy}"
+            assert !taxonomy.contains("|") :
+                "the stampa lineage must not leak into sintax output, got: ${taxonomy}"
+        }
+    }
+}

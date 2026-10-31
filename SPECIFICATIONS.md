@@ -1595,20 +1595,36 @@ from placeholder values to real taxonomic assignments.
        `vsearch --sintax`; and
     2. the regular Part C path ([S49] / [S61]) when
        `--taxonomy_method=sintax`, where it replaces
-       `--reference_dataset` (stampa- and sintax-formatted
-       references differ in incompatible ways; a single file
-       cannot satisfy both methods in production use).
+       `--reference_dataset`.
+  The two flags name the two formats ([S47]); public databases ship
+  neither, and a reference prepared for one method does not carry
+  the header annotation the other method reads.
   When `--recover_unmerged` is **unset** (the default, [S78]) or
   `--reference_dataset_sintax` is **unset**, the shadow Part
   C workflow is silently skipped from every entry point (no
   error, no published shadow artefact) and the regular path
   must run through stampa. Path-typed normalisation ([S60])
-  applies — a leading `~` is expanded at workflow startup. This
-  parameter is a stop-gap exposed to give users a way out of the
-  one-format-fits-all bind until a better solution is identified
-  (e.g. an on-the-fly format converter or a multi-format reference
-  loader); the existence of two separate flags is the visible
-  workaround.
+  applies — a leading `~` is expanded at workflow startup.
+  Two flags are needed because a single run can consume both
+  formats at once: the default stampa assignment (and
+  `--majority_assignment`, [S66]) reads `--reference_dataset`, while
+  the shadow path (enabled by `--recover_unmerged`) always reads the
+  sintax-formatted file. A *hybrid* reference whose headers carry
+  both annotations (`>id;tax=d:…,p:…; Dom|Phy|…`) passes both
+  `[S73]` checks and is read correctly by both methods, so the same
+  file may be passed to both flags; on the stampa path the
+  `references` column then shows the full `id;tax=…;` token instead
+  of the bare `id`. The `tax=` part must contain no space, since
+  stampa splits the header at the first space. Hybrid references
+  are **not** supported with `--majority_assignment` ([S66]): the
+  `tax=` token's commas collide with the comma-separated
+  `references` list, so the majority step cannot look the
+  accessions up.
+  - **Pass when (hybrid):** `stampa_merge.py` on a hit against a
+    hybrid header reports the `|`-separated lineage in `taxonomy`
+    and the full `id;tax=…;` token in `references`; and
+    `assign_taxonomy_sintax` against a hybrid reference reports the
+    `tax=` lineage.
   - **Pass when:** an end-to-end run that produces at least one
     `_notmerged` sample publishes
     `<basename>_notmerged_table_assigned.tsv` only when
