@@ -9,6 +9,8 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-31
+
 ### Added
 
 - Part C checks every header of its reference before any assignment
@@ -31,6 +33,16 @@ version here must match `manifest.version` in
   the run.
 - README: a "Reference datasets and the reference check" section
   describes the two reference formats, hybrid files and the check.
+- Every `bin/*.py` helper now checks the Python version before anything
+  else and, on Python < 3.10, exits with status 1 and a one-line message
+  naming the script, the required and the found version, and suggesting
+  an engine profile (`[S109]`). Previously such a run crashed with a
+  `SyntaxError` or `TypeError` deep in the file. This happens when no
+  container or conda profile is enabled and tasks use the host's
+  `python3`, e.g. `-profile genotoul,demo`, where the compute nodes ship
+  Python 3.6. The helpers no longer use
+  `from __future__ import annotations`, which is itself a `SyntaxError`
+  on Python < 3.7 and would hide the check.
 
 ### Changed
 
@@ -46,24 +58,6 @@ version here must match `manifest.version` in
   `majority_assignment.py` no longer crash on reference headers that
   are not valid UTF-8 (e.g. a Latin-1 `é`); they pass those bytes
   through unchanged, whatever the locale (`[S112]`).
-
-## [0.7.0] - 2026-10-30
-
-### Added
-
-- Every `bin/*.py` helper now checks the Python version before anything
-  else and, on Python < 3.10, exits with status 1 and a one-line message
-  naming the script, the required and the found version, and suggesting
-  an engine profile (`[S109]`). Previously such a run crashed with a
-  `SyntaxError` or `TypeError` deep in the file. This happens when no
-  container or conda profile is enabled and tasks use the host's
-  `python3`, e.g. `-profile genotoul,demo`, where the compute nodes ship
-  Python 3.6. The helpers no longer use
-  `from __future__ import annotations`, which is itself a `SyntaxError`
-  on Python < 3.7 and would hide the check.
-
-### Fixed
-
 - `main.nf` failed to compile on Nextflow 26.10+ (`Return statement
   cannot be used in a workflow body`). The entry workflow now selects
   its run mode with an `if` / `else if` / `else` chain, and the Part A
