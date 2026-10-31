@@ -1131,8 +1131,8 @@ their COVERAGE rows are `done`.
 
 **Blocks:** `[S114]`, `[S115]`, `[S116]`, `[S117]`. Related: `[S73]`,
 `[S94]`, `[S111]`, `[S112]`, `[S113]`, `D08`.
-**Status:** `resolved` — answers recorded (2026-10-31); spec bullets
-`[S114]`–`[S117]` added, tests and code pending
+**Status:** `resolved` — implemented, spec and tests reflect it
+(2026-10-31, `[S114]`–`[S117]`).
 
 Raised 2026-10-31. The startup checks (`[S73]` format sniff, `[S111]`
 majority guard) read only the **first** header of a reference, by
