@@ -198,7 +198,8 @@ fixed layout:
 │   │   ├── <basename>_<step>.log       Part B step logs
 │   │   └── <basename>_read_counts.tsv  per-sample read/cluster
 │   │                           tracking summary (Part B runs)
-│   └── part_c/             Part C taxonomy log
+│   └── part_c/             Part C taxonomy log and reference check
+│                           report (<basename>_reference_check.tsv)
 └── pipeline_info/      software_versions.yml (tool versions) +
                         execution_{report,timeline}.html,
                         execution_trace.txt, pipeline_dag.html
@@ -277,6 +278,63 @@ folders you or a trusted colleague produced.** The pipeline validates
 sample-ID characters and rejects cells that would corrupt its internal
 tables, but it does not — and is not meant to — sandbox which paths a
 samplesheet is allowed to reference.
+
+### Reference datasets and the reference check
+
+Part C assigns taxonomy against a reference fasta whose headers carry
+the lineage. Two header formats exist, one per method:
+
+| Flag                         | Read by                                   | Header format                        |
+|------------------------------|-------------------------------------------|--------------------------------------|
+| `--reference_dataset`        | stampa (default `--taxonomy_method`), `--majority_assignment` | `>accession Bacteria\|Proteobacteria\|...` |
+| `--reference_dataset_sintax` | `--taxonomy_method=sintax`, the shadow path (`--recover_unmerged`) | `>accession;tax=d:Bacteria,p:Proteobacteria,...;` |
+
+A *hybrid* file whose headers carry both annotations
+(`>accession;tax=d:...,p:...; Bacteria|Proteobacteria`) can be passed to
+both flags, but not with `--majority_assignment`: its accessions contain
+commas, and the run aborts at startup (`[S111]`). References may be
+plain, gzip (`.gz`) or bzip2 (`.bz2`) compressed.
+
+At startup, the pipeline only reads the **first** header of each
+reference, to catch a swapped or wrong-format file early. Before the
+assignment, a `check_reference` task then reads **every** header with
+the rules of the method that will use the file (`[S114]`). It runs on
+every Part C run, including the shadow path; `-resume` reuses its
+result, so a large reference is checked once.
+
+**Errors stop the run before the assignment** (`[S115]`):
+
+| Issue code            | Meaning                                                        |
+|-----------------------|----------------------------------------------------------------|
+| `format`              | the header does not follow the format above                     |
+| `invalid_utf8`        | the header is not valid UTF-8 (e.g. a Latin-1 `é`)              |
+| `control_char`        | a tab or another control character (CRLF line ends are fine)    |
+| `duplicate_accession` | the same accession appears twice                               |
+| `comma_in_accession`  | a comma in an accession, with `--majority_assignment` only     |
+| `whitespace`          | stampa only: two spaces after the accession, or a trailing space after the lineage |
+
+The `whitespace` error matters because the lineage is copied as is: a
+trailing space turns `Genus` into `Genus `, which then disagrees with
+the other references and silently changes the result.
+
+**Warnings are reported and the run continues** (`[S116]`):
+
+| Issue code        | Meaning                                                               |
+|-------------------|-----------------------------------------------------------------------|
+| `empty_rank`      | an empty rank (`A\|\|C`, a trailing `\|`, sintax `p:`); it stays an empty name in the results (`[S113]`) |
+| `star_in_lineage` | a `*` in a lineage, which looks like stampa's "ranks disagree" marker |
+
+Lineages of different depths are normal and not reported.
+
+Every finding is listed in `<outdir>/logs/part_c/<basename>_reference_check.tsv`
+(columns `line`, `accession`, `issue`; `<basename>_notmerged_reference_check.tsv`
+for the shadow path), published even when the run stops (`[S117]`). The
+error or warning message gives the counts per issue, the first five
+offending headers and the report's path. The check cannot be turned
+off: fix the reference (the report gives each line number) and rerun.
+Header bytes that are not valid UTF-8 never crash the taxonomy helpers
+themselves (`[S112]`), but the check rejects them so they are fixed at
+the source.
 
 
 ## Running with containers
