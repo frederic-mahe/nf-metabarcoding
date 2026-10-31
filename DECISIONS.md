@@ -1125,3 +1125,78 @@ Resolved 2026-07-10: the pass is implemented (`recluster_search` →
 `recluster_merge`, `bin/recluster_otu_table.py`), gated in both
 `part_B` and `part_B_shadow`, `[S102]`–`[S105]` carry green tests, and
 their COVERAGE rows are `done`.
+
+
+## D22 — full-reference check before Part C assignment
+
+**Blocks:** nothing yet; future `[Sxx]` bullets for a `check_reference`
+process. Related: `[S73]`, `[S94]`, `[S111]`, `[S112]`, `D08`.
+**Status:** `open`
+
+Raised 2026-10-31. The startup checks (`[S73]` format sniff, `[S111]`
+majority guard) read only the **first** header of a reference, by
+design: `D08` forbids parse-time filesystem work beyond a declared
+input's header, and `[S94]` bounds that read. Defects further down the
+file therefore surface late, or not at all. Measured on the stampa path
+(`vsearch --usearch_global` + `bin/stampa_merge.py`, `LC_ALL=C`):
+
+| Header defect (not on line 1)        | Outcome today                               |
+|--------------------------------------|---------------------------------------------|
+| non-ASCII, valid UTF-8               | works                                       |
+| CRLF line endings                    | works (vsearch strips the `\r`)             |
+| empty rank (`A\|\|C`)                | passed through as is                        |
+| invalid UTF-8 (Latin-1 `é`)          | crashed after vsearch; fixed by `[S112]`     |
+| tab in a header                      | crash (`ValueError`) after vsearch          |
+| header without a lineage             | crash (`ValueError`) after vsearch          |
+| trailing space after the lineage     | **silent**: last rank becomes `Genus ` |
+| two spaces after the accession       | **silent**: lineage starts with a space     |
+
+The crashes happen after the most expensive step (exhaustive search,
+`[S108]`); the silent cases change the LCA (`[S49]`, `D18`) without any
+signal. `[S112]` already makes the helpers pass non-UTF-8 bytes through
+unchanged; silently *repairing* taxonomy (trimming spaces, etc.) is
+ruled out, because it would change scientific results invisibly.
+
+**Proposal.** A `check_reference` process at the start of Part C reads
+the whole reference once (plain, `.gz`, `.bz2`) as an ordinary task
+(compute node, not parse time), gates the assignment (the assignment
+consumes its output), and writes a short report under `logs/part_c/`
+(line numbers, first few offending headers). `-resume` reuses its
+result. Draft classification:
+
+- **Errors (abort before assignment):**
+  - a header that does not match the method's format (stampa:
+    `>id <lineage>`; sintax: `>id;tax=…;`), on any line;
+  - invalid UTF-8;
+  - a tab or another control character in a header;
+  - duplicate accessions (the majority step currently overwrites
+    them silently);
+  - with `--majority_assignment`, a comma in any accession (`[S111]`
+    extended to the whole file).
+- **Warnings (reported, run continues):**
+  - extra or trailing whitespace around the lineage;
+  - empty ranks;
+  - `*` inside a lineage (collides with the LCA wildcard);
+  - very uneven lineage depth across the file.
+
+Rejected alternative: a "check and normalise" process that also writes
+a cleaned copy used downstream. More forgiving, but it copies a
+multi-GB reference on every run and still rewrites headers behind the
+user's back. A cleaned reference belongs to the preparation mode
+(`TBD_20260922_databases.md`, proposed `D21`), whose output would pass
+this check by construction.
+
+**Open questions:**
+
+1. Is the error / warning split above right? In particular, should
+   the whitespace cases (silent result changes) be errors rather than
+   warnings?
+2. Should warnings be promotable to errors (e.g. a
+   `--strict_reference` flag), or stay advisory?
+3. Report format and location: a TSV (`line`, `accession`, `issue`)
+   under `logs/part_c/`, or only a summary in the error message?
+4. Should the shadow path's sintax reference (`[S50]`, `[S64]`) be
+   checked by the same process (same rules, sintax grammar)?
+5. Does the check run on every Part C run, or can it be skipped
+   (`--skip_reference_check`) for references already known to be
+   clean, given that `-resume` already caches it?
