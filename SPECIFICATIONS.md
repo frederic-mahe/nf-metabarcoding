@@ -1737,6 +1737,20 @@ from placeholder values to real taxonomic assignments.
     unchanged (stampa_merge.py: in the lineage; update_occurrence_table.py:
     in the taxonomy column; majority_assignment.py: in the reference
     lineage, plain and `.gz`).
+- `[S113]` An empty rank in a stampa reference lineage (`A||C|D`, or a
+  trailing `A|B|C|`) is an ordinary, empty name: the Python helpers
+  neither reject nor repair it. `bin/stampa_merge.py` keeps it when
+  every top hit agrees, and writes `*` when top hits disagree on that
+  rank (`[S49]`). `bin/majority_assignment.py` counts the empty name
+  like any other, so it can win a rank and is written with an empty
+  name, e.g. ` (2/3)` (`[S66]`); unlike a missing deeper rank, it is
+  not replaced with `NA`. A full-reference check may report empty
+  ranks as a warning (`D22`).
+  - **Pass when:** `stampa_merge.py` emits `A||C|D` for two hits on
+    `A||C|D`, `A|*|C|D` for hits on `A||C|D` and `A|B|C|D`, and
+    `A|B|C|` for two hits on `A|B|C|`; `majority_assignment.py`
+    reports `A (3/3)| (2/3)|C (3/3)|D (3/3)` for references
+    `A||C|D`, `A||C|D`, `A|B|C|D`.
 
 ## Fetch — download from ENA/SRA
 
