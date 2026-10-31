@@ -1721,7 +1721,22 @@ from placeholder values to real taxonomic assignments.
     `--majority_assignment true` and a hybrid `--reference_dataset`
     exits non-zero before any process runs, with stderr naming
     `majority_assignment`.
-
+- `[S112]` Part C's Python helpers that handle reference taxonomy
+  text — `bin/stampa_merge.py`, `bin/update_occurrence_table.py` and
+  `bin/majority_assignment.py` — pass header bytes through unchanged.
+  They read and write UTF-8 with Python's `surrogateescape` error
+  handler, set explicitly rather than taken from the locale, so a
+  reference whose headers are not valid UTF-8 (e.g. a Latin-1 `é`,
+  byte `0xE9`) is neither rejected nor altered, and valid UTF-8 is
+  written back byte for byte, under any locale (including
+  `LC_ALL=C`). Detecting such headers is left to a full-reference
+  check (see `D22`); this bullet only guarantees that the helpers do
+  not crash on them or change them.
+  - **Pass when:** run as subprocesses under `LC_ALL=C`, each helper
+    copies a Latin-1 byte and a UTF-8 `é` from its input to its output
+    unchanged (stampa_merge.py: in the lineage; update_occurrence_table.py:
+    in the taxonomy column; majority_assignment.py: in the reference
+    lineage, plain and `.gz`).
 
 ## Fetch — download from ENA/SRA
 

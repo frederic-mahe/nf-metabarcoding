@@ -104,11 +104,17 @@ def open_reference(filename: str) -> TextIO:
     """
     with open(filename, "rb") as probe:
         signature = probe.read(2)
+    # [S112]: UTF-8 + surrogateescape, independent of the locale, so
+    # header bytes that are not valid UTF-8 pass through unchanged.
     if signature == GZIP_MAGIC:
-        return gzip.open(filename, "rt")
+        return gzip.open(
+            filename, "rt", encoding="utf-8", errors="surrogateescape"
+        )
     if signature == BZIP2_MAGIC:
-        return bz2.open(filename, "rt")
-    return open(filename, "rt")
+        return bz2.open(
+            filename, "rt", encoding="utf-8", errors="surrogateescape"
+        )
+    return open(filename, "rt", encoding="utf-8", errors="surrogateescape")
 
 
 def parse_fasta(filename: str) -> dict[str, str]:
@@ -165,7 +171,9 @@ def majority_rows(
 ) -> Iterator[tuple[str, str, str]]:
     """Yield ``(OTU, amplicon, taxonomy_majority)`` for each table row."""
     csv.field_size_limit(sys.maxsize)  # some reference lists are very long
-    with open(filename) as csvfile:
+    with open(
+        filename, encoding="utf-8", errors="surrogateescape"
+    ) as csvfile:
         tablereader = csv.DictReader(csvfile, delimiter="\t")
         for row in tablereader:
             yield (
@@ -187,6 +195,8 @@ def emit_table(
 def main(argv: Optional[list[str]] = None) -> int:
     """Merge multiple top-hit assignments into a majority assignment."""
     args = parse_args(argv)
+    # [S112]: write back the bytes read from the reference, unchanged.
+    sys.stdout.reconfigure(encoding="utf-8", errors="surrogateescape")
     accessions = parse_fasta(args.reference_db)
     emit_table(majority_rows(args.input_table, accessions))
     return 0

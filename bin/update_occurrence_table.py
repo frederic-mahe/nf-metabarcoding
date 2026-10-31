@@ -81,7 +81,9 @@ def parse_assignments(path: str) -> dict[str, tuple[str, str, str]]:
     data, keeping the join correct whether or not a header is present.
     """
     assignments: dict[str, tuple[str, str, str]] = {}
-    with open(path) as handle:
+    # [S112]: UTF-8 + surrogateescape, independent of the locale, so
+    # taxonomy bytes that are not valid UTF-8 pass through unchanged.
+    with open(path, encoding="utf-8", errors="surrogateescape") as handle:
         for line in handle:
             line = line.rstrip("\n")
             if not line:
@@ -99,7 +101,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
     assignments = parse_assignments(args.assignments)
 
-    with open(args.occurrence_table) as handle:
+    # [S112]: same encoding on the table and on stdout, so every byte
+    # is written back unchanged.
+    sys.stdout.reconfigure(encoding="utf-8", errors="surrogateescape")
+    with open(
+        args.occurrence_table, encoding="utf-8", errors="surrogateescape"
+    ) as handle:
         header = handle.readline().rstrip("\n")
         print(header)
         for line in handle:
