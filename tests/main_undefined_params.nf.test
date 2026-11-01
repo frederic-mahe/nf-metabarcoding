@@ -1,0 +1,44 @@
+nextflow_pipeline {
+
+    name "nf-metabarcoding: no undefined-parameter warnings"
+    script "main.nf"
+
+    test("Part C standalone logs no undefined-parameter warning") {
+        // COVERAGE: [S118]
+        // validate_params() reads every input-mode selector, including
+        // the Part A-only fastq_folder, which is never set here.
+        tag "ci"
+        when {
+            params {
+                threads           = 1
+                outdir            = "${outputDir}/undefined_params"
+                reference_dataset = "${outputDir}/undefined_params_ref.fas"
+                occurrence_table  = "${outputDir}/undefined_params_table.tsv"
+            }
+        }
+        setup {
+            def ref = file("${outputDir}/undefined_params_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = ">refA Kingdom|Phylum|Class\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            file("${outputDir}/undefined_params_table.tsv").text = (
+                "OTU\ttotal\tcloud\tamplicon\tlength\tabundance\tchimera\tspread\t" +
+                "quality\tsequence\tidentity\ttaxonomy\treferences\ts1\n" +
+                "1\t10\tNA\tamp1\t32\t10\tN\t1\t0.001\t" +
+                "ACGTACGTACGTACGTACGTACGTACGTACGT\t0.0\tNA\tNA\t10\n"
+            )
+        }
+        then {
+            assert workflow.success
+            // under nf-test the warning reaches nextflow.log, not the
+            // console; check both
+            def console = (workflow.stdout + workflow.stderr).join("\n")
+            def log = file("${metaDir}/nextflow.log")
+            assert log.exists()
+            def warnings = log.readLines().findAll {
+                it.contains("Access to undefined parameter")
+            }
+            assert warnings == []
+            assert !console.contains("Access to undefined parameter")
+        }
+    }
+}

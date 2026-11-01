@@ -9,6 +9,14 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+### Fixed
+
+- Part C standalone runs (and every other run without `--fastq_folder`)
+  no longer log `WARN: Access to undefined parameter fastq_folder`.
+  `fastq_folder`, `forward_primer` and `reverse_primer` are now
+  declared `null` in `nextflow.config`, like the other input selectors;
+  Part A still requires them (`[S18]`, `[S118]`).
+
 ## [0.7.0] - 2026-10-31
 
 ### Added

@@ -478,7 +478,8 @@ the latter case.
     rows at or below the new threshold (a stale hard-coded `> 2`
     would keep them).
 - `[S18]` required parameters (`forward_primer`, `reverse_primer`,
-  `fastq_folder`) have no default and must be supplied via CLI or
+  `fastq_folder`) have no default (they are declared `null` in
+  `nextflow.config`, `[S118]`) and must be supplied via CLI or
   project config; the workflow aborts at startup with a message
   naming the missing parameter. `forward_primer` and `reverse_primer`
   are not required when `--no_trimming` is set (see `[S20]`).
@@ -2490,3 +2491,16 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
     usage banner, without `Script compilation failed`, on both the
     pinned 25.10.x and the latest stable Nextflow (CI `config-checks`
     matrix).
+- `[S118]` every parameter the workflow reads (`params.<name>` in
+  `main.nf`, `modules/` and `subworkflows/`) is declared in the
+  top-level `params { }` block of `nextflow.config`, set to `null` when
+  it has no default, so no run logs Nextflow's `Access to undefined
+  parameter` warning. `validate_params()` reads every input-mode
+  selector (`[S02]`) on every run, so an undeclared selector such as
+  `fastq_folder` would warn in Part C standalone mode, where it is
+  never set. Required parameters stay required: the mode checks
+  (`[S18]`) reject a `null` value.
+  - **Pass when:** a repo-level check finds every `params.<name>`
+    read in `main.nf`, `modules/` and `subworkflows/` declared in the
+    `params { }` block; a standalone Part C run logs no `Access to
+    undefined parameter` warning.

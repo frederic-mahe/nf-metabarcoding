@@ -15,10 +15,12 @@ honest, in the spirit of the manifest <-> CITATION version check:
      (``params.<name>`` appears somewhere in the ``*.nf`` / ``*.config``
      sources), so the schema never accumulates dead entries.
 
-Parameters that are referenced/profile-injected but have no top-level
-default (``fastq_folder``, ``forward_primer``, ``reverse_primer``, the
-slurm/modules knobs) are covered by check (2) only — they legitimately
-have no entry in the base ``params { }`` block.
+Required parameters with no default (``fastq_folder``,
+``forward_primer``, ``reverse_primer``) are declared ``= null`` in the
+base ``params { }`` block ([S118]), so check (1) covers them too.
+Profile-injected parameters (the slurm/modules knobs) are covered by
+check (2) only — they legitimately have no entry in the base
+``params { }`` block.
 """
 
 from __future__ import annotations
