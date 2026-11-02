@@ -367,7 +367,7 @@ What the headers look like:
 |------------|------------------------------------------------------------------------------------------|
 | `--stampa` | `>HG374866.9.1343 domain__Bacteria\|kingdom__Pseudomonadati\|...\|genus__Pseudomonas\|Rhizoctonia_solani` |
 | `--sintax` | `>HG374866.9.1343;tax=d:Bacteria,k:Pseudomonadati,...,g:Pseudomonas;` |
-| `--sintax` | `>CP000247.2018.3559;tax=d:Bacteria,...,g:Escherichia-Shigella,s:Escherichia_coli;` |
+| `--sintax` | `>ON619452.1.1418;tax=d:Bacteria,...,g:Escherichia-Shigella,s:Escherichia_coli;` |
 
 - Each sequence gets the lineage of its own taxmap row
   (accession, start, stop). Several rRNA copies of one genome can have
