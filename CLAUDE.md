@@ -80,10 +80,8 @@ branch-creation rights:
 - checkout that new branch
 - commit often, it is ok to have small changes in each commit, it
   makes bug-hunting easier
-- add "Co-Authored-By" trailers to commit messages, for my co-worker
-  Florian Filloux:
-  `Co-Authored-By: Florian Filloux <ffillouxdev@users.noreply.github.com>`
-- do not add yourself (Claude) as co-author in commit messages (sorry)
+- do not add any "Co-Authored-By" trailer to commit messages (no
+  co-author, Claude included)
 - when done, ask for a human review. Humans are in charge of merging
   your work into the dev branch
 - check modified bash files with `shellcheck` and fix reported issues
