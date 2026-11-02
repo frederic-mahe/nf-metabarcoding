@@ -337,6 +337,59 @@ themselves (`[S112]`), but the check rejects them so they are fixed at
 the source.
 
 
+### Preparing a SILVA reference (`bin/prepare_silva.py`)
+
+`bin/prepare_silva.py` builds both references from a SILVA SSU
+release, in one pass (`[S119]`–`[S122]`). It is a standalone tool: the
+pipeline does not call it. Run it once per release, with Python >= 3.10
+(standard library only):
+
+```
+python3 bin/prepare_silva.py \
+    --taxonomy tax_slv_ssu_138.2.txt.gz \
+    --taxmap taxmap_slv_ssu_ref_nr_138.2.txt.gz \
+    --fasta SILVA_138.2_SSURef_NR99_tax_silva.fasta.gz \
+    --stampa SILVA_138.2_stampa.fasta.gz \
+    --sintax SILVA_138.2_sintax.fasta.gz
+```
+
+Then pass the outputs to `--reference_dataset` (stampa) and
+`--reference_dataset_sintax`. Inputs may be plain or gzip; an output
+whose name ends with `.gz` is compressed. Tested with SILVA 138.1,
+138.2 and 144. For a release where you only have the full `SSURef`
+fasta (not `NR99`), add `--skip_unmapped`: the NR99 taxmap then
+selects the NR99 records.
+
+What the headers look like:
+
+| Output     | Header                                                                                   |
+|------------|------------------------------------------------------------------------------------------|
+| `--stampa` | `>HG374866.9.1343 domain__Bacteria\|kingdom__Pseudomonadati\|...\|genus__Pseudomonas\|Rhizoctonia_solani` |
+| `--sintax` | `>HG374866.9.1343;tax=d:Bacteria,k:Pseudomonadati,...,g:Pseudomonas,t:Rhizoctonia_solani;` |
+
+- Each sequence gets the lineage of its own taxmap row
+  (accession, start, stop). Several rRNA copies of one genome can have
+  different lineages.
+- stampa keeps every SILVA rank. sintax keeps only the ranks vsearch
+  reads (`d k p c o f g`), because vsearch silently ignores any other
+  rank letter. `--sintax_other_ranks x` keeps the other ranks as `x:`
+  anyway.
+- SILVA's organism name is the source organism: a host genome,
+  `uncultured bacterium`, and so on. It is not always a species of the
+  lineage, so sintax gives it the rank `t` (strain), not `s`. Use
+  `--sintax_organism_rank s` or `none` to change that.
+- Whitespace becomes `_`. Characters that would break a format also
+  become `_`: `|` and `*` in stampa, `,` and `;` in sintax.
+  Sequences are converted to DNA (`U` → `T`).
+- SILVA placeholder names (`uncultured`, `Incertae Sedis`) are kept as
+  they are.
+- The tool stops, leaving no output file, when the inputs disagree:
+  a sequence missing from the taxmap, a duplicate identifier, a missing
+  column, and so on.
+
+Both outputs pass the reference check above with no finding.
+
+
 ## Running with containers
 
 `[S08]`. Four engine profiles run every tool inside a container so the

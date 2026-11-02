@@ -146,10 +146,10 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 
 | Spec   | Bullet                                                                     | Test file                                       | Status  | Blocked by |
 |--------|----------------------------------------------------------------------------|-------------------------------------------------|---------|------------|
-| `[S119]`| `bin/prepare_silva.py` (standalone, not called by the workflow): taxonomy + taxmap + fasta, plain or gzip → stampa and/or sintax, `.gz` by name; outputs clean for `check_reference.py` | `tests/python/test_prepare_silva.py` | red | D21 |
-| `[S120]`| lineage per (accession, start, stop); exact rank names; stampa `rank__name\|...\|organism`; sintax `d k p c o f g` + organism (`t`/`s`/none), other ranks dropped or `x:`; character replacement; U→T | `tests/python/test_prepare_silva.py` | red | D21 |
-| `[S121]`| exit 1, one-line message, no output on: unmapped fasta record (unless `--skip_unmapped`), duplicate id, bad id, empty record/fasta, duplicate taxmap row, missing column, bad taxonomy row | `tests/python/test_prepare_silva.py` | red | D21 |
-| `[S122]`| SILVA 138.1 / 138.2 / 144 layouts (rank sets, non-`trunc` fasta, full `SSURef` fasta + `--skip_unmapped`) | `tests/python/test_prepare_silva.py` | red | D21 |
+| `[S119]`| `bin/prepare_silva.py` (standalone, not called by the workflow): taxonomy + taxmap + fasta, plain or gzip → stampa and/or sintax, `.gz` by name; outputs clean for `check_reference.py` | `tests/python/test_prepare_silva.py` | done | D21 |
+| `[S120]`| lineage per (accession, start, stop); exact rank names; stampa `rank__name\|...\|organism`; sintax `d k p c o f g` + organism (`t`/`s`/none), other ranks dropped or `x:`; character replacement; U→T | `tests/python/test_prepare_silva.py` | done | D21 |
+| `[S121]`| exit 1, one-line message, no output on: unmapped fasta record (unless `--skip_unmapped`), duplicate id, bad id, empty record/fasta, duplicate taxmap row, missing column, bad taxonomy row | `tests/python/test_prepare_silva.py` | done | D21 |
+| `[S122]`| SILVA 138.1 / 138.2 / 144 layouts (rank sets, non-`trunc` fasta, full `SSURef` fasta + `--skip_unmapped`) | `tests/python/test_prepare_silva.py` | done | D21 |
 
 
 ## Fetch — download from ENA/SRA
