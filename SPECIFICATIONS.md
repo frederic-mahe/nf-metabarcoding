@@ -1839,6 +1839,78 @@ from placeholder values to real taxonomic assignments.
     reference with only warnings logs a warning naming the report; a
     clean reference publishes a header-only report.
 
+## Reference preparation — SILVA (standalone tool)
+
+`bin/prepare_silva.py` builds the two Part C references (`[S47]`) from
+a SILVA SSU release (`D21`). The workflow does not call it: users run
+it once per release, then pass its outputs to `--reference_dataset`
+and `--reference_dataset_sintax`.
+
+- `[S119]` `bin/prepare_silva.py` reads the three files of a SILVA
+  release, each plain or gzip-compressed (detected from the file
+  content, not the name): the taxonomy (`--taxonomy`, rows
+  `path<TAB>taxid<TAB>rank...`), the taxmap (`--taxmap`, a TSV with the
+  columns `primaryAccession`, `start`, `stop`, `path` and
+  `organism_name`) and the fasta (`--fasta`, headers
+  `>accession.start.stop lineage`). It writes a stampa reference
+  (`--stampa`), a sintax reference (`--sintax`), or both in one pass;
+  at least one is required. An output whose name ends with `.gz` is
+  gzip-compressed. It runs on Python >= 3.10 with the standard library
+  only, and follows `[S109]`.
+  - **Pass when:** given minimal plain and gzip inputs, the tool writes
+    both references, a `.gz` output decompresses, and running without
+    `--stampa` or `--sintax` exits with a usage error; both outputs are
+    `clean` for `bin/check_reference.py` (`[S114]`) under their own
+    grammar.
+- `[S120]` each fasta record gets the lineage of its own taxmap row,
+  looked up by (`accession`, `start`, `stop`), never by the accession
+  alone: two rRNA copies of one genome may have different lineages.
+  Each element of the taxmap `path` gets the rank of that path prefix
+  in the taxonomy file, matched by exact rank name (`superkingdom` is
+  not `kingdom`); an element absent from the taxonomy file has no
+  rank. Formats:
+    - stampa: `>id rank__name|rank__name|...|organism`; an element
+      without rank is written as its bare name;
+    - sintax: `>id;tax=r:name,r:name,...;` with `domain` → `d`,
+      `kingdom` → `k`, `phylum` → `p`, `class` → `c`, `order` → `o`,
+      `family` → `f`, `genus` → `g`, then the organism name with the
+      rank given by `--sintax_organism_rank` (`t` by default, `s`, or
+      `none` to omit it). Other ranks, and elements without rank, are
+      dropped, or written as `x:name` with `--sintax_other_ranks x`;
+    - in every name, whitespace becomes `_`; in stampa, `|` and `*`
+      become `_` (`*` is the last-common-ancestor wildcard, `[S49]`);
+      in sintax, `,` and `;` become `_`; an empty organism name adds
+      no field (no empty rank, `[S116]`);
+    - sequences keep their line layout, and `U`/`u` become `T`/`t`.
+  - **Pass when:** on a fixture where one accession has two copies with
+    different paths, each copy gets its own lineage; `superkingdom`
+    and `superorder` elements are not written as `k:` or `o:`; the
+    organism options and `--sintax_other_ranks x` give the expected
+    headers; the replaced characters and the empty organism give the
+    expected headers; a vsearch `--sintax` search against the output
+    reports every written rank (skipped when vsearch is absent).
+- `[S121]` the tool stops with exit status 1 and a one-line message
+  (no traceback) on: a fasta record absent from the taxmap (unless
+  `--skip_unmapped`, which drops such records and logs their count),
+  a duplicated fasta identifier, an identifier that is not
+  `accession.start.stop`, a record without sequence, a fasta without
+  records, a duplicated taxmap row, a missing taxmap column or a
+  malformed taxonomy row. Outputs are written to a temporary file in
+  the output folder and renamed on success, so a failed run leaves no
+  output file.
+  - **Pass when:** each case above exits 1 with a message naming it and
+    leaves no output; `--skip_unmapped` drops only the unmapped
+    records.
+- `[S122]` the tool handles the layouts of SILVA 138.1, 138.2 and 144:
+  the ranks change between releases (144 adds `kingdom` under
+  `Bacteria` and `Archaea`); 138.1 and 138.2 ship the fasta without
+  `trunc`; for 138.1 the NR99 fasta may be replaced by the full
+  `SSURef` fasta (2.2 million records) with `--skip_unmapped`, the
+  NR99 taxmap then selecting the NR99 records.
+  - **Pass when:** minimal fixtures in each layout give the expected
+    headers, and the `SSURef` layout with `--skip_unmapped` keeps
+    exactly the records of the taxmap.
+
 ## Fetch — download from ENA/SRA
 
 - `[S97]` setting `--accession` selects a standalone fetch mode that

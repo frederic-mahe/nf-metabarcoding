@@ -1127,6 +1127,52 @@ Resolved 2026-07-10: the pass is implemented (`recluster_search` →
 their COVERAGE rows are `done`.
 
 
+## D21 — reference preparation: standalone `bin/` tool first
+
+**Blocks:** `[S119]`, `[S120]`, `[S121]`, `[S122]`. Related: `[S47]`,
+`[S73]`, `[S114]`–`[S117]`, `[S109]`.
+**Status:** `resolved` — standalone tool, no pipeline mode
+(developer, 2026-11-02).
+
+Raised 2026-09-22 (draft plan `TBD_20260922_databases.md`, not
+committed). SILVA, PR2, UNITE and BoLD do not ship the stampa or sintax
+header formats that Part C reads (`[S47]`), so users reformat
+references by hand, and `check_reference` (`[S114]`) rejects the
+mistakes late. Measured on a hand-made SILVA 144 sintax reference
+(`sed` rewrite of rank names): 235,288 headers rejected as `format`.
+The hand-made stampa reference passed the check but gave 8,933
+sequences the lineage of another rRNA copy of the same genome (the
+taxmap was keyed on the accession alone), which no header check can
+see.
+
+**Resolution (developer, 2026-11-02):**
+
+- **Shape** — a standalone helper, `bin/prepare_silva.py`, documented
+  in the README and tested with pytest. The workflow does not call it:
+  no selector, no process, no `[S02]` change. A pipeline mode (draft
+  plan, Q9) is deferred until a second source (PR2, UNITE) gives a
+  shared converter to wrap.
+- **Source** — SILVA SSU only, from the three files of a release:
+  `tax_slv_ssu_<release>.txt`, `taxmap_slv_ssu_ref_nr_<release>.txt`
+  and a `SILVA_<release>_SSURef*_tax_silva*.fasta`. No download
+  (draft plan §3).
+- **Two outputs, not one hybrid file** (draft plan, Q2) — the stampa
+  and the sintax lineage keep different ranks and replace different
+  characters, so one header cannot serve both.
+- **Ranks** (Q4) — stampa keeps every SILVA rank, annotated as
+  `rank__name`; sintax keeps the ranks vsearch reads (`d k p c o f g`)
+  plus the organism name as `t`, because vsearch silently ignores any
+  other rank letter. SILVA placeholder names (`uncultured`,
+  `Incertae Sedis`) are kept as is: changing them is a biology
+  decision, not a formatting one.
+- **Sequences** (Q6) — `U` becomes `T`; nothing else changes.
+- **Identifiers** (Q5) — SILVA's `accession.start.stop`, which must be
+  unique; a duplicate stops the tool.
+- **Releases** — checked against SILVA 138.1, 138.2 and 144, whose
+  files differ (rank sets, NR99 or full SSURef fasta, `trunc` or not;
+  `[S122]`).
+
+
 ## D22 — full-reference check before Part C assignment
 
 **Blocks:** `[S114]`, `[S115]`, `[S116]`, `[S117]`. Related: `[S73]`,
