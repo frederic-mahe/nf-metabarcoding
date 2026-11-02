@@ -1,6 +1,6 @@
 """Tests for bin/prepare_silva.py, the SILVA reference builder (D21)."""
 
-# COVERAGE: [S119], [S120], [S121], [S122]
+# COVERAGE: [S119], [S120], [S121], [S122], [S123], [S124], [S125]
 
 import gzip
 import io
@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -166,7 +167,7 @@ def test_stampa_headers() -> None:
 
 
 def test_sintax_headers() -> None:
-    _, sintax = run()
+    _, sintax = run(organism="strain")
     assert headers(sintax) == [
         ">A1.1.100;tax=d:Bacteria,k:Pseudomonadati,p:Pseudomonadota"
         ",t:Rhizoctonia_solani;",
@@ -179,18 +180,19 @@ def test_sintax_headers() -> None:
 
 
 def test_sintax_organism_and_other_ranks_options() -> None:
-    _, sintax = run(organism_rank=None, keep_other_ranks=True)
+    _, sintax = run(organism="none", keep_other_ranks=True)
     assert headers(sintax)[2] == (
         ">E1.5.50;tax=d:Eukaryota,x:Amorphea,x:Nucletmycea,k:Fungi,x:Mag;"
     )
-    _, sintax = run(organism_rank="s")
-    assert headers(sintax)[0].endswith(",s:Rhizoctonia_solani;")
+    # default "species": this lineage stops at the phylum ([S124])
+    _, sintax = run()
+    assert headers(sintax)[0].endswith(",p:Pseudomonadota;")
 
 
 def test_cli_sintax_options(tmp_path: Path) -> None:
     sintax = tmp_path / "sintax.fasta"
     assert ps.main(write_inputs(tmp_path) + [
-        "--sintax", str(sintax), "--sintax_organism_rank", "none",
+        "--sintax", str(sintax), "--sintax_organism", "none",
         "--sintax_other_ranks", "x"]) == 0
     assert sintax.read_text().splitlines()[0] == (
         ">A1.1.100;tax=d:Bacteria,k:Pseudomonadati,p:Pseudomonadota;"
@@ -208,8 +210,8 @@ def test_each_rrna_copy_keeps_its_own_lineage() -> None:
 def test_element_absent_from_taxonomy_has_no_rank() -> None:
     lineage = ps.build_lineage("Archaea;Foo;", "", {"Archaea;": "domain"})
     assert ps.stampa_lineage(lineage) == "domain__Archaea|Foo"
-    assert ps.sintax_lineage(lineage, "t", False) == "d:Archaea"
-    assert ps.sintax_lineage(lineage, "t", True) == "d:Archaea,x:Foo"
+    assert ps.sintax_lineage(lineage, "strain", False) == "d:Archaea"
+    assert ps.sintax_lineage(lineage, "strain", True) == "d:Archaea,x:Foo"
 
 
 def test_rna_to_dna_keeps_line_layout() -> None:
@@ -222,7 +224,8 @@ def test_rna_to_dna_keeps_line_layout() -> None:
 @pytest.mark.skipif(shutil.which("vsearch") is None, reason="needs vsearch")
 def test_vsearch_reads_every_rank(tmp_path: Path) -> None:
     reference = tmp_path / "ref.fasta"
-    ps.main(write_inputs(tmp_path) + ["--sintax", str(reference)])
+    ps.main(write_inputs(tmp_path) + ["--sintax", str(reference),
+                                      "--sintax_organism", "strain"])
     # replace the first toy sequence by a long, non-repetitive one
     sequence = "".join(random.Random(1).choices("ACGT", k=300))
     reference.write_text(
@@ -284,7 +287,7 @@ def test_skip_unmapped_drops_only_unmapped_records() -> None:
 
 
 def test_layout_138() -> None:
-    stampa, sintax = run(FASTA_138, TAXMAP_138, TAX_138)
+    stampa, sintax = run(FASTA_138, TAXMAP_138, TAX_138, organism="strain")
     assert headers(stampa) == [
         ">A16379.1.1485 domain__Bacteria|phylum__Proteobacteria"
         "|class__Gammaproteobacteria|order__Enterobacterales"
@@ -316,3 +319,225 @@ def test_layout_144() -> None:
     _, sintax = run()
     assert headers(sintax)[0].startswith(
         ">A1.1.100;tax=d:Bacteria,k:Pseudomonadati,p:Pseudomonadota,")
+
+
+# ---------------------------------------------------------------------------
+# [S123] sintax placeholders take their nearest named ancestor as prefix
+
+TAX_PLACEHOLDERS = """\
+Bacteria;\t3\tdomain\t\t
+Bacteria;Fidelibacterota;\t10\tphylum\t\t
+Bacteria;Fidelibacterota;Incertae Sedis;\t11\tclass\t\t
+Bacteria;Fidelibacterota;Incertae Sedis;Incertae Sedis;\t12\torder\t\t
+Bacteria;Fidelibacterota;Incertae Sedis;Incertae Sedis;uncultured;\t\
+13\tfamily\t\t
+Bacteria;Bacilli;\t20\tclass\t\t
+Bacteria;Bacilli;Bacillales--other;\t21\torder\t\t
+Bacteria;Bacilli;Bacillales--other;Bacillus--other;\t22\tgenus\t\t
+Bacteria;Rhizobiales Incertae Sedis;\t30\tphylum\t\t
+Eukaryota;\t2\tdomain\t\t
+Eukaryota;Amorphea;\t5\tmajor_clade\t\t
+Eukaryota;Amorphea;Unknown Family;\t6\tfamily\t\t
+Eukaryota;Amorphea;Unknown Family;Incertae-Sedis;\t7\tgenus\t\t
+"""
+
+TAXMAP_PLACEHOLDERS = TAXMAP_HEADER + """\
+P1\t1\t9\t\
+Bacteria;Fidelibacterota;Incertae Sedis;Incertae Sedis;uncultured;\t\t13
+P2\t1\t9\tBacteria;Bacilli;Bacillales--other;Bacillus--other;\t\t22
+P3\t1\t9\tBacteria;Rhizobiales Incertae Sedis;\t\t30
+P4\t1\t9\tEukaryota;Amorphea;Unknown Family;Incertae-Sedis;\t\t7
+"""
+
+FASTA_PLACEHOLDERS = "".join(
+    f">P{i}.1.9 x\nACGT\n" for i in range(1, 5))
+
+
+def run_placeholders(**options) -> tuple[list[str], list[str]]:
+    stampa, sintax = run(FASTA_PLACEHOLDERS, TAXMAP_PLACEHOLDERS,
+                         TAX_PLACEHOLDERS, **options)
+    return headers(stampa), headers(sintax)
+
+
+def test_placeholders_are_renamed_in_sintax() -> None:
+    _, sintax = run_placeholders()
+    assert sintax == [
+        # a run of placeholders: same anchor all the way down
+        ">P1.1.9;tax=d:Bacteria,p:Fidelibacterota"
+        ",c:Fidelibacterota_Incertae_Sedis"
+        ",o:Fidelibacterota_Incertae_Sedis"
+        ",f:Fidelibacterota_uncultured;",
+        # --other names, anchored on the nearest name without --other
+        ">P2.1.9;tax=d:Bacteria,c:Bacilli,o:Bacilli_Bacillales--other"
+        ",g:Bacilli_Bacillus--other;",
+        # a name that only contains "Incertae Sedis" is not a placeholder
+        ">P3.1.9;tax=d:Bacteria,p:Rhizobiales_Incertae_Sedis;",
+        # the anchor may have a rank sintax does not write (major_clade)
+        ">P4.1.9;tax=d:Eukaryota,f:Amorphea_Unknown_Family"
+        ",g:Amorphea_Incertae-Sedis;",
+    ]
+
+
+def test_placeholders_keep_and_stampa_untouched() -> None:
+    stampa, sintax = run_placeholders(rename_placeholders=False)
+    assert sintax[0] == (
+        ">P1.1.9;tax=d:Bacteria,p:Fidelibacterota,c:Incertae_Sedis"
+        ",o:Incertae_Sedis,f:uncultured;")
+    renamed_stampa, _ = run_placeholders()
+    assert renamed_stampa == stampa
+    assert stampa[0] == (
+        ">P1.1.9 domain__Bacteria|phylum__Fidelibacterota"
+        "|class__Incertae_Sedis|order__Incertae_Sedis|family__uncultured")
+
+
+def test_placeholder_without_named_ancestor_keeps_its_name() -> None:
+    lineage = ps.build_lineage("Incertae Sedis;", "", {
+        "Incertae Sedis;": "domain"})
+    assert ps.sintax_lineage(lineage, "none", False) == "d:Incertae_Sedis"
+
+
+def test_cli_sintax_placeholders_keep(tmp_path: Path) -> None:
+    sintax = tmp_path / "sintax.fasta"
+    args = write_inputs(tmp_path, FASTA_PLACEHOLDERS, TAXMAP_PLACEHOLDERS,
+                        TAX_PLACEHOLDERS)
+    assert ps.main(args + ["--sintax", str(sintax),
+                           "--sintax_placeholders", "keep"]) == 0
+    assert sintax.read_text().splitlines()[0].endswith(",f:uncultured;")
+
+
+# ---------------------------------------------------------------------------
+# [S124] organism -> s:Genus_epithet, or nothing
+
+SPECIES_RANKS = {
+    "Bacteria;": "domain",
+    "Bacteria;Enterobacteriaceae;": "family",
+}
+
+
+@pytest.mark.parametrize("genus, organism, expected", [
+    ("Escherichia-Shigella", "Escherichia coli", "Escherichia coli"),
+    ("Escherichia-Shigella", "Shigella flexneri 2a str. 2457T",
+     "Shigella flexneri"),
+    ("Clostridium sensu stricto 1", "Clostridium botulinum A str. ATCC 3502",
+     "Clostridium botulinum"),
+    ("[Eubacterium] coprostanoligenes group",
+     "[Eubacterium] coprostanoligenes", "[Eubacterium] coprostanoligenes"),
+    ("Haemophilus", "[Haemophilus] ducreyi", "[Haemophilus] ducreyi"),
+    ("Candidatus Pelagibacter", "Candidatus Pelagibacter ubique HTCC1062",
+     "Candidatus Pelagibacter ubique"),
+    ("Fusobacterium", "Fusobacterium nucleatum subsp. vincentii ATCC 49256",
+     "Fusobacterium nucleatum"),
+    ("Auricularia", "Auricularia auricula-judae (ear fungus)",
+     "Auricularia auricula-judae"),
+    ("Plasmodium", "Plasmodium vivax (malaria parasite P. vivax)",
+     "Plasmodium vivax"),
+    # genus disagrees: host organism, renamed genus
+    ("Pseudomonas", "Rhizoctonia solani", None),
+    ("Lactiplantibacillus", "Lactobacillus plantarum", None),
+    ("Pseudomonas", "metagenome", None),
+    # uncultured or empty organism
+    ("Pseudomonas", "uncultured bacterium", None),
+    ("Pseudomonas", "uncultured Pseudomonas fluorescens", None),
+    ("Pseudomonas", "", None),
+    # no epithet
+    ("Pseudomonas", "Pseudomonas", None),
+    ("Pseudomonas", "Pseudomonas sp.", None),
+    ("Pseudomonas", "Pseudomonas sp", None),
+    ("Pseudomonas", "Pseudomonas HTCC2255", None),
+    ("Pseudomonas", "Pseudomonas 2a", None),
+    ("Phytophthora", "Phytophthora taxon juncus", None),
+    ("Rickettsia", "Rickettsia secondary endosymbiont of Archarius", None),
+    ("Glomus", "Glomus mycorrhizal symbiont of Marchantia", None),
+    ("Nitrospira", "Nitrospira enrichment culture clone GaII", None),
+    ("Wolbachia", "Wolbachia endosymbiont of Drosophila", None),
+    # the genus itself is a placeholder
+    ("uncultured", "uncultured bacterium", None),
+    ("Incertae Sedis", "Incertae Sedis bacterium", None),
+])
+def test_species_name(genus: str, organism: str,
+                      expected: Optional[str]) -> None:
+    path = f"Bacteria;Enterobacteriaceae;{genus};"
+    ranks = dict(SPECIES_RANKS, **{path: "genus"})
+    lineage = ps.build_lineage(path, organism, ranks)
+    assert ps.species_name(lineage) == expected
+
+
+def test_species_needs_a_lineage_ending_at_genus() -> None:
+    lineage = ps.build_lineage("Bacteria;Enterobacteriaceae;",
+                               "Escherichia coli", SPECIES_RANKS)
+    assert ps.species_name(lineage) is None
+
+
+def test_species_in_sintax_header() -> None:
+    path = "Bacteria;Enterobacteriaceae;Escherichia-Shigella;"
+    ranks = dict(SPECIES_RANKS, **{path: "genus"})
+    lineage = ps.build_lineage(
+        path, "Escherichia coli O157:H7 str. Sakai", ranks)
+    assert ps.sintax_lineage(lineage) == (
+        "d:Bacteria,f:Enterobacteriaceae,g:Escherichia-Shigella"
+        ",s:Escherichia_coli")
+    assert ps.sintax_lineage(lineage, "strain") == (
+        "d:Bacteria,f:Enterobacteriaceae,g:Escherichia-Shigella"
+        ",t:Escherichia_coli_O157:H7_str._Sakai")
+    assert ps.sintax_lineage(lineage, "none") == (
+        "d:Bacteria,f:Enterobacteriaceae,g:Escherichia-Shigella")
+
+
+# ---------------------------------------------------------------------------
+# [S125] homonym report
+
+TAX_HOMONYMS = """\
+Eukaryota;\t2\tdomain\t\t
+Eukaryota;Tricholomataceae;\t3\tfamily\t\t
+Eukaryota;Tricholomataceae;Tricholoma;\t4\tgenus\t\t
+Eukaryota;Ulvaceae;\t5\tfamily\t\t
+Eukaryota;Ulvaceae;Tricholoma;\t6\tgenus\t\t
+Eukaryota;Ulvaceae;Incertae Sedis;\t7\tgenus\t\t
+Eukaryota;Tricholomataceae;Incertae Sedis;\t8\tgenus\t\t
+"""
+
+TAXMAP_HOMONYMS = TAXMAP_HEADER + """\
+H1\t1\t9\tEukaryota;Tricholomataceae;Tricholoma;\tTricholoma terreum\t4
+H2\t1\t9\tEukaryota;Ulvaceae;Tricholoma;\tTricholoma sp.\t6
+H3\t1\t9\tEukaryota;Ulvaceae;Incertae Sedis;\t\t7
+H4\t1\t9\tEukaryota;Tricholomataceae;Incertae Sedis;\t\t8
+"""
+
+FASTA_HOMONYMS = "".join(f">H{i}.1.9 x\nACGT\n" for i in range(1, 5))
+
+
+def test_homonym_report(tmp_path: Path) -> None:
+    report = tmp_path / "homonyms.tsv"
+    args = write_inputs(tmp_path, FASTA_HOMONYMS, TAXMAP_HOMONYMS,
+                        TAX_HOMONYMS)
+    result = run_cli(args + ["--sintax", str(tmp_path / "s.fasta"),
+                             "--homonyms", str(report)])
+    assert result.returncode == 0, result.stderr
+    assert "1 sintax (rank, name) pair(s) under more than one parent" \
+        in result.stderr
+    # the renamed placeholders (g:Ulvaceae_Incertae_Sedis, ...) are not
+    # homonyms
+    assert report.read_text().splitlines() == [
+        "rank\tname\tparent_lineage",
+        "g\tTricholoma\td:Eukaryota,f:Tricholomataceae",
+        "g\tTricholoma\td:Eukaryota,f:Ulvaceae",
+    ]
+
+
+def test_homonym_report_lists_kept_placeholders(tmp_path: Path) -> None:
+    report = tmp_path / "homonyms.tsv"
+    args = write_inputs(tmp_path, FASTA_HOMONYMS, TAXMAP_HOMONYMS,
+                        TAX_HOMONYMS)
+    assert ps.main(args + ["--sintax", str(tmp_path / "s.fasta"),
+                           "--sintax_placeholders", "keep",
+                           "--homonyms", str(report)]) == 0
+    assert "g\tIncertae_Sedis\td:Eukaryota,f:Ulvaceae" \
+        in report.read_text().splitlines()
+
+
+def test_homonym_report_header_only(tmp_path: Path) -> None:
+    report = tmp_path / "homonyms.tsv"
+    assert ps.main(write_inputs(tmp_path) + [
+        "--sintax", str(tmp_path / "s.fasta"),
+        "--homonyms", str(report)]) == 0
+    assert report.read_text() == "rank\tname\tparent_lineage\n"

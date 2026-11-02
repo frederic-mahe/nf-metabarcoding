@@ -1873,10 +1873,12 @@ and `--reference_dataset_sintax`.
       without rank is written as its bare name;
     - sintax: `>id;tax=r:name,r:name,...;` with `domain` → `d`,
       `kingdom` → `k`, `phylum` → `p`, `class` → `c`, `order` → `o`,
-      `family` → `f`, `genus` → `g`, then the organism name with the
-      rank given by `--sintax_organism_rank` (`t` by default, `s`, or
-      `none` to omit it). Other ranks, and elements without rank, are
-      dropped, or written as `x:name` with `--sintax_other_ranks x`;
+      `family` → `f`, `genus` → `g`, then the organism, per
+      `--sintax_organism`: `species` (default) writes `s:` per
+      `[S124]`; `strain` writes the whole organism name as `t:`;
+      `none` omits it. Other ranks, and elements without rank, are
+      dropped, or written as `x:name` with `--sintax_other_ranks x`.
+      Placeholder names are renamed per `[S123]`;
     - in every name, whitespace becomes `_`; in stampa, `|` and `*`
       become `_` (`*` is the last-common-ancestor wildcard, `[S49]`);
       in sintax, `,` and `;` become `_`; an empty organism name adds
@@ -1885,8 +1887,8 @@ and `--reference_dataset_sintax`.
   - **Pass when:** on a fixture where one accession has two copies with
     different paths, each copy gets its own lineage; `superkingdom`
     and `superorder` elements are not written as `k:` or `o:`; the
-    organism options and `--sintax_other_ranks x` give the expected
-    headers; the replaced characters and the empty organism give the
+    `--sintax_organism` choices and `--sintax_other_ranks x` give the
+    expected headers; the replaced characters and the empty organism give the
     expected headers; a vsearch `--sintax` search against the output
     reports every written rank (skipped when vsearch is absent).
 - `[S121]` the tool stops with exit status 1 and a one-line message
@@ -1910,6 +1912,57 @@ and `--reference_dataset_sintax`.
   - **Pass when:** minimal fixtures in each layout give the expected
     headers, and the `SSURef` layout with `--skip_unmapped` keeps
     exactly the records of the taxmap.
+
+- `[S123]` in the sintax output, a placeholder name takes the name of
+  its nearest ancestor that is not a placeholder as a prefix, joined by
+  `_` (`D21`): `Bacteria;Fidelibacterota;Incertae Sedis;Incertae Sedis;`
+  gives `p:Fidelibacterota,c:Fidelibacterota_Incertae_Sedis,
+  o:Fidelibacterota_Incertae_Sedis`. The ancestor is searched in the
+  whole SILVA path, including ranks sintax does not write. Placeholders
+  are the names `uncultured`, `Incertae Sedis`, `Incertae-Sedis`,
+  `Incertae Sedis?` and `Unknown Family`, and any name ending with
+  `--other`; a name that merely contains them
+  (`Rhizobiales Incertae Sedis`) is not one. A placeholder without such
+  an ancestor keeps its name. `--sintax_placeholders keep` turns the
+  renaming off. Stampa names are never renamed.
+  - **Pass when:** a run of placeholders, an `--other` name, a
+    placeholder whose nearest named ancestor has a rank sintax drops,
+    and a name containing `Incertae Sedis` give the expected sintax
+    headers; stampa headers are unchanged; `keep` restores SILVA's
+    names.
+- `[S124]` with `--sintax_organism species` (default), the organism is
+  written as `s:Genus_epithet` only when all of these hold, and is
+  omitted otherwise (`D21`):
+    - the lineage's last element has the rank `genus` and is not a
+      placeholder (`[S123]`);
+    - the organism name is not empty and its first word, after an
+      optional leading `Candidatus`, is not `uncultured`;
+    - that word, without square brackets, is one of the genus names
+      the lineage's genus stands for: the genus without a leading
+      `Candidatus` and square brackets, cut at the first space, then
+      split on `-` (`Escherichia-Shigella` → *Escherichia*,
+      *Shigella*; `Clostridium sensu stricto 1` → *Clostridium*);
+    - the second word is made of lowercase letters and hyphens only,
+      and is not one of `sp`, `spp`, `cf`, `aff`, `nr`, `bacterium`,
+      `archaeon`, `endosymbiont`, `symbiont`, `clone`, `isolate`,
+      `genomosp`, `group`, `complex`, `metagenome`, `environmental`,
+      `taxon`, `primary`, `secondary`, `mycorrhizal`, `enrichment`.
+  Only these two words are written, preceded by `Candidatus` when the
+  organism starts with it: `Fusobacterium nucleatum subsp. vincentii`
+  gives `s:Fusobacterium_nucleatum`.
+  - **Pass when:** fixtures for each condition above give an `s:` field
+    or none as stated, including a merged genus, a `sensu stricto`
+    genus, a bracketed genus and a `Candidatus` species.
+- `[S125]` the tool counts, in the sintax output, the (rank, name) pairs
+  written under more than one parent lineage (the `rank:name` fields
+  before them), logs that count, and with `--homonyms FILE` writes
+  them to a TSV file with a header row and the columns `rank`, `name`
+  and `parent_lineage`, one row per pair and parent, sorted. The pairs
+  are reported, not renamed. A run without homonyms writes a
+  header-only file.
+  - **Pass when:** a fixture with one genus name under two families
+    gives two rows, one per family; renamed placeholders (`[S123]`) do
+    not appear; a fixture without homonyms gives a header-only file.
 
 ## Fetch — download from ENA/SRA
 
