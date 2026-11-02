@@ -9,6 +9,19 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+### Added
+
+- `bin/prepare_silva.py`, a standalone tool that builds the stampa and
+  sintax references from a SILVA SSU release (taxonomy, taxmap and
+  fasta files). The pipeline does not call it. It was tested with
+  SILVA 138.1, 138.2 and 144, and both of its outputs pass the
+  reference check (`D21`, `[S119]`–`[S122]`). In the sintax output,
+  placeholder names (`Incertae Sedis`, `uncultured`, ...) are prefixed
+  with their nearest named ancestor, the organism becomes a species
+  (`s:Genus_epithet`) only when it agrees with the lineage, and the
+  remaining homonyms can be listed with `--homonyms`
+  (`[S123]`–`[S125]`).
+
 ### Fixed
 
 - Part C standalone runs (and every other run without `--fastq_folder`)

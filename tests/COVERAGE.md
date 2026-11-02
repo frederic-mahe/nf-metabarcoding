@@ -142,6 +142,19 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S90]`| `--fastq_minlen` (default 32) → vsearch `--fastq_minlen` in `filter_and_convert_to_fasta` | `tests/processes/part_a/filter_and_convert_to_fasta.nf.test` | done | — |
 
 
+## Reference preparation — SILVA (standalone tool)
+
+| Spec   | Bullet                                                                     | Test file                                       | Status  | Blocked by |
+|--------|----------------------------------------------------------------------------|-------------------------------------------------|---------|------------|
+| `[S119]`| `bin/prepare_silva.py` (standalone, not called by the workflow): taxonomy + taxmap + fasta, plain or gzip → stampa and/or sintax, `.gz` by name; outputs clean for `check_reference.py` | `tests/python/test_prepare_silva.py` | done | D21 |
+| `[S120]`| lineage per (accession, start, stop); exact rank names; stampa `rank__name\|...\|organism`; sintax `d k p c o f g` + organism (`--sintax_organism species`/`strain`/`none`), other ranks dropped or `x:`; character replacement; U→T | `tests/python/test_prepare_silva.py` | done | D21 |
+| `[S121]`| exit 1, one-line message, no output on: unmapped fasta record (unless `--skip_unmapped`), duplicate id, bad id, empty record/fasta, duplicate taxmap row, missing column, bad taxonomy row | `tests/python/test_prepare_silva.py` | done | D21 |
+| `[S122]`| SILVA 138.1 / 138.2 / 144 layouts (rank sets, non-`trunc` fasta, full `SSURef` fasta + `--skip_unmapped`) | `tests/python/test_prepare_silva.py` | done | D21 |
+| `[S123]`| sintax placeholders (`uncultured`, `Incertae Sedis` and variants, `Unknown Family`, `X--other`) prefixed with the nearest non-placeholder ancestor; `--sintax_placeholders keep`; stampa untouched | `tests/python/test_prepare_silva.py` | done | D21 |
+| `[S124]`| `--sintax_organism species` (default): `s:Genus_epithet` only when the lineage ends at a real genus, the organism is not uncultured, its genus agrees (merged / sensu stricto / bracketed / Candidatus genera) and the second word is an epithet; otherwise omitted | `tests/python/test_prepare_silva.py` | done | D21 |
+| `[S125]`| sintax (rank, name) pairs under more than one parent lineage counted and logged; `--homonyms FILE` TSV (`rank`, `name`, `parent_lineage`), header-only when none | `tests/python/test_prepare_silva.py` | done | D21 |
+
+
 ## Fetch — download from ENA/SRA
 
 | Spec   | Bullet                                                                     | Test file                                       | Status  | Blocked by |

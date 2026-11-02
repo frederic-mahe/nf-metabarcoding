@@ -1127,6 +1127,82 @@ Resolved 2026-07-10: the pass is implemented (`recluster_search` →
 their COVERAGE rows are `done`.
 
 
+## D21 — reference preparation: standalone `bin/` tool first
+
+**Blocks:** `[S119]`, `[S120]`, `[S121]`, `[S122]`, `[S123]`, `[S124]`,
+`[S125]`. Related: `[S47]`,
+`[S73]`, `[S114]`–`[S117]`, `[S109]`.
+**Status:** `resolved` — standalone tool, no pipeline mode
+(developer, 2026-11-02).
+
+Raised 2026-09-22 (draft plan `TBD_20260922_databases.md`, not
+committed). SILVA, PR2, UNITE and BoLD do not ship the stampa or sintax
+header formats that Part C reads (`[S47]`), so users reformat
+references by hand, and `check_reference` (`[S114]`) rejects the
+mistakes late. Measured on a hand-made SILVA 144 sintax reference
+(`sed` rewrite of rank names): 235,288 headers rejected as `format`.
+The hand-made stampa reference passed the check but gave 8,933
+sequences the lineage of another rRNA copy of the same genome (the
+taxmap was keyed on the accession alone), which no header check can
+see.
+
+**Resolution (developer, 2026-11-02):**
+
+- **Shape** — a standalone helper, `bin/prepare_silva.py`, documented
+  in the README and tested with pytest. The workflow does not call it:
+  no selector, no process, no `[S02]` change. A pipeline mode (draft
+  plan, Q9) is deferred until a second source (PR2, UNITE) gives a
+  shared converter to wrap.
+- **Source** — SILVA SSU only, from the three files of a release:
+  `tax_slv_ssu_<release>.txt`, `taxmap_slv_ssu_ref_nr_<release>.txt`
+  and a `SILVA_<release>_SSURef*_tax_silva*.fasta`. No download
+  (draft plan §3).
+- **Two outputs, not one hybrid file** (draft plan, Q2) — the stampa
+  and the sintax lineage keep different ranks and replace different
+  characters, so one header cannot serve both.
+- **Ranks** (Q4) — stampa keeps every SILVA rank, annotated as
+  `rank__name`, and SILVA's names as they are; sintax keeps the ranks
+  vsearch reads (`d k p c o f g`), because vsearch silently ignores any
+  other rank letter.
+- **Sintax placeholders and organisms** (developer, 2026-11-02) —
+  vsearch counts the names of each rank independently, so a name
+  shared by unrelated lineages pools their votes. In SILVA 144,
+  1,642 paths end in `Incertae Sedis` (up to six in a row), and
+  `uncultured bacterium` is the organism of 187,609 sequences in 4,707
+  lineages. Two rules apply to the sintax output only; stampa is left
+  as is for now:
+  - placeholders (`uncultured`, `Incertae Sedis`, `Unknown Family`,
+    `X--other`) take the name of their nearest non-placeholder
+    ancestor as a prefix (`[S123]`): `c:Fidelibacterota_Incertae_Sedis`.
+    An `X--other` name also serves as an ancestor, under its own name:
+    it names a group ("other members of X"), and skipping it left 82
+    placeholder homonyms in SILVA 144;
+    The word is kept (not PR2's `_X`), because `uncultured` and
+    `Incertae Sedis` do not mean the same thing. Measured on 138.1,
+    138.2 and 144: no renamed placeholder ends up under two parents,
+    and 2 `--other` names do (SILVA 144, reported by `[S125]`);
+  - the organism becomes `s:Genus_epithet` only when its genus agrees
+    with the lineage's genus and its second word is an epithet;
+    otherwise it is omitted (`[S124]`). SILVA's organism is the source
+    organism of the record (host genomes, `metagenome`), not a species
+    of the lineage. Kept: 24.8% (138.1), 24.4% (138.2) and 9.4% (144)
+    of the sequences. Species whose genus SILVA renamed
+    (`Lactiplantibacillus / Lactobacillus plantarum`) are lost: mapping
+    them needs a synonym table (NCBI, LPSN), a separate decision. An
+    omitted `s:` counts as a vote against the species in vsearch, so
+    the omission makes species calls more cautious, never more
+    confident (measured with vsearch 2.32);
+  - the remaining homonyms (true homonyms such as the genus
+    *Tricholoma*, species split across SILVA clades such as
+    *Candida albicans*) are reported, not renamed (`[S125]`).
+- **Sequences** (Q6) — `U` becomes `T`; nothing else changes.
+- **Identifiers** (Q5) — SILVA's `accession.start.stop`, which must be
+  unique; a duplicate stops the tool.
+- **Releases** — checked against SILVA 138.1, 138.2 and 144, whose
+  files differ (rank sets, NR99 or full SSURef fasta, `trunc` or not;
+  `[S122]`).
+
+
 ## D22 — full-reference check before Part C assignment
 
 **Blocks:** `[S114]`, `[S115]`, `[S116]`, `[S117]`. Related: `[S73]`,
