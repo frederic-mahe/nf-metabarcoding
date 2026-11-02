@@ -48,6 +48,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S19]`| Part A steps emit per-sample `<sampleId>_<step>.log` files (data → `per_sample/`, logs → `logs/part_a/per_sample/`) | `tests/processes/part_a/merge_fastq_pairs.nf.test`, `tests/processes/part_a/trim_primers.nf.test`, `tests/processes/part_a/dereplicate_fasta.nf.test`, `tests/processes/part_a/list_local_clusters.nf.test`, `tests/main.nf.test` | done | D15, D16 |
 | `[S20]`| `--no_trimming` toggle skips primer trimming; mutually exclusive w/ primers| `tests/main.nf.test`                            | done    | —          |
 | `[S21]`| unpaired fastq files skip the merging step                                 | `tests/main.nf.test`                            | done    | —          |
+| `[S126]`| no fastq file found by the `--fastq_folder` scan → Part A stops; message names the folders, says "not recursive", lists subfolders holding fastq files | `tests/python/test_no_fastq_found.py`, `tests/main.nf.test` | red | — |
 | `[S22]`| Part B re-cleaves global swarm clusters using per-sample sub-seed presence | `tests/python/test_cluster_cleaver.py`          | done    | —          |
 | `[S23]`| `notmerged` reserved suffix — sample IDs ending in `notmerged` are rejected | `tests/python/test_reserved_keyword.py`, `tests/main.nf.test` | done | —          |
 | `[S93]`| sample IDs restricted to safe charset `[A-Za-z0-9._-]` (shared validator) | `tests/python/test_sample_id.py` | done | — |

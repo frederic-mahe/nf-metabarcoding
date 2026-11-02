@@ -233,6 +233,22 @@ emit_reserved_keyword() {
     cp paired_merge_ok_2.fastq.gz "${dir}/X_notmerged_2.fastq.gz"
 }
 
+emit_fastq_in_subfolders_only() {
+    # [S126] — a folder whose fastq files all sit one level down (in
+    # PNA/ and nonPNA/), next to non-fastq files that must not count as
+    # inputs. Scanning the top folder finds no fastq file (discovery is
+    # not recursive), so Part A must stop and point at the subfolders.
+    local -r dir="fastq_in_subfolders_only"
+    local sub
+    for sub in PNA nonPNA; do
+        mkdir -p "${dir}/${sub}"
+        cp paired_merge_ok_1.fastq.gz "${dir}/${sub}/S_${sub}.R1.fq.gz"
+        cp paired_merge_ok_2.fastq.gz "${dir}/${sub}/S_${sub}.R2.fq.gz"
+        printf '>s1\nACGT\n' > "${dir}/${sub}/S_${sub}.fas"
+    done
+    printf 'not a fastq file\n' > "${dir}/demultiplexing.log"
+}
+
 emit_part_b_fixtures() {
     # Hand-crafted per-sample Part A outputs for Part B's process
     # tests. Two samples (S1, S2) plus a shadow-pipeline artefact
@@ -480,6 +496,7 @@ emit_empty
 emit_unpaired_only
 emit_miseq_pair
 emit_reserved_keyword
+emit_fastq_in_subfolders_only
 emit_duplicate_sample_ids
 emit_part_b_fixtures
 emit_e2e_part_b_fixture

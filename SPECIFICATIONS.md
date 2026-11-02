@@ -563,6 +563,21 @@ the latter case.
     unpaired fastq file produces the expected per-sample artefacts
     (`<sampleId>.fas`, `_dereplicating.log`, `_clustering.log`) and
     the workflow trace does **not** mention `merge_fastq_pairs`.
+- `[S126]` when the `--fastq_folder` scan (`[S10]`/`[S21]`) finds no
+  fastq file at all in the listed folders, Part A stops with an
+  error instead of finishing as a successful run that processed
+  nothing. The message names every scanned folder and states that
+  discovery is not recursive. When fastq files sit one level below a
+  scanned folder (e.g. `data/run/PNA/*.fq.gz` for
+  `--fastq_folder data/run`), the message lists those subfolders so
+  the user can pass them instead. A folder that holds only
+  non-fastq files (`.fas`, `.log`, ...) counts as empty.
+  - **Pass when:** running `bin/discover_fastq.py` on a folder with
+    no fastq file exits non-zero, prints nothing on stdout, and its
+    stderr names the folder and says "not recursive"; when that
+    folder has subfolders holding fastq files, stderr names each of
+    them; and running Part A on such a folder fails before
+    `merge_fastq_pairs` with the same message.
 - `[S23]` `notmerged` is a reserved sample-ID suffix used by the
   shadow pipeline (`[S04]`). A sample whose ID ends with the literal
   string `notmerged` (e.g. `X_notmerged`) is rejected at discovery

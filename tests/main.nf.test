@@ -707,6 +707,34 @@ nextflow_pipeline {
         }
     }
 
+    test("aborts when --fastq_folder holds no fastq file and points at the subfolders that do") {
+        // COVERAGE: [S126]
+        tag "pending"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                fastq_folder   = "${projectDir}/tests/data/fastq_in_subfolders_only"
+                fastq_pattern  = ""
+                outdir         = "${outputDir}/no_fastq_found"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
+            assert msg.toLowerCase().contains("not recursive") :
+                "expected error to say discovery is not recursive, got: ${msg}"
+            assert msg.contains("fastq_in_subfolders_only/PNA") :
+                "expected error to list the PNA subfolder, got: ${msg}"
+            assert msg.contains("fastq_in_subfolders_only/nonPNA") :
+                "expected error to list the nonPNA subfolder, got: ${msg}"
+            // stopped at discovery: no sample reached the merging step
+            assert !workflow.trace.tasks().any { it.name.contains("merge_fastq_pairs") } :
+                "merge_fastq_pairs should not run when no fastq file is found"
+        }
+    }
+
     test("aborts when a sample ID ends with the reserved 'notmerged' suffix") {
         // COVERAGE: [S23]
         tag "ci"
