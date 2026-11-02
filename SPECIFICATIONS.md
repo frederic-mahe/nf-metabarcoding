@@ -1921,15 +1921,22 @@ and `--reference_dataset_sintax`.
   whole SILVA path, including ranks sintax does not write. Placeholders
   are the names `uncultured`, `Incertae Sedis`, `Incertae-Sedis`,
   `Incertae Sedis?` and `Unknown Family`, and any name ending with
-  `--other`; a name that merely contains them
-  (`Rhizobiales Incertae Sedis`) is not one. A placeholder without such
-  an ancestor keeps its name. `--sintax_placeholders keep` turns the
+  `--other` (SILVA 144: "other members of X"); a name that merely
+  contains them (`Rhizobiales Incertae Sedis`) is not one. An `X--other`
+  name is renamed like the others, but it names a group, so it is also
+  an ancestor for the placeholders below it, under its own name
+  (`Bacilli;Bacillales--other;Bacillus--other;Incertae Sedis` gives
+  `Bacilli_Bacillales--other`, `Bacillales--other_Bacillus--other`,
+  `Bacillus--other_Incertae_Sedis`). Measured on SILVA 144: skipping
+  `--other` names as ancestors left 82 placeholder homonyms; this rule
+  leaves none and 2 `--other` ones. A placeholder without such an
+  ancestor keeps its name. `--sintax_placeholders keep` turns the
   renaming off. Stampa names are never renamed.
-  - **Pass when:** a run of placeholders, an `--other` name, a
-    placeholder whose nearest named ancestor has a rank sintax drops,
-    and a name containing `Incertae Sedis` give the expected sintax
-    headers; stampa headers are unchanged; `keep` restores SILVA's
-    names.
+  - **Pass when:** a run of placeholders, a chain of `--other` names
+    with a placeholder below them, a placeholder whose nearest named
+    ancestor has a rank sintax drops, and a name containing
+    `Incertae Sedis` give the expected sintax headers; stampa headers
+    are unchanged; `keep` restores SILVA's names.
 - `[S124]` with `--sintax_organism species` (default), the organism is
   written as `s:Genus_epithet` only when all of these hold, and is
   omitted otherwise (`D21`):

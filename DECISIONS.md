@@ -1174,9 +1174,13 @@ see.
   - placeholders (`uncultured`, `Incertae Sedis`, `Unknown Family`,
     `X--other`) take the name of their nearest non-placeholder
     ancestor as a prefix (`[S123]`): `c:Fidelibacterota_Incertae_Sedis`.
+    An `X--other` name also serves as an ancestor, under its own name:
+    it names a group ("other members of X"), and skipping it left 82
+    placeholder homonyms in SILVA 144;
     The word is kept (not PR2's `_X`), because `uncultured` and
     `Incertae Sedis` do not mean the same thing. Measured on 138.1,
-    138.2 and 144: no renamed name ends up under two parents;
+    138.2 and 144: no renamed placeholder ends up under two parents,
+    and 2 `--other` names do (SILVA 144, reported by `[S125]`);
   - the organism becomes `s:Genus_epithet` only when its genus agrees
     with the lineage's genus and its second word is an epithet;
     otherwise it is omitted (`[S124]`). SILVA's organism is the source

@@ -340,7 +340,7 @@ the source.
 ### Preparing a SILVA reference (`bin/prepare_silva.py`)
 
 `bin/prepare_silva.py` builds both references from a SILVA SSU
-release, in one pass (`[S119]`–`[S122]`). It is a standalone tool: the
+release, in one pass (`[S119]`–`[S125]`). It is a standalone tool: the
 pipeline does not call it. Run it once per release, with Python >= 3.10
 (standard library only):
 
@@ -350,7 +350,8 @@ python3 bin/prepare_silva.py \
     --taxmap taxmap_slv_ssu_ref_nr_138.2.txt.gz \
     --fasta SILVA_138.2_SSURef_NR99_tax_silva.fasta.gz \
     --stampa SILVA_138.2_stampa.fasta.gz \
-    --sintax SILVA_138.2_sintax.fasta.gz
+    --sintax SILVA_138.2_sintax.fasta.gz \
+    --homonyms SILVA_138.2_sintax_homonyms.tsv
 ```
 
 Then pass the outputs to `--reference_dataset` (stampa) and
@@ -365,7 +366,8 @@ What the headers look like:
 | Output     | Header                                                                                   |
 |------------|------------------------------------------------------------------------------------------|
 | `--stampa` | `>HG374866.9.1343 domain__Bacteria\|kingdom__Pseudomonadati\|...\|genus__Pseudomonas\|Rhizoctonia_solani` |
-| `--sintax` | `>HG374866.9.1343;tax=d:Bacteria,k:Pseudomonadati,...,g:Pseudomonas,t:Rhizoctonia_solani;` |
+| `--sintax` | `>HG374866.9.1343;tax=d:Bacteria,k:Pseudomonadati,...,g:Pseudomonas;` |
+| `--sintax` | `>CP000247.2018.3559;tax=d:Bacteria,...,g:Escherichia-Shigella,s:Escherichia_coli;` |
 
 - Each sequence gets the lineage of its own taxmap row
   (accession, start, stop). Several rRNA copies of one genome can have
@@ -374,15 +376,34 @@ What the headers look like:
   reads (`d k p c o f g`), because vsearch silently ignores any other
   rank letter. `--sintax_other_ranks x` keeps the other ranks as `x:`
   anyway.
-- SILVA's organism name is the source organism: a host genome,
-  `uncultured bacterium`, and so on. It is not always a species of the
-  lineage, so sintax gives it the rank `t` (strain), not `s`. Use
-  `--sintax_organism_rank s` or `none` to change that.
+- SILVA's organism name is the source organism of the record: a host
+  genome (the first record above is a *Pseudomonas* sequence from a
+  *Rhizoctonia solani* genome), `uncultured bacterium`, `metagenome`.
+  sintax writes it as a species, `s:Genus_epithet`, only when its genus
+  agrees with the lineage's genus and its second word is a species
+  epithet (`[S124]`); otherwise there is no `s:` field. About a quarter
+  of the sequences get one (SILVA 138.x), a tenth in SILVA 144, where
+  many genera were renamed but organism names were not
+  (`Lactiplantibacillus` / `Lactobacillus plantarum` gets none).
+  vsearch counts a reference without `s:` as a vote against the
+  species, so this makes species calls more cautious, not less.
+  `--sintax_organism strain` writes the whole organism name as `t:`
+  instead, and `none` omits it.
 - Whitespace becomes `_`. Characters that would break a format also
   become `_`: `|` and `*` in stampa, `,` and `;` in sintax.
   Sequences are converted to DNA (`U` → `T`).
-- SILVA placeholder names (`uncultured`, `Incertae Sedis`) are kept as
-  they are.
+- In sintax, SILVA placeholder names (`uncultured`, `Incertae Sedis`,
+  `Unknown Family`, SILVA 144's `X--other`) take the name of their
+  nearest named ancestor as a prefix: `c:Fidelibacterota_Incertae_Sedis`
+  (`[S123]`). Otherwise vsearch, which counts the names of each rank
+  separately, would pool the votes of all unrelated lineages that share
+  the name. `--sintax_placeholders keep` turns this off. Stampa keeps
+  SILVA's names.
+- A few names remain under more than one parent lineage in sintax:
+  true homonyms (the genus *Tricholoma* in a fungus and an alga),
+  species that SILVA splits across clades (*Candida albicans*). The
+  tool logs their count, and `--homonyms FILE` lists them
+  (`[S125]`).
 - The tool stops, leaving no output file, when the inputs disagree:
   a sequence missing from the taxmap, a duplicate identifier, a missing
   column, and so on.

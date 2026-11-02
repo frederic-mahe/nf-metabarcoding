@@ -318,7 +318,7 @@ def test_layout_138_1_full_ssuref_needs_skip_unmapped(tmp_path: Path) -> None:
 def test_layout_144() -> None:
     _, sintax = run()
     assert headers(sintax)[0].startswith(
-        ">A1.1.100;tax=d:Bacteria,k:Pseudomonadati,p:Pseudomonadota,")
+        ">A1.1.100;tax=d:Bacteria,k:Pseudomonadati,p:Pseudomonadota")
 
 
 # ---------------------------------------------------------------------------
@@ -334,6 +334,8 @@ Bacteria;Fidelibacterota;Incertae Sedis;Incertae Sedis;uncultured;\t\
 Bacteria;Bacilli;\t20\tclass\t\t
 Bacteria;Bacilli;Bacillales--other;\t21\torder\t\t
 Bacteria;Bacilli;Bacillales--other;Bacillus--other;\t22\tgenus\t\t
+Bacteria;Bacilli;Bacillales--other;Bacillus--other;Incertae Sedis;\t\
+23\tspecies_group\t\t
 Bacteria;Rhizobiales Incertae Sedis;\t30\tphylum\t\t
 Eukaryota;\t2\tdomain\t\t
 Eukaryota;Amorphea;\t5\tmajor_clade\t\t
@@ -344,7 +346,8 @@ Eukaryota;Amorphea;Unknown Family;Incertae-Sedis;\t7\tgenus\t\t
 TAXMAP_PLACEHOLDERS = TAXMAP_HEADER + """\
 P1\t1\t9\t\
 Bacteria;Fidelibacterota;Incertae Sedis;Incertae Sedis;uncultured;\t\t13
-P2\t1\t9\tBacteria;Bacilli;Bacillales--other;Bacillus--other;\t\t22
+P2\t1\t9\t\
+Bacteria;Bacilli;Bacillales--other;Bacillus--other;Incertae Sedis;\t\t23
 P3\t1\t9\tBacteria;Rhizobiales Incertae Sedis;\t\t30
 P4\t1\t9\tEukaryota;Amorphea;Unknown Family;Incertae-Sedis;\t\t7
 """
@@ -360,20 +363,21 @@ def run_placeholders(**options) -> tuple[list[str], list[str]]:
 
 
 def test_placeholders_are_renamed_in_sintax() -> None:
-    _, sintax = run_placeholders()
+    _, sintax = run_placeholders(keep_other_ranks=True)
     assert sintax == [
         # a run of placeholders: same anchor all the way down
         ">P1.1.9;tax=d:Bacteria,p:Fidelibacterota"
         ",c:Fidelibacterota_Incertae_Sedis"
         ",o:Fidelibacterota_Incertae_Sedis"
         ",f:Fidelibacterota_uncultured;",
-        # --other names, anchored on the nearest name without --other
+        # --other names are renamed, and anchor what is below them
         ">P2.1.9;tax=d:Bacteria,c:Bacilli,o:Bacilli_Bacillales--other"
-        ",g:Bacilli_Bacillus--other;",
+        ",g:Bacillales--other_Bacillus--other"
+        ",x:Bacillus--other_Incertae_Sedis;",
         # a name that only contains "Incertae Sedis" is not a placeholder
         ">P3.1.9;tax=d:Bacteria,p:Rhizobiales_Incertae_Sedis;",
         # the anchor may have a rank sintax does not write (major_clade)
-        ">P4.1.9;tax=d:Eukaryota,f:Amorphea_Unknown_Family"
+        ">P4.1.9;tax=d:Eukaryota,x:Amorphea,f:Amorphea_Unknown_Family"
         ",g:Amorphea_Incertae-Sedis;",
     ]
 

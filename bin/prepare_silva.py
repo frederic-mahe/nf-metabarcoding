@@ -39,13 +39,20 @@ Design notes:
   ``kingdom``). vsearch only reads the ranks ``d k p c o f g s t``
   and silently ignores any other, so other SILVA ranks
   (``major_clade``, ``subphylum``, ...) are dropped by default;
+- in the sintax output only (``[S123]``-``[S125]``): placeholder names
+  (``uncultured``, ``Incertae Sedis``, ``X--other``, ...) take their
+  nearest named ancestor as a prefix, because vsearch would otherwise
+  pool unrelated lineages that share the name; the organism becomes
+  ``s:Genus_epithet`` only when it agrees with the lineage's genus
+  (SILVA's organism is the source organism of the record: a host
+  genome, ``metagenome``...); remaining homonyms are reported;
 - characters that break a header grammar are replaced by ``_``:
   whitespace everywhere, ``|`` and ``*`` in stampa lineages (``*`` is
   stampa's wildcard), ``,`` and ``;`` in sintax names;
 - outputs are written to a temporary file and renamed on success, so a
   failed run never leaves a truncated reference behind.
 
-The workflow does not call this script (``D21``, ``[S119]``-``[S122]``):
+The workflow does not call this script (``D21``, ``[S119]``-``[S125]``):
 run it once per SILVA release and pass its outputs to
 ``--reference_dataset`` (stampa) and ``--reference_dataset_sintax``.
 """
@@ -89,8 +96,29 @@ SINTAX_RANKS: dict[str, str] = {
     "family": "f",
     "genus": "g",
 }
-# rank letter used for unrecognised ranks with --sintax-other-ranks x
+# rank letter used for unrecognised ranks with --sintax_other_ranks x
 OTHER_RANK = "x"
+SPECIES_RANK = "s"
+STRAIN_RANK = "t"
+
+# [S123]: SILVA names that stand for "no name at this rank" ...
+PLACEHOLDER = re.compile(
+    r"^(?:uncultured|Incertae[ -]Sedis\??|Unknown Family)$"
+)
+# ... and SILVA 144's "other members of X", renamed too, but also an
+# anchor for the placeholders below it
+OTHER_SUFFIX = "--other"
+# [S124]: a species epithet: lowercase letters and hyphens only ...
+EPITHET = re.compile(r"^[a-z][a-z-]+$")
+# ... but not one of these words, which follow a genus name in SILVA
+# organism names without being an epithet
+NOT_EPITHETS = frozenset({
+    "sp", "spp", "cf", "aff", "nr", "bacterium", "archaeon",
+    "endosymbiont", "symbiont", "clone", "isolate", "genomosp", "group",
+    "complex", "metagenome", "environmental", "taxon", "primary",
+    "secondary", "mycorrhizal", "enrichment",
+})
+CANDIDATUS = "Candidatus"
 
 TAXMAP_COLUMNS = ("primaryAccession", "start", "stop", "path", "organism_name")
 
@@ -268,22 +296,143 @@ def stampa_lineage(lineage: Lineage) -> str:
     return "|".join(fields)
 
 
-def sintax_lineage(
-    lineage: Lineage, organism_rank: Optional[str], keep_other_ranks: bool
-) -> str:
-    """``d:Bacteria,...,g:Pseudomonas,t:Organism_name``."""
+def sintax_fields(
+    lineage: Lineage,
+    organism: str = "species",
+    keep_other_ranks: bool = False,
+    rename_placeholders: bool = True,
+) -> list[str]:
+    """``['d:Bacteria', ..., 'g:Escherichia-Shigella', 's:Escherichia_coli']``.
+
+    ``organism``: ``species`` ([S124]), ``strain`` (the whole organism
+    name as ``t:``) or ``none``.
+    """
+    if rename_placeholders:
+        names = anchored_names(lineage)
+    else:
+        names = [taxon.name for taxon in lineage.taxa]
     fields = []
-    for taxon in lineage.taxa:
+    for taxon, name in zip(lineage.taxa, names):
         letter = SINTAX_RANKS.get(taxon.rank or "")
         if letter is None:
             if not keep_other_ranks:
                 continue
             letter = OTHER_RANK
-        fields.append(f"{letter}:{clean(taxon.name, SINTAX_FORBIDDEN)}")
-    organism = clean(lineage.organism, SINTAX_FORBIDDEN)
-    if organism_rank and organism:
-        fields.append(f"{organism_rank}:{organism}")
-    return ",".join(fields)
+        fields.append(f"{letter}:{clean(name, SINTAX_FORBIDDEN)}")
+    if organism == "species":
+        letter, name = SPECIES_RANK, species_name(lineage)
+    elif organism == "strain":
+        letter, name = STRAIN_RANK, lineage.organism
+    else:
+        letter, name = "", None
+    name = clean(name or "", SINTAX_FORBIDDEN)
+    if name:
+        fields.append(f"{letter}:{name}")
+    return fields
+
+
+def sintax_lineage(
+    lineage: Lineage,
+    organism: str = "species",
+    keep_other_ranks: bool = False,
+    rename_placeholders: bool = True,
+) -> str:
+    """``d:Bacteria,...,g:Escherichia-Shigella,s:Escherichia_coli``."""
+    return ",".join(sintax_fields(
+        lineage, organism, keep_other_ranks, rename_placeholders))
+
+
+class HomonymIndex:
+    """Parent lineages of each sintax (rank, name) pair ([S125])."""
+
+    def __init__(self) -> None:
+        self.parents: dict[str, set[str]] = {}
+
+    def add(self, fields: list[str]) -> None:
+        parent = ""
+        for field in fields:
+            self.parents.setdefault(field, set()).add(parent)
+            parent = f"{parent},{field}" if parent else field
+
+    def homonyms(self) -> list[tuple[str, str, str]]:
+        """``(rank, name, parent lineage)`` of every pair under more
+        than one parent, sorted."""
+        rows = []
+        for field, parents in self.parents.items():
+            if len(parents) > 1:
+                rank, _, name = field.partition(":")
+                rows.extend((rank, name, parent) for parent in parents)
+        return sorted(rows)
+
+    def write(self, path: Path) -> None:
+        with atomic_output(path) as handle:
+            print("rank", "name", "parent_lineage", sep="\t", file=handle)
+            for row in self.homonyms():
+                print(*row, sep="\t", file=handle)
+
+
+def is_placeholder(name: str) -> bool:
+    """``uncultured``, ``Incertae Sedis``, ``Bacillus--other``, ... ."""
+    return PLACEHOLDER.match(name) is not None or name.endswith(OTHER_SUFFIX)
+
+
+def anchored_names(lineage: Lineage) -> list[str]:
+    """Taxon names, placeholders prefixed with their nearest named
+    ancestor ([S123]): ``Fidelibacterota;Incertae Sedis`` ->
+    ``Fidelibacterota``, ``Fidelibacterota Incertae Sedis``.
+
+    An ``X--other`` name is prefixed too, and is then the anchor of
+    the placeholders below it, under its own name.
+    """
+    names = []
+    anchor = ""
+    for taxon in lineage.taxa:
+        name = taxon.name
+        if is_placeholder(name):
+            names.append(f"{anchor} {name}" if anchor else name)
+        else:
+            names.append(name)
+        if not PLACEHOLDER.match(name):
+            anchor = name
+    return names
+
+
+def genus_names(genus: str) -> set[str]:
+    """Genus names a SILVA genus stands for ([S124]).
+
+    ``Escherichia-Shigella`` -> {Escherichia, Shigella};
+    ``Clostridium sensu stricto 1`` -> {Clostridium};
+    ``[Eubacterium] coprostanoligenes group`` -> {Eubacterium};
+    ``Candidatus Pelagibacter`` -> {Pelagibacter}.
+    """
+    words = genus.replace("[", "").replace("]", "").split()
+    if words and words[0] == CANDIDATUS:
+        words = words[1:]
+    return set(filter(None, words[0].split("-"))) if words else set()
+
+
+def species_name(lineage: Lineage) -> Optional[str]:
+    """``Genus epithet`` when the organism agrees with the lineage's
+    genus, None otherwise ([S124])."""
+    if not lineage.taxa:
+        return None
+    genus = lineage.taxa[-1]
+    if genus.rank != "genus" or is_placeholder(genus.name):
+        return None
+    words = lineage.organism.split()
+    prefix = []
+    if words and words[0] == CANDIDATUS:
+        prefix = [CANDIDATUS]
+        words = words[1:]
+    if len(words) < 2 or words[0] == "uncultured":
+        return None
+    if words[0].replace("[", "").replace("]", "") \
+            not in genus_names(genus.name):
+        return None
+    epithet = words[1]
+    if not EPITHET.match(epithet) or epithet in NOT_EPITHETS:
+        return None
+    return " ".join(prefix + words[:2])
 
 
 def to_dna(lines: list[str]) -> list[str]:
@@ -299,9 +448,11 @@ def convert(
     lineages: dict[SequenceKey, Lineage],
     stampa: Optional[IO[str]],
     sintax: Optional[IO[str]],
-    organism_rank: Optional[str] = "t",
+    organism: str = "species",
     keep_other_ranks: bool = False,
     skip_unmapped: bool = False,
+    rename_placeholders: bool = True,
+    index: Optional[HomonymIndex] = None,
 ) -> Counter[str]:
     """Write one stampa and/or sintax record per fasta record."""
     stats: Counter[str] = Counter()
@@ -326,7 +477,13 @@ def convert(
             stampa.write(f">{identifier} {stampa_lineage(lineage)}\n")
             stampa.write(f"{sequence}\n")
         if sintax is not None:
-            tax = sintax_lineage(lineage, organism_rank, keep_other_ranks)
+            fields = sintax_fields(lineage, organism, keep_other_ranks,
+                                   rename_placeholders)
+            if index is not None:
+                index.add(fields)
+            if fields and fields[-1].startswith(f"{SPECIES_RANK}:"):
+                stats["species"] += 1
+            tax = ",".join(fields)
             sintax.write(f">{identifier};tax={tax};\n{sequence}\n")
         stats["sequences"] += 1
     if not stats["sequences"]:
@@ -369,12 +526,29 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="sintax output (gzip-compressed if FILE ends with .gz)",
     )
     parser.add_argument(
-        "--sintax_organism_rank", choices=("t", "s", "none"), default="t",
+        "--sintax_organism", choices=("species", "strain", "none"),
+        default="species",
         help=(
-            "sintax rank given to SILVA's organism name (default: t). "
-            "SILVA organism names are those of the source organism, not "
-            "always a species of the lineage (host genomes, 'uncultured "
-            "bacterium'), hence not 's' by default"
+            "what sintax does with SILVA's organism name: 'species' "
+            "(default) writes s:Genus_epithet when the name agrees with "
+            "the lineage's genus, nothing otherwise; 'strain' writes the "
+            "whole name as t:; 'none' omits it"
+        ),
+    )
+    parser.add_argument(
+        "--sintax_placeholders", choices=("rename", "keep"),
+        default="rename",
+        help=(
+            "sintax placeholder names (uncultured, Incertae Sedis, "
+            "X--other, ...): prefix them with their nearest named "
+            "ancestor (default) or keep them as is"
+        ),
+    )
+    parser.add_argument(
+        "--homonyms", type=Path, metavar="FILE",
+        help=(
+            "write the sintax (rank, name) pairs found under more than "
+            "one parent lineage to FILE (TSV)"
         ),
     )
     parser.add_argument(
@@ -406,8 +580,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 def main(argv: Optional[list[str]] = None) -> int:
     logging.basicConfig(format="%(name)s: %(message)s", level=logging.INFO)
     args = parse_args(argv)
-    organism_rank = None if args.sintax_organism_rank == "none" \
-        else args.sintax_organism_rank
+    index = HomonymIndex() if args.sintax else None
     try:
         with open_text(args.taxonomy) as handle:
             ranks = parse_taxonomy(handle)
@@ -423,10 +596,14 @@ def main(argv: Optional[list[str]] = None) -> int:
                 if args.sintax else None
             stats = convert(
                 fasta, lineages, stampa, sintax,
-                organism_rank=organism_rank,
+                organism=args.sintax_organism,
                 keep_other_ranks=args.sintax_other_ranks == "x",
                 skip_unmapped=args.skip_unmapped,
+                rename_placeholders=args.sintax_placeholders == "rename",
+                index=index,
             )
+        if index is not None and args.homonyms:
+            index.write(args.homonyms)
     except (PrepareError, OSError, UnicodeDecodeError, csv.Error) as error:
         LOGGER.error("%s", error)
         return 1
@@ -435,6 +612,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         LOGGER.info(
             "%d fasta record(s) absent from the taxmap skipped",
             stats["skipped"],
+        )
+    if args.sintax and args.sintax_organism == "species":
+        LOGGER.info("%d sequence(s) with a sintax species (s:)",
+                    stats["species"])
+    if index is not None:
+        pairs = len({row[:2] for row in index.homonyms()})
+        LOGGER.info(
+            "%d sintax (rank, name) pair(s) under more than one parent "
+            "lineage%s", pairs,
+            f" (see {args.homonyms})" if args.homonyms else "",
         )
     if stats["unranked_taxon"]:
         LOGGER.warning(
