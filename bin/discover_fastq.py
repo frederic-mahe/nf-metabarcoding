@@ -380,13 +380,83 @@ def _strip_extension(name: str) -> str:
     return re.sub(r"\.(fastq|fq)(\.(gz|bz2))?$", "", name)
 
 
+def _fastq_in(folder: Path) -> list[Path]:
+    """Glob every fastq file directly in ``folder`` (no recursion)."""
+    found: list[Path] = []
+    for pattern in _FASTQ_GLOBS:
+        found.extend(sorted(folder.glob(pattern)))
+    return found
+
+
 def _collect_fastq(folders: list[Path]) -> list[Path]:
     """Glob every fastq file in the listed folders (no recursion)."""
     seen: list[Path] = []
     for folder in folders:
-        for pattern in _FASTQ_GLOBS:
-            seen.extend(sorted(folder.glob(pattern)))
+        seen.extend(_fastq_in(folder))
     return seen
+
+
+class NoFastqFoundError(ValueError):
+    """Raised when no listed folder holds a fastq file ([S126])."""
+
+
+def empty_folders(folders: list[Path]) -> list[Path]:
+    """Return the listed folders that hold no fastq file, in order."""
+    return [folder for folder in folders if not _fastq_in(folder)]
+
+
+def fastq_subfolders(folders: list[Path]) -> list[Path]:
+    """Return the first-level subfolders of ``folders`` holding fastq files.
+
+    Used to point the user at the real input folders when
+    ``--fastq_folder`` names their parent ([S126]).
+    """
+    hits: list[Path] = []
+    for folder in folders:
+        if not folder.is_dir():
+            continue
+        for child in sorted(folder.iterdir()):
+            if child.is_dir() and _fastq_in(child):
+                hits.append(child)
+    return hits
+
+
+def check_fastq_found(folders: list[Path], samples: list[Sample]) -> None:
+    """Reject a scan that found no fastq file at all ([S126]).
+
+    The message names every scanned folder, states that discovery is
+    not recursive, and lists the first-level subfolders that do hold
+    fastq files, if any.
+    """
+    if samples:
+        return
+    lines: list[str] = [
+        "no fastq file found in --fastq_folder (discovery is not "
+        "recursive); scanned folders:"
+    ]
+    lines.extend(f"  {folder}" for folder in folders)
+    subfolders = fastq_subfolders(folders)
+    if subfolders:
+        lines.append(
+            "fastq files were found in these subfolders; list them in "
+            "--fastq_folder instead:"
+        )
+        lines.extend(f"  {sub}" for sub in subfolders)
+    raise NoFastqFoundError("\n".join(lines))
+
+
+def warn_empty_folders(folders: list[Path]) -> None:
+    """Print a warning for each listed folder holding no fastq file.
+
+    Only called once the scan as a whole found samples ([S126]): an
+    empty folder next to populated ones is reported, not rejected.
+    """
+    for folder in empty_folders(folders):
+        print(
+            f"warning: --fastq_folder entry {folder} contains no fastq "
+            f"file (discovery is not recursive)",
+            file=sys.stderr,
+        )
 
 
 def discover(
@@ -468,16 +538,19 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
     samples = discover(args.folders, extra_pattern=args.extra_pattern)
     try:
+        check_fastq_found(args.folders, samples)
         check_sample_id_charset(samples)
         check_reserved_suffix(samples)
         check_unique_sample_ids(samples)
     except (
+        NoFastqFoundError,
         InvalidSampleIdError,
         ReservedSuffixError,
         DuplicateSampleIDError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    warn_empty_folders(args.folders)
     for sample in samples:
         r2 = str(sample.r2) if sample.r2 is not None else ""
         print(f"{sample.sample_id}\t{sample.r1}\t{r2}")

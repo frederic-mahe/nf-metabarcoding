@@ -571,13 +571,20 @@ the latter case.
   scanned folder (e.g. `data/run/PNA/*.fq.gz` for
   `--fastq_folder data/run`), the message lists those subfolders so
   the user can pass them instead. A folder that holds only
-  non-fastq files (`.fas`, `.log`, ...) counts as empty.
+  non-fastq files (`.fas`, `.log`, ...) counts as empty. When only
+  some of the listed folders are empty, the run goes on with the
+  fastq files found elsewhere, and Part A prints a `WARNING:` line on
+  stderr for each empty folder, naming it. Every `warning:` line that
+  `bin/discover_fastq.py` writes on stderr is relayed this way.
   - **Pass when:** running `bin/discover_fastq.py` on a folder with
     no fastq file exits non-zero, prints nothing on stdout, and its
     stderr names the folder and says "not recursive"; when that
     folder has subfolders holding fastq files, stderr names each of
-    them; and running Part A on such a folder fails before
-    `merge_fastq_pairs` with the same message.
+    them; running Part A on such a folder fails before
+    `merge_fastq_pairs` with the same message; and with one empty
+    and one populated folder, the helper exits zero, lists the
+    populated folder's samples, and warns about the empty folder
+    only, and Part A succeeds and prints that warning.
 - `[S23]` `notmerged` is a reserved sample-ID suffix used by the
   shadow pipeline (`[S04]`). A sample whose ID ends with the literal
   string `notmerged` (e.g. `X_notmerged`) is rejected at discovery

@@ -39,7 +39,14 @@ workflow part_A {
             }
     } else {
         discover_inputs()
-        samples = discover_inputs.out
+        // [S126]: relay the discovery warnings (e.g. a --fastq_folder
+        // entry holding no fastq file) like the startup warnings.
+        discover_inputs.out.warnings.subscribe { stderr_file ->
+            stderr_file.readLines()
+                .findAll { it.startsWith('warning: ') }
+                .each { System.err.println("WARNING: ${it.substring('warning: '.length())}") }
+        }
+        samples = discover_inputs.out.samples
             .splitCsv(sep: '\t')
             .map { row ->
                 def r2 = (row.size() > 2 && row[2]) ? file(row[2]) : null

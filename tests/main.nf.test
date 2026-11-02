@@ -709,7 +709,7 @@ nextflow_pipeline {
 
     test("aborts when --fastq_folder holds no fastq file and points at the subfolders that do") {
         // COVERAGE: [S126]
-        tag "pending"
+        tag "ci"
         when {
             params {
                 forward_primer = "CCAGCASCYGCGGTAATTCC"
@@ -732,6 +732,35 @@ nextflow_pipeline {
             // stopped at discovery: no sample reached the merging step
             assert !workflow.trace.tasks().any { it.name.contains("merge_fastq_pairs") } :
                 "merge_fastq_pairs should not run when no fastq file is found"
+        }
+    }
+
+    test("warns about an empty --fastq_folder entry and runs on the others") {
+        // COVERAGE: [S126]
+        tag "ci"
+        when {
+            params {
+                forward_primer = "CCAGCASCYGCGGTAATTCC"
+                reverse_primer = "ACTTTCGTTCTTGATYRA"
+                // the fixture's top level holds no fastq file; PNA/ does
+                fastq_folder   = "${projectDir}/tests/data/fastq_in_subfolders_only," +
+                                 "${projectDir}/tests/data/fastq_in_subfolders_only/PNA"
+                fastq_pattern  = ""
+                outdir         = "${outputDir}/partially_empty"
+                threads        = 1
+            }
+        }
+        then {
+            assert workflow.success
+            def err = workflow.stderr.join("\n")
+            def warnings = workflow.stderr.findAll { it.contains("WARNING:") }
+            assert warnings.size() == 1 :
+                "expected one WARNING line, got: ${err}"
+            assert warnings[0].contains("fastq_in_subfolders_only") &&
+                   !warnings[0].contains("fastq_in_subfolders_only/PNA") :
+                "expected the warning to name the empty top folder only, got: ${err}"
+            assert file("${outputDir}/partially_empty/per_sample/S_PNA.fas").exists() :
+                "the populated folder's sample should be processed"
         }
     }
 

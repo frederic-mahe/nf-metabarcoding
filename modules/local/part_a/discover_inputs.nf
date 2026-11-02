@@ -10,7 +10,8 @@ process discover_inputs {
     // when set, is the user override checked before that table.
 
     output:
-    path "samples.tsv"
+    path "samples.tsv",          emit: samples
+    path "discovery_stderr.txt", emit: warnings
 
     script:
     // [S10]: resolve each folder against launchDir so a relative
@@ -34,7 +35,13 @@ process discover_inputs {
         && !params.fastq_pattern.toString().isEmpty())
             ? "--extra-pattern '${params.fastq_pattern}'"
             : ""
+    // [S126]: keep the helper's stderr in a file so part_A can relay
+    // its warning: lines (a successful task's stderr is not shown);
+    // on failure, replay it on stderr so the error reaches the user.
     """
-    discover_fastq.py ${extra_arg} ${folder_args} > samples.tsv
+    if ! discover_fastq.py ${extra_arg} ${folder_args} > samples.tsv 2> discovery_stderr.txt ; then
+        cat discovery_stderr.txt >&2
+        exit 1
+    fi
     """
 }

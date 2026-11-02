@@ -86,11 +86,11 @@ def test_every_scanned_folder_is_named(tmp_path: Path) -> None:
     assert str(second) in proc.stderr, proc.stderr
 
 
-def test_one_fastq_file_anywhere_in_the_list_is_enough(
+def test_partially_empty_scan_warns_about_the_empty_folders(
     tmp_path: Path,
 ) -> None:
-    # [S126] fires only when the whole scan is empty; one empty folder
-    # next to a populated one is not an error.
+    # [S126] fails only when the whole scan is empty; an empty folder
+    # next to a populated one is reported by a warning, not an error.
     empty = tmp_path / "empty"
     empty.mkdir()
     fastq = _touch(tmp_path / "full" / "loose_sample.fastq.gz")
@@ -99,3 +99,19 @@ def test_one_fastq_file_anywhere_in_the_list_is_enough(
 
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.startswith("loose_sample\t"), proc.stdout
+    warnings = [
+        line for line in proc.stderr.splitlines()
+        if line.startswith("warning:")
+    ]
+    assert len(warnings) == 1, proc.stderr
+    assert str(empty) in warnings[0], proc.stderr
+    assert str(fastq.parent) not in proc.stderr, proc.stderr
+
+
+def test_populated_scan_prints_no_warning(tmp_path: Path) -> None:
+    _touch(tmp_path / "loose_sample.fastq.gz")
+
+    proc = _run(tmp_path)
+
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stderr == "", proc.stderr
