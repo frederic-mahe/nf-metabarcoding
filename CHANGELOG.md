@@ -7,7 +7,7 @@ version here must match `manifest.version` in
 [`nextflow.config`](nextflow.config) and `version` in
 [`CITATION.cff`](CITATION.cff) (enforced by `[S77]` / `[S80]`).
 
-## [Unreleased]
+## [0.8.0] - 2026-11-04
 
 ### Added
 
