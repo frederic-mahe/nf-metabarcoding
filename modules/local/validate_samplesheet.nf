@@ -1,7 +1,8 @@
 process validate_samplesheet {
     // [S70]: structurally validate the --input samplesheet and emit the
-    // normalized TSV (one row per sample, profile implicit in the
-    // header columns). bin/parse_samplesheet.py does the structural
+    // normalized TSV (one row per sample — or per file for pooled
+    // single-end samples, [S132] — profile implicit in the header
+    // columns). bin/parse_samplesheet.py does the structural
     // checks (columns, duplicates, reserved suffix, single-end
     // inference, sibling qual/stats defaulting); file existence is
     // enforced by the caller's file(checkIfExists: true) when each row

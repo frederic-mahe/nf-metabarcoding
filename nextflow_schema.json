@@ -61,6 +61,18 @@
                     "default": "*_1_{1,2}.fastq.gz",
                     "description": "R1/R2 pair pattern (canonical patterns auto-detected)."
                 },
+                "pool_fastq_by_folder": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Treat each subfolder of --fastq_folder as one single-end sample and pool its fastq files (Nanopore fastq_pass/barcodeNN/ layout).",
+                    "help_text": "Point --fastq_folder at fastq_pass/. Each subfolder (barcode01, ..., unclassified) becomes a sample named after it; fastq files directly in fastq_pass/ and subfolders without fastq files are skipped with a warning. Cannot be combined with --fastq_recursive or --input."
+                },
+                "fastq_recursive": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Also scan every subfolder of --fastq_folder, at any depth.",
+                    "help_text": "Pairing stays within one folder; sample IDs must stay unique across folders. Cannot be combined with --pool_fastq_by_folder or --input."
+                },
                 "fastq_encoding": {
                     "type": "integer",
                     "default": 33,

@@ -90,7 +90,7 @@ def test_pool_by_folder_warns_about_loose_files_and_empty_subfolders(
         str(top) in w and "1 " in w and "ignored" in w for w in warnings
     ), proc.stderr
     # no chunk-series warning under pooling ([S130])
-    assert "--pool_fastq_by_folder" not in proc.stderr, proc.stderr
+    assert "numbered file series" not in proc.stderr, proc.stderr
 
 
 # COVERAGE: [S128]

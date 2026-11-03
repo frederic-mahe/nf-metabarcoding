@@ -173,7 +173,13 @@ def _parse_fastq(rows: list[tuple[int, dict]]) -> list[FastqSample]:
             )
         )
         lines.append(line)
-    _check_unique(records, lines)
+    # [S132]: rows sharing a sample are pooled when they are all
+    # single-end; a sample with any paired row must stay unique.
+    paired = {record.sample for record in records if record.fastq_2}
+    _check_unique(
+        [record for record in records if record.sample in paired],
+        [ln for record, ln in zip(records, lines) if record.sample in paired],
+    )
     return records
 
 

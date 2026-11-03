@@ -238,6 +238,55 @@ using the canonical pattern table documented in
 paired-end pattern (or whose R2 partner is missing) are processed as
 single-end samples that skip the merging step.
 
+Only the listed folders are scanned, not their subfolders. Add
+`--fastq_recursive` to scan every subfolder too, at any depth (`[S131]`).
+Pairs are still found within one folder, and sample IDs must stay
+unique across folders. Beware of what lives under the folder: a
+recursive scan also picks up `fastq_fail/` folders, Nextflow `work/`
+folders, or old results.
+
+### Nanopore runs (`--pool_fastq_by_folder`)
+
+MinKNOW writes each barcode's reads as numbered chunks:
+`fastq_pass/barcode01/<prefix>_0.fastq.gz`, `<prefix>_1.fastq.gz`, ...
+Scanned as usual, those chunks would be paired (`_1` with `_2`) or
+treated as separate samples, so discovery prints a warning when it sees
+such a series (`[S130]`). Point `--fastq_folder` at `fastq_pass/` and
+add `--pool_fastq_by_folder` instead (`[S128]`):
+
+```bash
+nextflow run main.nf \
+    --fastq_folder /data/run42/fastq_pass \
+    --pool_fastq_by_folder \
+    --forward_primer ... --reverse_primer ...
+```
+
+Each subfolder (`barcode01`, ..., `unclassified`) becomes one
+single-end sample named after it. Its fastq files (any mix of plain,
+`.gz` and `.bz2`) are pooled into one gzipped file, and
+`logs/part_a/per_sample/<sample>_pooling.log` lists them (`[S129]`).
+Fastq files sitting directly in `fastq_pass/`, and subfolders holding
+no fastq file, are skipped with a warning. This flag cannot be
+combined with `--fastq_recursive` or `--input` (`[S133]`).
+
+To give barcodes real sample names, or to pool barcodes from several
+runs, use an `--input` samplesheet instead: single-end rows that share
+a `sample` value are pooled the same way (`[S132]`).
+
+```csv
+sample,fastq_1,fastq_2,run
+soil_A,/data/run42/fastq_pass/barcode01/FAX_pass_barcode01_0.fastq.gz,,run42
+soil_A,/data/run42/fastq_pass/barcode01/FAX_pass_barcode01_1.fastq.gz,,run42
+soil_A,/data/run43/fastq_pass/barcode05/FAY_pass_barcode05_0.fastq.gz,,run43
+```
+
+The default settings are tuned for Illumina reads. Nanopore reads
+carry more errors, so most clusters will probably fail the default
+occurrence-table quality filter (`--max_ee`, expected errors per base,
+default `0.0002`). Swarm's clustering assumes few differences between
+reads too. Treat Nanopore support as experimental and expect to adjust
+these settings.
+
 ### Adding a custom pattern (`--fastq_pattern`)
 
 If your file names don't match any canonical row, supply your own
@@ -748,6 +797,9 @@ test. Summary at the time of writing:
   sintax shadow path), with optional majority-rule assignment (`[S66]`)
 - `--input` samplesheet input (`[S70]`) and the unified `--outdir`
   output layout (`[S71]`)
+- Experimental Nanopore input: per-barcode pooling of fastq chunks
+  (`--pool_fastq_by_folder`, `[S128]`), samplesheet pooling (`[S132]`),
+  and recursive discovery (`--fastq_recursive`, `[S131]`)
 - Fetch mode (`--accession`, `[S97]`) — a convenience path to download
   raw reads for an ENA/SRA bioproject/study accession via `fastq-dl`
   (for heavier use we recommend nf-core/fetchngs); see "Fetching reads

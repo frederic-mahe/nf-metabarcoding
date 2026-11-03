@@ -442,6 +442,21 @@ def validate_params() {
         "of --occurrence_table / --representatives_fasta / --input / " +
         "--fasta_folder / --fastq_folder / --accession, got: ${selectors_set}"
 
+    // [S133]: --fastq_recursive and --pool_fastq_by_folder both change
+    // how --fastq_folder is scanned. Combined, a recursive pooling scan
+    // would turn fastq_fail/ barcodes, work/ subfolders or nested
+    // folders into samples, so they are mutually exclusive; with
+    // --input there is no folder scan for them to change.
+    assert !(coerce_bool(params.fastq_recursive) && coerce_bool(params.pool_fastq_by_folder)) :
+        "--fastq_recursive and --pool_fastq_by_folder are mutually " +
+        "exclusive; --pool_fastq_by_folder already reads the subfolders " +
+        "of --fastq_folder"
+    ['fastq_recursive', 'pool_fastq_by_folder'].each { name ->
+        assert !(params.input && coerce_bool(params[name])) :
+            "--${name} only applies to the --fastq_folder scan and cannot " +
+            "be combined with --input"
+    }
+
     // [S98]: validate every --accession entry up-front (a pure param
     // check, no network) so a bad accession aborts at startup naming the
     // offending value rather than surfacing as an obscure fastq-dl error

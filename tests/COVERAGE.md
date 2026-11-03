@@ -49,12 +49,12 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S20]`| `--no_trimming` toggle skips primer trimming; mutually exclusive w/ primers| `tests/main.nf.test`                            | done    | —          |
 | `[S21]`| unpaired fastq files skip the merging step                                 | `tests/main.nf.test`                            | done    | —          |
 | `[S126]`| no fastq file found by the `--fastq_folder` scan → Part A stops (message names the folders, says "not recursive", lists subfolders holding fastq files); partially empty scan → one `WARNING:` per empty folder | `tests/python/test_no_fastq_found.py`, `tests/main.nf.test` | done | — |
-| `[S128]`| `--pool_fastq_by_folder`: each first-level subfolder → one single-end sample named after it; loose files and empty subfolders warned; no-fastq → error | `tests/python/test_discover_fastq_pooling.py`, `tests/main.nf.test` | red | — |
-| `[S129]`| `pool_fastq` pools a multi-file sample into `<sample>.fastq.gz` (gz copied, plain/bz2 recompressed, sorted, deterministic) + `_pooling.log`; stderr notice | `tests/python/test_pool_fastq.py`, `tests/processes/part_a/pool_fastq.nf.test` | red | — |
-| `[S130]`| numbered file series (`_0`, `_1`, `_2`, ...) without pooling → warning suggesting `--pool_fastq_by_folder`; plain `_1`/`_2` pair silent | `tests/python/test_discover_fastq_pooling.py` | red | — |
-| `[S131]`| `--fastq_recursive`: scan subfolders at any depth, pairing within a folder, `[S126]` messages follow the flag | `tests/python/test_discover_fastq_pooling.py` | red | — |
-| `[S132]`| samplesheet: repeated single-end rows for one `sample` are pooled; paired or mixed duplicates still rejected | `tests/python/test_samplesheet_pooling.py`, `tests/main.nf.test` | red | — |
-| `[S133]`| `--fastq_recursive` ⟂ `--pool_fastq_by_folder`; either with `--input` stops at startup | `tests/main.nf.test` | red | — |
+| `[S128]`| `--pool_fastq_by_folder`: each first-level subfolder → one single-end sample named after it; loose files and empty subfolders warned; no-fastq → error | `tests/python/test_discover_fastq_pooling.py`, `tests/main.nf.test` | done | — |
+| `[S129]`| `pool_fastq` pools a multi-file sample into `<sample>.fastq.gz` (gz copied, plain/bz2 recompressed, sorted, deterministic) + `_pooling.log`; stderr notice | `tests/python/test_pool_fastq.py`, `tests/processes/part_a/pool_fastq.nf.test` | done | — |
+| `[S130]`| numbered file series (`_0`, `_1`, `_2`, ...) without pooling → warning suggesting `--pool_fastq_by_folder`; plain `_1`/`_2` pair silent | `tests/python/test_discover_fastq_pooling.py` | done | — |
+| `[S131]`| `--fastq_recursive`: scan subfolders at any depth, pairing within a folder, `[S126]` messages follow the flag | `tests/python/test_discover_fastq_pooling.py` | done | — |
+| `[S132]`| samplesheet: repeated single-end rows for one `sample` are pooled; paired or mixed duplicates still rejected | `tests/python/test_samplesheet_pooling.py`, `tests/main.nf.test` | done | — |
+| `[S133]`| `--fastq_recursive` ⟂ `--pool_fastq_by_folder`; either with `--input` stops at startup | `tests/main.nf.test` | done | — |
 | `[S22]`| Part B re-cleaves global swarm clusters using per-sample sub-seed presence | `tests/python/test_cluster_cleaver.py`          | done    | —          |
 | `[S23]`| `notmerged` reserved suffix — sample IDs ending in `notmerged` are rejected | `tests/python/test_reserved_keyword.py`, `tests/main.nf.test` | done | —          |
 | `[S93]`| sample IDs restricted to safe charset `[A-Za-z0-9._-]` (shared validator) | `tests/python/test_sample_id.py` | done | — |
@@ -186,7 +186,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `list_local_clusters`           | `tests/processes/part_a/list_local_clusters.nf.test`          | S17, S19     | done   |
 | `join_notmerged`                | `tests/processes/part_a/join_notmerged.nf.test`               | S04, S19, S54, S63 | done   |
 | `strip_reads`                   | `tests/processes/part_a/strip_reads.nf.test`                  | S24, S54, S106 | done   |
-| `pool_fastq`                    | `tests/processes/part_a/pool_fastq.nf.test`                   | S129         | red    |
+| `pool_fastq`                    | `tests/processes/part_a/pool_fastq.nf.test`                   | S129         | done   |
 | `build_expected_error_file`     | `tests/processes/part_b/build_expected_error_file.nf.test`    | S28, S65     | done   |
 | `build_distribution_file`       | `tests/processes/part_b/build_distribution_file.nf.test`      | S29          | done   |
 | `list_all_cluster_seeds_of_size_greater_than_2` | `tests/processes/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf.test` | S30 | done |

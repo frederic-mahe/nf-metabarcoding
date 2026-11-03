@@ -16,6 +16,9 @@ Used as:
   stdout.
 
 See ``[S10]``, ``[S11]``, ``[S12]``, ``[S21]`` in SPECIFICATIONS.md.
+``--recursive`` ([S131]) extends the scan to every subfolder;
+``--pool-by-folder`` ([S128]) switches to the folder-per-sample layout
+of Nanopore runs and emits one ``sample_id\tfile\t`` row per file.
 """
 
 import sys
@@ -29,6 +32,7 @@ if sys.version_info < (3, 10):
     )
 
 import argparse  # noqa: E402
+import os  # noqa: E402
 import re  # noqa: E402
 from dataclasses import dataclass  # noqa: E402
 from pathlib import Path  # noqa: E402
@@ -388,10 +392,38 @@ def _fastq_in(folder: Path) -> list[Path]:
     return found
 
 
-def _collect_fastq(folders: list[Path]) -> list[Path]:
-    """Glob every fastq file in the listed folders (no recursion)."""
-    seen: list[Path] = []
+def _tree(folder: Path) -> list[Path]:
+    """Return ``folder`` and every folder below it, in sorted order.
+
+    Folder symlinks are not followed ([S131]), so a link loop cannot
+    make the scan run forever.
+    """
+    found: list[Path] = []
+    for root, dirs, _files in os.walk(folder, followlinks=False):
+        dirs.sort()
+        found.append(Path(root))
+    return found
+
+
+def _scanned(folders: list[Path], recursive: bool = False) -> list[Path]:
+    """Return the folders the scan reads, in order."""
+    if not recursive:
+        return list(folders)
+    scanned: list[Path] = []
     for folder in folders:
+        scanned.extend(_tree(folder))
+    return scanned
+
+
+def _collect_fastq(
+    folders: list[Path], recursive: bool = False
+) -> list[Path]:
+    """Glob every fastq file in the listed folders.
+
+    Subfolders are scanned only when ``recursive`` is set ([S131]).
+    """
+    seen: list[Path] = []
+    for folder in _scanned(folders, recursive):
         seen.extend(_fastq_in(folder))
     return seen
 
@@ -400,9 +432,18 @@ class NoFastqFoundError(ValueError):
     """Raised when no listed folder holds a fastq file ([S126])."""
 
 
-def empty_folders(folders: list[Path]) -> list[Path]:
-    """Return the listed folders that hold no fastq file, in order."""
-    return [folder for folder in folders if not _fastq_in(folder)]
+def empty_folders(
+    folders: list[Path], recursive: bool = False
+) -> list[Path]:
+    """Return the listed folders that hold no fastq file, in order.
+
+    With ``recursive``, a folder is empty only when its whole tree
+    holds no fastq file ([S131]).
+    """
+    return [
+        folder for folder in folders
+        if not _collect_fastq([folder], recursive)
+    ]
 
 
 def fastq_subfolders(folders: list[Path]) -> list[Path]:
@@ -421,16 +462,26 @@ def fastq_subfolders(folders: list[Path]) -> list[Path]:
     return hits
 
 
-def check_fastq_found(folders: list[Path], samples: list[Sample]) -> None:
+def check_fastq_found(
+    folders: list[Path], samples: list[Sample], recursive: bool = False
+) -> None:
     """Reject a scan that found no fastq file at all ([S126]).
 
     The message names every scanned folder, states that discovery is
     not recursive, and lists the first-level subfolders that do hold
-    fastq files, if any.
+    fastq files, if any. With ``recursive`` ([S131]) the message says
+    the search was recursive instead, and lists no subfolders.
     """
     if samples:
         return
-    lines: list[str] = [
+    if recursive:
+        lines = [
+            "no fastq file found in --fastq_folder (searched recursively, "
+            "--fastq_recursive); scanned folders:"
+        ]
+        lines.extend(f"  {folder}" for folder in folders)
+        raise NoFastqFoundError("\n".join(lines))
+    lines = [
         "no fastq file found in --fastq_folder (discovery is not "
         "recursive); scanned folders:"
     ]
@@ -445,22 +496,128 @@ def check_fastq_found(folders: list[Path], samples: list[Sample]) -> None:
     raise NoFastqFoundError("\n".join(lines))
 
 
-def warn_empty_folders(folders: list[Path]) -> None:
+def warn_empty_folders(
+    folders: list[Path], recursive: bool = False
+) -> None:
     """Print a warning for each listed folder holding no fastq file.
 
     Only called once the scan as a whole found samples ([S126]): an
     empty folder next to populated ones is reported, not rejected.
     """
-    for folder in empty_folders(folders):
+    scope = (
+        "searched recursively" if recursive
+        else "discovery is not recursive"
+    )
+    for folder in empty_folders(folders, recursive):
         print(
             f"warning: --fastq_folder entry {folder} contains no fastq "
-            f"file (discovery is not recursive)",
+            f"file ({scope})",
             file=sys.stderr,
         )
 
 
+# A Nanopore chunk name: ``<prefix>_<n>.<ext>`` ([S130]).
+_NUMBERED = re.compile(r"^(?P<prefix>.+)_(?P<n>[0-9]+)" + _EXT + "$")
+
+# A series needs ``_0`` and at least this many distinct numbers, so a
+# plain ``_1`` / ``_2`` pair never warns ([S130]).
+_MIN_SERIES = 3
+
+
+def numbered_series(folder: Path) -> list[str]:
+    """Return the prefixes of the numbered file series in ``folder``.
+
+    A series is a set of ``<prefix>_<n>.<ext>`` fastq files sharing the
+    same prefix, with ``_0`` present and at least ``_MIN_SERIES``
+    distinct numbers ([S130]).
+    """
+    numbers: dict[str, set[int]] = {}
+    for path in _fastq_in(folder):
+        m = _NUMBERED.match(path.name)
+        if m is not None:
+            numbers.setdefault(m["prefix"], set()).add(int(m["n"]))
+    return sorted(
+        prefix for prefix, seen in numbers.items()
+        if 0 in seen and len(seen) >= _MIN_SERIES
+    )
+
+
+def warn_numbered_series(
+    folders: list[Path], recursive: bool = False
+) -> None:
+    """Warn about numbered file series typical of Nanopore runs ([S130])."""
+    for folder in _scanned(folders, recursive):
+        for prefix in numbered_series(folder):
+            print(
+                f"warning: {folder} holds a numbered file series "
+                f"({prefix}_0, {prefix}_1, ...), typical of Nanopore "
+                f"output; each file is treated as a separate sample or "
+                f"pair. To pool each folder into one sample, point "
+                f"--fastq_folder at the parent folder and set "
+                f"--pool_fastq_by_folder",
+                file=sys.stderr,
+            )
+
+
+# ---------- --pool-by-folder ([S128]) --------------------------------------
+
+class PooledSample(NamedTuple):
+    """One folder-per-sample sample: every fastq file of a subfolder."""
+
+    sample_id: str
+    folder: Path
+    files: list[Path]
+
+
+def discover_pooled(folders: list[Path]) -> list[PooledSample]:
+    """Return one sample per first-level subfolder holding fastq files.
+
+    Prints a warning for fastq files sitting directly in a listed
+    folder (they are ignored) and for each subfolder holding no fastq
+    file (it is skipped). Raises :class:`NoFastqFoundError` when no
+    subfolder of any listed folder holds a fastq file.
+    """
+    samples: list[PooledSample] = []
+    for folder in folders:
+        loose = _fastq_in(folder)
+        if loose:
+            print(
+                f"warning: {len(loose)} fastq file(s) directly in "
+                f"--fastq_folder entry {folder} ignored "
+                f"(--pool_fastq_by_folder only reads subfolders)",
+                file=sys.stderr,
+            )
+        if not folder.is_dir():
+            continue
+        for child in sorted(folder.iterdir()):
+            if not child.is_dir():
+                continue
+            files = sorted(_fastq_in(child))
+            if not files:
+                print(
+                    f"warning: subfolder {child} contains no fastq file; "
+                    f"skipped",
+                    file=sys.stderr,
+                )
+                continue
+            samples.append(
+                PooledSample(sample_id=child.name, folder=child, files=files)
+            )
+    if not samples:
+        lines = [
+            "no subfolder holding fastq files found in --fastq_folder "
+            "(--pool_fastq_by_folder); scanned folders:"
+        ]
+        lines.extend(f"  {folder}" for folder in folders)
+        raise NoFastqFoundError("\n".join(lines))
+    return samples
+
+
 def discover(
-    folders: list[Path], *, extra_pattern: Optional[str] = None
+    folders: list[Path],
+    *,
+    extra_pattern: Optional[str] = None,
+    recursive: bool = False,
 ) -> list[Sample]:
     """Walk ``folders`` and return the list of discovered samples.
 
@@ -472,7 +629,7 @@ def discover(
     * any file that matches no R1 pattern is single-end (``[S21]``);
     * an R2 file consumed by its R1 partner is NOT re-emitted.
     """
-    all_paths = _collect_fastq(folders)
+    all_paths = _collect_fastq(folders, recursive)
     by_path: dict[Path, Path] = {p: p for p in all_paths}
     consumed_as_r2: set[Path] = set()
     samples: list[Sample] = []
@@ -519,7 +676,7 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "folders",
         nargs="+",
         type=Path,
-        help="Folders to scan (no recursion).",
+        help="Folders to scan (no recursion unless --recursive).",
     )
     parser.add_argument(
         "--extra-pattern",
@@ -531,14 +688,61 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "before the canonical pattern table."
         ),
     )
+    layout = parser.add_mutually_exclusive_group()
+    layout.add_argument(
+        "--recursive",
+        action="store_true",
+        help="Also scan every subfolder, at any depth ([S131]).",
+    )
+    layout.add_argument(
+        "--pool-by-folder",
+        action="store_true",
+        help=(
+            "Treat each first-level subfolder as one single-end sample "
+            "and emit one row per file ([S128])."
+        ),
+    )
     return parser.parse_args(argv)
+
+
+def _main_pooled(folders: list[Path]) -> int:
+    """``--pool-by-folder`` branch of :func:`main` ([S128])."""
+    try:
+        pooled = discover_pooled(folders)
+        # The checks take Sample tuples; the folder stands in for R1 so
+        # error messages name the offending folder.
+        as_samples = [
+            Sample(sample_id=p.sample_id, r1=p.folder, r2=None)
+            for p in pooled
+        ]
+        check_sample_id_charset(as_samples)
+        check_reserved_suffix(as_samples)
+        check_unique_sample_ids(as_samples)
+    except (
+        NoFastqFoundError,
+        InvalidSampleIdError,
+        ReservedSuffixError,
+        DuplicateSampleIDError,
+    ) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    for sample in pooled:
+        for path in sample.files:
+            print(f"{sample.sample_id}\t{path}\t")
+    return 0
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
-    samples = discover(args.folders, extra_pattern=args.extra_pattern)
+    if args.pool_by_folder:
+        return _main_pooled(args.folders)
+    samples = discover(
+        args.folders,
+        extra_pattern=args.extra_pattern,
+        recursive=args.recursive,
+    )
     try:
-        check_fastq_found(args.folders, samples)
+        check_fastq_found(args.folders, samples, args.recursive)
         check_sample_id_charset(samples)
         check_reserved_suffix(samples)
         check_unique_sample_ids(samples)
@@ -550,7 +754,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    warn_empty_folders(args.folders)
+    warn_empty_folders(args.folders, args.recursive)
+    warn_numbered_series(args.folders, args.recursive)
     for sample in samples:
         r2 = str(sample.r2) if sample.r2 is not None else ""
         print(f"{sample.sample_id}\t{sample.r1}\t{r2}")

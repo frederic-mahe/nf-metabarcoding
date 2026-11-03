@@ -21,6 +21,17 @@ version here must match `manifest.version` in
   (`s:Genus_epithet`) only when it agrees with the lineage, and the
   remaining homonyms can be listed with `--homonyms`
   (`[S123]`–`[S125]`).
+- Experimental support for Nanopore runs (`D23`). With
+  `--pool_fastq_by_folder`, each subfolder of `--fastq_folder` (e.g.
+  `fastq_pass/barcode01/`) becomes one single-end sample, and its
+  fastq chunks are pooled into one file (`[S128]`, `[S129]`). Without
+  the flag, discovery warns about a numbered file series (`_0`, `_1`,
+  `_2`, ...) instead of pairing `_1` with `_2` silently (`[S130]`).
+  An `--input` samplesheet may repeat a sample on several single-end
+  rows to pool them (`[S132]`). `--fastq_recursive` scans subfolders
+  at any depth (`[S131]`). The two flags are mutually exclusive and
+  cannot be combined with `--input` (`[S133]`). Default settings stay
+  tuned for Illumina reads.
 
 ### Removed
 

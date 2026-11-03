@@ -1,4 +1,4 @@
-include { normalize_path } from '../functions.nf'
+include { normalize_path; coerce_bool } from '../functions.nf'
 
 
 process discover_inputs {
@@ -8,6 +8,9 @@ process discover_inputs {
     // bin/discover_fastq.py is the single source of truth for the
     // canonical paired-end pattern table ([S11]); params.fastq_pattern,
     // when set, is the user override checked before that table.
+    // --fastq_recursive ([S131]) and --pool_fastq_by_folder ([S128])
+    // change the scan; under pooling the TSV holds one row per file,
+    // and part_A groups the rows by sample.
 
     output:
     path "samples.tsv",          emit: samples
@@ -35,11 +38,14 @@ process discover_inputs {
         && !params.fastq_pattern.toString().isEmpty())
             ? "--extra-pattern '${params.fastq_pattern}'"
             : ""
+    def layout_arg = coerce_bool(params.pool_fastq_by_folder)
+        ? "--pool-by-folder"
+        : (coerce_bool(params.fastq_recursive) ? "--recursive" : "")
     // [S126]: keep the helper's stderr in a file so part_A can relay
     // its warning: lines (a successful task's stderr is not shown);
     // on failure, replay it on stderr so the error reaches the user.
     """
-    if ! discover_fastq.py ${extra_arg} ${folder_args} > samples.tsv 2> discovery_stderr.txt ; then
+    if ! discover_fastq.py ${extra_arg} ${layout_arg} ${folder_args} > samples.tsv 2> discovery_stderr.txt ; then
         cat discovery_stderr.txt >&2
         exit 1
     fi

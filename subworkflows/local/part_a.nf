@@ -1,5 +1,6 @@
 include { discover_inputs }                 from '../../modules/local/part_a/discover_inputs.nf'
 include { merge_fastq_pairs }               from '../../modules/local/part_a/merge_fastq_pairs.nf'
+include { pool_fastq }                      from '../../modules/local/part_a/pool_fastq.nf'
 include { strip_reads }                     from '../../modules/local/part_a/strip_reads.nf'
 include { join_notmerged }                  from '../../modules/local/part_a/join_notmerged.nf'
 include { trim_primers }                    from '../../modules/local/part_a/trim_primers.nf'
@@ -63,9 +64,25 @@ workflow part_A {
     def paired_ch = branched.paired.map { sample, r1, r2 ->
         tuple(sample, [r1, r2])
     }
-    def unpaired_ch = branched.unpaired.map { sample, r1, _r2 ->
-        tuple(sample, r1)
+    // [S128]/[S132]/[S129]: single-end rows sharing a sample ID (one
+    // row per file under --pool_fastq_by_folder, or repeated
+    // samplesheet rows) are grouped, sorted by path, and pooled into
+    // one fastq file. A sample made of a single file skips pooling.
+    def single_end = branched.unpaired
+        .map { sample, r1, _r2 -> tuple(sample, r1) }
+        .groupTuple()
+        .map { sample, files -> tuple(sample, files.toSorted { it.toString() }) }
+        .branch { _sample, files ->
+            pooled: files.size() > 1
+            single: true
+        }
+    single_end.pooled.subscribe { sample, files ->
+        System.err.println("pooling ${files.size()} fastq files into sample ${sample}")
     }
+    pool_fastq(single_end.pooled)
+    def unpaired_ch = single_end.single
+        .map { sample, files -> tuple(sample, files[0]) }
+        .mix(pool_fastq.out.pooled)
 
     // discover pairs and merge
     merge_fastq_pairs(paired_ch)
