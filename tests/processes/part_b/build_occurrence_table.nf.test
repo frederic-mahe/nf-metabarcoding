@@ -6,8 +6,9 @@ nextflow_process {
 
     test("merges Part B inputs into the filtered occurrence table") {
         // COVERAGE: [S35]
+        // COVERAGE: [S127]
         // The cleaved variants (representatives_2, stats_2, swarms_2,
-        // uchime_2, assignments_2) are wired as empty fixtures here to
+        // uchime_2) are wired as empty fixtures here to
         // exercise the empty-cleaved path; the same script is also
         // pinned byte-exact by the pytest characterization test.
         tag "ci"
@@ -21,7 +22,6 @@ nextflow_process {
                 def swarms = file("\${projectDir}/tests/data/build_filtered_contingency_table/swarms")
                 def uchime = file("\${projectDir}/tests/data/build_filtered_contingency_table/uchime")
                 def quality = file("\${projectDir}/tests/data/build_filtered_contingency_table/quality")
-                def assigns = file("\${projectDir}/tests/data/build_filtered_contingency_table/assignments")
                 def distr = file("\${projectDir}/tests/data/build_filtered_contingency_table/distribution")
                 input[0]  = reps
                 input[1]  = file(empty.toString())   // empty fas2
@@ -32,11 +32,9 @@ nextflow_process {
                 input[6]  = uchime
                 input[7]  = file(empty.toString())   // empty uchime2
                 input[8]  = quality
-                input[9]  = assigns
-                input[10] = file(empty.toString())   // empty results2
-                input[11] = distr
-                input[12] = "proj"
-                input[13] = "s1,s2,s3,s4,s5"   // [S09] sample list
+                input[9]  = distr
+                input[10] = "proj"
+                input[11] = "s1,s2,s3,s4,s5"   // [S09] sample list
                 """
             }
         }
@@ -56,6 +54,13 @@ nextflow_process {
                 "expected header + 3 rows, got ${lines.size()}: ${lines}"
             assert lines[0].startsWith("OTU\ttotal") :
                 "unexpected header: ${lines[0]}"
+            // [S127]: no assignments are passed, so every row carries
+            // the placeholder identity / taxonomy / references.
+            lines.drop(1).each { row ->
+                def cols = row.split("\t")
+                assert cols[10..12] == ["0.0", "NA", "NA"] :
+                    "placeholder columns expected, got: ${row}"
+            }
         }
     }
 }

@@ -762,18 +762,13 @@ the latter case.
     non-empty for the documented fixture; a run with
     `--fastidious false` produces `_1.{swarms,stats,struct}` /
     `_1_representatives.fas` (no `_1f` artefacts).
-- `[S33]` Part B's `fake_taxonomic_assignment` writes a placeholder
-  Part C input file by scanning the swarm representatives FASTA
-  (`<basename>_1f_representatives.fas` from `[S32]`) and emitting,
-  per record, the tab-separated row
-  `<sha1>\t<size>\t0.0\tNA\tNA`. The output path is
-  `<basename>_1f_representatives.results`. This step exists so the
-  occurrence-table builder can run before the real taxonomic
-  assignment lands (Part C); it is later overwritten by the
-  stampa/sintax output.
-  - **Pass when:** running on a representatives FASTA with three
-    records emits three TSV rows, one per record, in the
-    `<sha1>\t<size>\t0.0\tNA\tNA` shape.
+- `[S33]` **Retired.** Was: Part B's `fake_taxonomic_assignment`
+  wrote a placeholder `<sha1>\t<size>\t0.0\tNA\tNA` row per swarm
+  representative (`<basename>_1f_representatives.results`) so the
+  occurrence-table builder had an assignments file before Part C
+  ran. The builder now fills these placeholders itself when no
+  assignments file is given (`[S127]`), so the process was removed.
+  ID is preserved so prior git history stays readable.
 - `[S34]` Part B's `chimera_detection` filters the global swarm
   representatives to abundance `>= params.chimera_minsize` (default
   2) with `vsearch --fastx_filter --minsize`, then pipes the kept
@@ -784,14 +779,11 @@ the latter case.
   - **Pass when:** both output files exist and the `.log` is
     non-empty for the documented fixture (the `.uchime` table can
     legitimately be empty when no chimeras are found).
-- `[S36]` Part B's `fake_taxonomic_assignment2` mirrors `[S33]` on
-  the cleaver's representatives FASTA (`<basename>_1f_representatives.fas2`
-  from `[S22]`). Output: `<basename>_1f_representatives.results2`.
-  Empty input (no clusters got cleaved) yields an empty output
-  file — downstream concatenation tolerates that.
-  - **Pass when:** running on a fas2 with `K` records emits `K`
-    placeholder rows; running on an empty fas2 emits an empty
-    file.
+- `[S36]` **Retired.** Was: Part B's `fake_taxonomic_assignment2`
+  mirrored `[S33]` on the cleaver's representatives
+  (`<basename>_1f_representatives.results2`). Removed together with
+  `[S33]`; see `[S127]`. ID is preserved so prior git history stays
+  readable.
 - `[S37]` Part B's `chimera_detection_post_cleave` re-runs uchime_denovo on
   the concatenation of pre-cleave and cleaved representatives
   (`<basename>_1f_representatives.fas` from `[S32]` plus
@@ -811,7 +803,8 @@ the latter case.
   `bin/build_filtered_contingency_table.py` to merge the
   swarm representatives, swarm stats, swarm output, uchime hits,
   per-amplicon quality (`build_expected_error_file`'s
-  `[S28]` output), taxonomic assignments, and the sequence ↔
+  `[S28]` output), the optional taxonomic assignments (`[S127]`),
+  and the sequence ↔
   sample distribution (`build_distribution_file`'s `[S29]` output)
   into a single occurrence table. Rows are filtered: a cluster is
   kept iff `chimera == "N" && ee/length <= --max_ee && (abundance >=
@@ -832,6 +825,23 @@ the latter case.
     (g) a sample present only in a filtered-out cluster surviving
     as a zero column, (h) `#` characters stripped from taxonomy
     strings.
+- `[S127]` `bin/build_filtered_contingency_table.py`'s
+  `--assignments` (a stampa-shaped
+  `amplicon\tabundance\tidentity\ttaxonomy\treferences` TSV) is
+  optional. When it is given, only representatives listed in it are
+  kept and their identity / taxonomy / references come from it (the
+  legacy behaviour). When it is omitted, every representative is
+  kept and each row carries the placeholder values `0.0` / `NA` /
+  `NA` in the identity / taxonomy / references columns. Part B's
+  `build_occurrence_table` (`[S35]`) does not pass `--assignments`:
+  the placeholders stay in the table until Part C's
+  `update_occurrence_table` overwrites them, so a Part B-only run
+  publishes a table with `0.0` / `NA` / `NA` in every row.
+  - **Pass when:** running the script on the `[S35]` fixture without
+    `--assignments` emits every passing cluster of the golden table
+    (same rows, same order, same columns) with columns 11–13 set to
+    `0.0` / `NA` / `NA`; `build_occurrence_table` on the same fixture
+    emits those placeholder values in every data row.
 
 
 - `[S38]` Part B's `search_for_terminal_gaps` extracts the
@@ -1195,8 +1205,8 @@ from placeholder values to real taxonomic assignments.
        amplicon. Each chunk emits a `stampa_chunk.tsv` slice
        with columns
        `amplicon\tabundance\tidentity\ttaxonomy\treferences`
-       (same shape as `fake_taxonomic_assignment`'s `[S33]`
-       output).
+       (the shape `build_filtered_contingency_table.py
+       --assignments` reads, `[S127]`).
     3. the per-chunk slices are concatenated (via Nextflow's
        `collectFile`) and then sorted by the `sort_taxonomy`
        process running `LC_ALL=C sort -k2,2nr -k1,1d` (abundance
@@ -1500,8 +1510,7 @@ from placeholder values to real taxonomic assignments.
   `.distr`, `_per_sample_OTUs.stats`, the global dereplicated `.fas`,
   the swarm artefacts `.swarms` / `.stats` / `.struct` /
   `_representatives.fas` and their cleaver siblings,
-  `.uchime` / `.uchime2`, `_representatives.results` /
-  `.results2`, the pre-mumu `.nosubstringOTUs.fas`) stay in the
+  `.uchime` / `.uchime2`, the pre-mumu `.nosubstringOTUs.fas`) stay in the
   Nextflow work directory and **must not** appear under
   `<outdir>/occurrence_table/`. The shadow Part B path follows the
   same contract with the `_notmerged` token in the basename.
@@ -2479,12 +2488,11 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
   occurrence table. Two classes of pipe are deliberately exempted so
   `pipefail` does not turn a correct outcome into a spurious failure:
     - pipes whose non-zero exit is a **legitimate empty result** stay
-      explicitly guarded. In particular the `grep "^>"` header scans in
-      `fake_taxonomic_assignment`, `fake_taxonomic_assignment2`, and
-      `build_distribution_file` exit non-zero on a header-less input
-      (`grep` returns 1 when nothing matches), so they pre-create the
-      output and trail the pipe with `|| true` — an empty input yields an
-      empty output and a successful task (`[S09]` / `[S33]`).
+      explicitly guarded. In particular the `grep "^>"` header scan in
+      `build_distribution_file` exits non-zero on a header-less input
+      (`grep` returns 1 when nothing matches), so it pre-creates the
+      output and trails the pipe with `|| true` — an empty input yields an
+      empty output and a successful task (`[S09]`).
     - minimum-size computations that close a pipe early
       (`... | sort -n | head -n 1` in `chimera_detection_post_cleave`,
       `[S37]`) are written SIGPIPE-safe (the producer is allowed to run
@@ -2492,9 +2500,8 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
       sorted output exceeds the OS pipe buffer on a large dataset.
   - **Pass when:** a process whose first pipe stage is forced to fail
     (`chimera_detection` on a non-FASTA `representatives` input) exits
-    non-zero instead of publishing a truncated `.uchime`;
-    `fake_taxonomic_assignment` on a header-less input still succeeds
-    with an empty `.results`; and `chimera_detection_post_cleave` on a
+    non-zero instead of publishing a truncated `.uchime`; and
+    `chimera_detection_post_cleave` on a
     cleaved input large enough to overflow the pipe buffer completes
     without a SIGPIPE abort.
 - `[S82]` `cleanup` defaults to `false` in `nextflow.config`, so a

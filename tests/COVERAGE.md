@@ -61,10 +61,11 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S30]`| Part B `list_all_cluster_seeds_of_size_greater_than_2` — concatenate per-sample `.stats` | `tests/processes/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf.test` | done | — |
 | `[S31]`| Part B `global_dereplication` — vsearch --derep_fulllength across every input `.fas` | `tests/processes/part_b/global_dereplication.nf.test` | done | — |
 | `[S32]`| Part B `global_clustering` — swarm `--fastidious` on the global fasta      | `tests/processes/part_b/global_clustering.nf.test` | done | — |
-| `[S33]`| Part B `fake_taxonomic_assignment` — placeholder taxonomy TSV              | `tests/processes/part_b/fake_taxonomic_assignment.nf.test` | done | — |
+| `[S33]`| **Retired** (was: Part B `fake_taxonomic_assignment` placeholder taxonomy TSV; replaced by the builder's own placeholders — see `[S127]`) | — | retired | — |
 | `[S34]`| Part B `chimera_detection` — vsearch uchime_denovo on representatives     | `tests/processes/part_b/chimera_detection.nf.test` | done | — |
 | `[S35]`| Part B `build_occurrence_table` — merge swarm/uchime/quality/stampa/distribution into the filtered occurrence table | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test` | done | — |
-| `[S36]`| Part B `fake_taxonomic_assignment2` — placeholder taxonomy TSV for cleaved representatives | `tests/processes/part_b/fake_taxonomic_assignment2.nf.test` | done | — |
+| `[S127]`| `build_filtered_contingency_table.py --assignments` is optional; without it every row carries `0.0`/`NA`/`NA`; `build_occurrence_table` omits it | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test` | red | — |
+| `[S36]`| **Retired** (was: Part B `fake_taxonomic_assignment2` placeholder taxonomy TSV for cleaved representatives; see `[S127]`) | — | retired | — |
 | `[S37]`| Part B `chimera_detection_post_cleave` — uchime_denovo on pre-cleave + cleaved reps with dynamic --minsize | `tests/processes/part_b/chimera_detection_post_cleave.nf.test` | done | — |
 | `[S38]`| Part B `search_for_terminal_gaps` — vsearch self-cluster (id=1.0) for sub/super-string OTUs | `tests/processes/part_b/search_for_terminal_gaps.nf.test` | done | — |
 | `[S39]`| Part B `merge_substring_otus` — merge pupil OTUs onto masters; sort; assert reads conserved | `tests/python/test_merge_substring_otus.py`, `tests/processes/part_b/merge_substring_otus.nf.test` | done | — |
@@ -116,7 +117,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S69]`| exact, agreeing version pins in `environment.yml` and CI, incl. `bioconda::mumu` | `tests/python/test_reproducible_pins.py` | done | — |
 | `[S77]`| `manifest.version` (`nextflow.config`) and `version` (`CITATION.cff`) must agree | `tests/python/test_version_sync.py` | done | — |
 | `[S80]`| repo metadata consistent: `manifest.homePage` ↔ `CITATION.cff` url same `owner/repo`; `manifest.defaultBranch` set and schema `$id` points at it; `CHANGELOG.md` documents `manifest.version` | `tests/python/test_metadata_consistency.py` | done | — |
-| `[S81]`| every piped process script runs under `set -euo pipefail` (left-pipe failure fails the task); documented empty-result pipes (`grep` no-match) stay `\|\| true`-guarded; SIGPIPE-safe min in post-cleave | `tests/processes/part_b/chimera_detection.nf.test`, `tests/processes/part_b/fake_taxonomic_assignment.nf.test`, `tests/processes/part_b/chimera_detection_post_cleave.nf.test` | done | — |
+| `[S81]`| every piped process script runs under `set -euo pipefail` (left-pipe failure fails the task); documented empty-result pipes (`grep` no-match) stay `\|\| true`-guarded; SIGPIPE-safe min in post-cleave | `tests/processes/part_b/chimera_detection.nf.test`, `tests/processes/part_b/chimera_detection_post_cleave.nf.test` | done | — |
 | `[S82]`| `cleanup` defaults to `false` (retain `work/` so `-resume` works across invocations; auto-clean is opt-in via `-c`) | `tests/check-cleanup-default.sh` (config resolution) | done | — |
 | `[S83]`| air-gapped container path: build-once-then-offline (Wave cache) or a site-supplied `process.container` via `-c` (composes with `-profile slurm`, no Wave); documented in README + `conf/site.config.example` | `tests/check-offline-container.sh` (config resolution); offline execution = manual cluster smoke test | done | — |
 | `[S84]`| every run writes Nextflow execution reports (timeline/report/trace/dag) to `<outdir>/pipeline_info/` for per-step resource tuning; demo profile re-points them to `demo_results/` | `tests/check-execution-reports.sh` (config resolution); generation = manual demo / cluster smoke run | done | — |
@@ -184,11 +185,9 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `list_all_cluster_seeds_of_size_greater_than_2` | `tests/processes/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf.test` | S30 | done |
 | `global_dereplication`          | `tests/processes/part_b/global_dereplication.nf.test`         | S31, S55     | done   |
 | `global_clustering`             | `tests/processes/part_b/global_clustering.nf.test`            | S32, S45     | done   |
-| `fake_taxonomic_assignment`     | `tests/processes/part_b/fake_taxonomic_assignment.nf.test`    | S33          | done   |
 | `chimera_detection`             | `tests/processes/part_b/chimera_detection.nf.test`            | S34          | done   |
 | `cleaving`                      | `tests/processes/part_b/cleaving.nf.test`                     | S22          | done   |
-| `build_occurrence_table`        | `tests/processes/part_b/build_occurrence_table.nf.test`       | S35          | done   |
-| `fake_taxonomic_assignment2`    | `tests/processes/part_b/fake_taxonomic_assignment2.nf.test`   | S36          | done   |
+| `build_occurrence_table`        | `tests/processes/part_b/build_occurrence_table.nf.test`       | S35, S127    | done   |
 | `chimera_detection_post_cleave`            | `tests/processes/part_b/chimera_detection_post_cleave.nf.test`           | S37          | done   |
 | `search_for_terminal_gaps`      | `tests/processes/part_b/search_for_terminal_gaps.nf.test`     | S38          | done   |
 | `merge_substring_otus`          | `tests/processes/part_b/merge_substring_otus.nf.test`         | S39          | done   |

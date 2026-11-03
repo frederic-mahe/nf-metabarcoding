@@ -52,7 +52,10 @@ FIXTURE = (
 )
 
 
-def _run(extra: list[str] | None = None) -> subprocess.CompletedProcess[str]:
+def _run(
+    extra: list[str] | None = None,
+    assignments: bool = True,
+) -> subprocess.CompletedProcess[str]:
     cmd = [
         sys.executable,
         str(SCRIPT),
@@ -61,9 +64,10 @@ def _run(extra: list[str] | None = None) -> subprocess.CompletedProcess[str]:
         "--swarms",          str(FIXTURE / "swarms"),
         "--chimera",         str(FIXTURE / "uchime"),
         "--quality",         str(FIXTURE / "quality"),
-        "--assignments",     str(FIXTURE / "assignments"),
         "--distribution",    str(FIXTURE / "distribution"),
     ]
+    if assignments:
+        cmd += ["--assignments", str(FIXTURE / "assignments")]
     if extra:
         cmd += extra
     return subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -162,3 +166,27 @@ def test_max_ee_filters_every_row_when_zero() -> None:
         f"expected header only under --max-ee 0, got {len(lines)} lines: "
         f"{lines}"
     )
+
+
+# COVERAGE: [S127]
+def test_no_assignments_fills_placeholders() -> None:
+    """[S127]: without --assignments every representative is kept and
+    the identity / taxonomy / references columns carry the placeholder
+    values ``0.0`` / ``NA`` / ``NA``. Everything else matches the
+    golden table: same rows, same order, same other columns.
+    """
+    expected = (FIXTURE / "expected_table.tsv").read_text().splitlines()
+    observed = _run(assignments=False).stdout.splitlines()
+    assert observed[0] == expected[0], "header must not change"
+    assert len(observed) == len(expected), (
+        f"expected {len(expected)} lines, got {len(observed)}: {observed}"
+    )
+    for exp_row, obs_row in zip(expected[1:], observed[1:]):
+        exp_cols = exp_row.split("\t")
+        obs_cols = obs_row.split("\t")
+        assert obs_cols[10:13] == ["0.0", "NA", "NA"], (
+            f"placeholder columns expected, got: {obs_row}"
+        )
+        assert obs_cols[:10] + obs_cols[13:] == (
+            exp_cols[:10] + exp_cols[13:]
+        ), f"non-taxonomy columns changed: {obs_row}"
