@@ -64,7 +64,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S33]`| **Retired** (was: Part B `fake_taxonomic_assignment` placeholder taxonomy TSV; replaced by the builder's own placeholders — see `[S127]`) | — | retired | — |
 | `[S34]`| Part B `chimera_detection` — vsearch uchime_denovo on representatives     | `tests/processes/part_b/chimera_detection.nf.test` | done | — |
 | `[S35]`| Part B `build_occurrence_table` — merge swarm/uchime/quality/stampa/distribution into the filtered occurrence table | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test` | done | — |
-| `[S127]`| `build_filtered_contingency_table.py --assignments` is optional; without it every row carries `0.0`/`NA`/`NA`; `build_occurrence_table` omits it | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test` | red | — |
+| `[S127]`| `build_filtered_contingency_table.py --assignments` is optional; without it every row carries `0.0`/`NA`/`NA`; `build_occurrence_table` omits it | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test` | done | — |
 | `[S36]`| **Retired** (was: Part B `fake_taxonomic_assignment2` placeholder taxonomy TSV for cleaved representatives; see `[S127]`) | — | retired | — |
 | `[S37]`| Part B `chimera_detection_post_cleave` — uchime_denovo on pre-cleave + cleaved reps with dynamic --minsize | `tests/processes/part_b/chimera_detection_post_cleave.nf.test` | done | — |
 | `[S38]`| Part B `search_for_terminal_gaps` — vsearch self-cluster (id=1.0) for sub/super-string OTUs | `tests/processes/part_b/search_for_terminal_gaps.nf.test` | done | — |

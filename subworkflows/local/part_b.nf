@@ -12,9 +12,7 @@ include { build_distribution_file }                        from '../../modules/l
 include { list_all_cluster_seeds_of_size_greater_than_2 }  from '../../modules/local/part_b/list_all_cluster_seeds_of_size_greater_than_2.nf'
 include { global_dereplication }                           from '../../modules/local/part_b/global_dereplication.nf'
 include { global_clustering }                              from '../../modules/local/part_b/global_clustering.nf'
-include { fake_taxonomic_assignment }                      from '../../modules/local/part_b/fake_taxonomic_assignment.nf'
 include { chimera_detection }                              from '../../modules/local/part_b/chimera_detection.nf'
-include { fake_taxonomic_assignment2 }                     from '../../modules/local/part_b/fake_taxonomic_assignment2.nf'
 include { chimera_detection_post_cleave }                  from '../../modules/local/part_b/chimera_detection_post_cleave.nf'
 include { build_occurrence_table }                         from '../../modules/local/part_b/build_occurrence_table.nf'
 include { cleaving }                                       from '../../modules/local/part_b/cleaving.nf'
@@ -63,9 +61,7 @@ workflow part_B {
     global_dereplication(fasta_list, basename)
     global_clustering(global_dereplication.out.fasta, basename)
 
-    // Placeholder taxonomy + chimera flag run in parallel — both
-    // consume only the swarm representatives ([S33]/[S34]).
-    fake_taxonomic_assignment(global_clustering.out.representatives, basename)
+    // Chimera flag on the swarm representatives ([S34]).
     chimera_detection(global_clustering.out.representatives, basename)
 
     // Re-cleave clusters using the per-sample stats ([S22]).
@@ -78,8 +74,7 @@ workflow part_B {
         basename
     )
 
-    // [S36]/[S37]: post-cleave taxonomy + chimera annotations.
-    fake_taxonomic_assignment2(cleaving.out.representatives, basename)
+    // [S37]: post-cleave chimera annotations.
     chimera_detection_post_cleave(
         global_clustering.out.representatives,
         cleaving.out.representatives,
@@ -87,7 +82,8 @@ workflow part_B {
         basename
     )
 
-    // [S35]: assemble the filtered occurrence table.
+    // [S35]: assemble the filtered occurrence table. Taxonomy columns
+    // hold placeholders until Part C fills them ([S127]).
     build_occurrence_table(
         global_clustering.out.representatives,
         cleaving.out.representatives,
@@ -98,8 +94,6 @@ workflow part_B {
         chimera_detection.out.uchime,
         chimera_detection_post_cleave.out.uchime,
         build_expected_error_file.out.qual,
-        fake_taxonomic_assignment.out.results,
-        fake_taxonomic_assignment2.out.results,
         build_distribution_file.out.distr,
         basename,
         sample_ids,                          // [S09]
@@ -202,7 +196,6 @@ workflow part_B_shadow {
     global_clustering(global_dereplication.out.fasta, basename)
     def representatives = global_clustering.out.representatives
 
-    fake_taxonomic_assignment(representatives, basename)
     chimera_detection(representatives, basename)
 
     cleaving(
@@ -214,7 +207,6 @@ workflow part_B_shadow {
         basename
     )
 
-    fake_taxonomic_assignment2(cleaving.out.representatives, basename)
     chimera_detection_post_cleave(
         representatives,
         cleaving.out.representatives,
@@ -232,8 +224,6 @@ workflow part_B_shadow {
         chimera_detection.out.uchime,
         chimera_detection_post_cleave.out.uchime,
         build_expected_error_file.out.qual,
-        fake_taxonomic_assignment.out.results,
-        fake_taxonomic_assignment2.out.results,
         build_distribution_file.out.distr,
         basename,
         sample_ids,                          // [S09]

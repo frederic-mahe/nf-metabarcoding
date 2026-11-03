@@ -1,16 +1,14 @@
 process build_occurrence_table {
-    // [S35]: merge swarm / uchime / quality / stampa / distribution
-    // into the filtered occurrence table. Representatives, stats,
-    // swarms, chimera annotations, and taxonomic assignments are
-    // each concatenated across the pre-cleave outputs and the
-    // post-cleave ([S22]/[S36]/[S37]) outputs so cleaved clusters
-    // get a row.
+    // [S35]: merge swarm / uchime / quality / distribution into the
+    // filtered occurrence table. Representatives, stats, swarms, and
+    // chimera annotations are each concatenated across the pre-cleave
+    // outputs and the post-cleave ([S22]/[S37]) outputs so cleaved
+    // clusters get a row.
     //
-    // Concat order matters for the taxonomic assignments: stampa_parse
-    // overwrites by amplicon ID, so the file listed *last* on stdin
-    // wins for an overlapping seed. Bash uses ``${TAX}{2,}`` (results2
-    // first, results last) so the pre-cleave assignment wins on
-    // overlap — that ordering is preserved here.
+    // [S127]: no taxonomic assignments exist yet at this point, so
+    // --assignments is not passed and the script writes the
+    // placeholder identity / taxonomy / references (0.0 / NA / NA).
+    // Part C's update_occurrence_table overwrites them later.
     //
     // [S46]: this is an intermediate OTU table — it is **not**
     // published; only the final <basename>_table.tsv reaches the
@@ -26,8 +24,6 @@ process build_occurrence_table {
     path uchime,            stageAs: 'uchime_global'
     path uchime_2,          stageAs: 'uchime_cleaved'
     path quality
-    path assignments,       stageAs: 'assignments_global'
-    path assignments_2,     stageAs: 'assignments_cleaved'
     path distribution
     val basename
     val sample_ids   // [S09]: comma-separated sample IDs; empty samples
@@ -45,7 +41,6 @@ process build_occurrence_table {
         --swarms          <(cat !{swarms} !{swarms_2}) \
         --chimera         <(cat !{uchime} !{uchime_2}) \
         --quality         !{quality} \
-        --assignments     <(cat !{assignments_2} !{assignments}) \
         --distribution    !{distribution} \
         --samples         '!{sample_ids}' \
         --max-ee          !{params.max_ee} \

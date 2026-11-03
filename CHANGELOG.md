@@ -22,6 +22,15 @@ version here must match `manifest.version` in
   remaining homonyms can be listed with `--homonyms`
   (`[S123]`–`[S125]`).
 
+### Removed
+
+- Part B's `fake_taxonomic_assignment` and `fake_taxonomic_assignment2`
+  processes (`[S33]`, `[S36]`, now retired). The occurrence table
+  builder writes the placeholder identity / taxonomy / references
+  (`0.0` / `NA` / `NA`) itself, and its `--assignments` option is
+  now optional (`[S127]`). Part B output is unchanged, and each run
+  has up to four fewer tasks.
+
 ### Fixed
 
 - Part C standalone runs (and every other run without `--fastq_folder`)

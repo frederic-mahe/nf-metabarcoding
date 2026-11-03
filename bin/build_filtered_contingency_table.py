@@ -2,9 +2,12 @@
 """Merge swarm/uchime/quality/stampa/distribution into a filtered OTU table.
 
 This script consumes the Part B inputs produced by `global_clustering`,
-`chimera_detection`, `build_expected_error_file`, `fake_taxonomic_assignment`
-(or stampa, once Part C runs), and `build_distribution_file`, and emits
-the filtered occurrence table to stdout.
+`chimera_detection`, `build_expected_error_file`, and
+`build_distribution_file`, plus an optional stampa-shaped assignments
+file, and emits the filtered occurrence table to stdout. Without
+assignments, every row carries the placeholder identity / taxonomy /
+references ``0.0`` / ``NA`` / ``NA`` (see ``[S127]``); Part C's
+``update_occurrence_table`` overwrites them later.
 
 Filter rule: a cluster appears in the output iff
 
@@ -46,6 +49,10 @@ MAX_EE: float = 0.0002
 MIN_ABUNDANCE: int = 3
 MIN_SPREAD: int = 2
 
+# [S127]: identity / taxonomy / references written when no taxonomic
+# assignment is available (the legacy fake_taxonomic_assignment values).
+PLACEHOLDER_ASSIGNMENT: tuple[str, str, str] = ("0.0", "NA", "NA")
+
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     """Parse arguments from the command line."""
@@ -72,8 +79,10 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
                         help="per-amplicon ee/length TSV "
                              "(build_expected_error_file output)")
     parser.add_argument("-a", "--assignments",
-                        required=True,
-                        help="taxonomic assignments (stampa output)")
+                        default=None,
+                        help="taxonomic assignments (stampa output); "
+                             "optional, placeholders are written "
+                             "when omitted")
     parser.add_argument("-d", "--distribution",
                         required=True,
                         help="sequence-to-sample distribution TSV "
@@ -122,13 +131,14 @@ def stampa_parse(
 
 
 def representatives_parse(
-    path: str, stampa: dict[str, tuple[str, str, str]],
+    path: str, stampa: Optional[dict[str, tuple[str, str, str]]],
 ) -> dict[str, str]:
     """Map ``seed -> sequence`` for every seed present in ``stampa``.
 
     Seeds absent from ``stampa`` are dropped: every downstream parser
     is keyed on ``representatives``, so the stampa filter cascades to
-    them automatically.
+    them automatically. When ``stampa`` is ``None`` (no assignments
+    file, ``[S127]``), every seed is kept.
     """
     print("PROGRESS: parsing fasta representatives", file=sys.stderr)
     representatives: dict[str, str] = {}
@@ -138,7 +148,9 @@ def representatives_parse(
             if line.startswith(">"):
                 amplicon = line.strip(">;\n").split(";size=")[0]
             else:
-                if amplicon is not None and amplicon in stampa:
+                if amplicon is not None and (
+                    stampa is None or amplicon in stampa
+                ):
                     representatives[amplicon] = line.strip()
     return representatives
 
@@ -314,7 +326,7 @@ def iter_rows(
         high_quality: object = quality.get(seed, "NA")
         chimera_status = uchime.get(seed, "NA")
         identity, taxonomy, references = stampa.get(
-            seed, ("NA", "NA", "NA"),
+            seed, PLACEHOLDER_ASSIGNMENT,
         )
 
         if (
@@ -358,7 +370,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         if s
     ]
 
-    stampa = stampa_parse(args.assignments)
+    stampa: Optional[dict[str, tuple[str, str, str]]] = None
+    if args.assignments is not None:
+        stampa = stampa_parse(args.assignments)
     representatives = representatives_parse(args.representatives, stampa)
     _, sorted_stats, seeds = stats_parse(args.stats, representatives)
     _, valid_otus = swarms_parse(args.swarms, representatives)
@@ -372,7 +386,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         samples,
         iter_rows(
             representatives, sorted_stats, seeds, seeds2samples,
-            samples, quality, uchime, stampa,
+            samples, quality, uchime, stampa or {},
             max_ee=args.max_ee,
             min_abundance=args.min_abundance,
             min_spread=args.min_spread,
