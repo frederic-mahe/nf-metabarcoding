@@ -24,9 +24,9 @@ jobs:
         uses: nf-core/setup-nextflow@v3
 
       - name: Install nf-test
-        run: |
-          curl -fsSL https://code.askimed.com/install/nf-test | bash
-          sudo mv nf-test /usr/local/bin/
+        uses: nf-core/setup-nf-test@v2
+        with:
+          version: 0.9.5
 
       - name: Set up bioinformatics tools
         uses: mamba-org/setup-micromamba@v3
