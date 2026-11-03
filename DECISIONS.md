@@ -104,6 +104,18 @@ Sub-decisions:
   This format is asserted by the unit tests, so future tweaks must
   stay backward compatible.
 
+**Amendment (2026-11-03, confirmed by the developer; see `D23`):**
+the refusal applies to sample IDs the pipeline **derives** from file
+or folder names (folder scan, including `--pool_fastq_by_folder` and
+`--fastq_recursive`). An `--input` samplesheet may repeat a `sample`
+value on several rows: that is an explicit request to pool those
+files into one sample, not a silent merge. Pooling is allowed only
+when every row of that sample is single-end (empty `fastq_2`); two
+paired rows, or a paired and a single-end row, still abort with the
+duplicate error. Every pooled sample is reported (one stderr line and
+a per-sample pooling log) so an accidental repeat stays visible.
+Specified as `[S132]`.
+
 
 ## D04 — Part C input mode and output policy
 
@@ -1299,3 +1311,61 @@ this check by construction.
 
 Specified as `[S114]` (process, scope, gating), `[S115]` (errors),
 `[S116]` (warnings) and `[S117]` (report and messages).
+
+
+## D23 — Nanopore layout: pooling fastq chunks, recursive discovery
+
+**Blocks:** `[S128]`, `[S129]`, `[S130]`, `[S131]`, `[S132]`,
+`[S133]`. Related: `[S13]`, `[S14]`, `[S70]`, `[S126]`, `D03`.
+**Status:** `resolved` — confirmed by the developer (2026-11-03).
+
+Raised 2026-11-03 from a user report. MinKNOW writes demultiplexed
+reads as `fastq_pass/barcodeNN/<prefix>_0.fastq.gz`,
+`<prefix>_1.fastq.gz`, `<prefix>_2.fastq.gz`, ... (one file per chunk
+of reads). Pointed at a barcode folder, discovery pairs `_1` with
+`_2` through canonical row 7 (`[._]1.<ext>`) and sends them to
+`merge_fastq_pairs`, where almost nothing merges; `_0`, `_3`, ...
+become separate single-end samples named after the chunk files. No
+warning is printed, because every R1 found its R2.
+
+Automatic pooling was rejected: MinKNOW and dorado naming varies
+across versions, and a false positive would silently pool distinct
+samples. Detection is used only to warn. The current defaults
+(`--max_ee`, swarm `d`) are tuned for Illumina reads; the goal here is
+to let users experiment with Nanopore data, not to tune for it.
+
+**Resolution:**
+
+1. **`--pool_fastq_by_folder`** (default `false`), a layout flag:
+   each first-level subfolder of each `--fastq_folder` entry becomes
+   one single-end sample named after the subfolder; all its fastq
+   files are pooled; pairing is off (`[S128]`). `unclassified/` is
+   treated like any other subfolder. Fastq files sitting directly in
+   a listed folder are ignored with a warning; a subfolder holding no
+   fastq file is skipped with a warning; when no subfolder holds a
+   fastq file the run stops, as in `[S126]`.
+2. **Pooling process** `pool_fastq` (`[S129]`): concatenates the
+   files in sorted path order into `<sample>.fastq.gz` (`.gz` copied
+   as is, plain files gzipped, `.bz2` re-compressed to gzip) and
+   writes `<sample>_pooling.log` with the file count. It runs for
+   every sample with more than one fastq file. Inspired by the
+   developer's pooling script.
+3. **Chunk-series warning** (`[S130]`): without pooling, a folder
+   holding `<prefix>_0`, `<prefix>_1`, `<prefix>_2`, ... (same
+   prefix, `_0` present, at least three numbers) triggers a warning
+   that names the folder and the flag; the run carries on. A plain
+   `_1` / `_2` pair stays silent. An error was rejected: a legitimate
+   `sample_1` / `sample_2` pair must not block a run.
+4. **`--fastq_recursive`** (default `false`, `[S131]`): discovery
+   descends into every subfolder; pairing stays within one folder;
+   name collisions abort per `[S13]`. Opt-in because a recursive
+   scan from a run root would pick up `fastq_fail/`, Nextflow `work/`
+   folders or old results.
+5. **Samplesheet pooling** (`[S132]`, amends `D03`): several
+   single-end rows sharing a `sample` value are pooled.
+6. **`--fastq_recursive` and `--pool_fastq_by_folder` are mutually
+   exclusive** (`[S133]`): pooling already looks one level below
+   `fastq_pass/`; combining them would turn `fastq_fail/` barcodes,
+   `work/` subfolders and nested folders into samples. Both are
+   folder-scan options, so setting either with `--input` also stops
+   at startup.
