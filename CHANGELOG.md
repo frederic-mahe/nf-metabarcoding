@@ -33,6 +33,18 @@ version here must match `manifest.version` in
   cannot be combined with `--input` (`[S133]`). Default settings stay
   tuned for Illumina reads.
 
+### Changed
+
+- Clearer task names in the log, trace and reports. The run-mode
+  workflows in `main.nf` are now named after their input:
+  `from_fastq`, `from_fasta`, `from_table` and `from_representatives`
+  (were `part_a`, `part_b`, `part_c` and `part_c_fasta`), and Part C's
+  internal `part_C_assign` is now `assign`. A task that used to appear
+  as `part_a:part_C:part_C_assign:assign_taxonomy_stampa` now appears
+  as `from_fastq:part_C:assign:assign_taxonomy_stampa`. Outputs are
+  unchanged; site configs with `withName:` selectors on full task
+  names need the new names (bare process names are unaffected).
+
 ### Removed
 
 - Part B's `fake_taxonomic_assignment` and `fake_taxonomic_assignment2`

@@ -11,11 +11,11 @@ include { dump_software_versions } from './modules/local/dump_software_versions.
 include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 
 
-workflow part_c {
+workflow from_table {
     // Standalone table-input Part C ([S47]/[S48]): the user provides
     // --occurrence_table (Part B's <basename>_table.tsv) and a
     // reference whose format matches --taxonomy_method ([S47]/[S64]).
-    // The fasta-input variant is the sibling `part_c_fasta` entry,
+    // The fasta-input variant is the sibling `from_representatives` entry,
     // reached via --representatives_fasta.
     if ( params.taxonomy_method == 'sintax' ) {
         assert params.reference_dataset_sintax :
@@ -61,7 +61,7 @@ workflow part_c {
 }
 
 
-workflow part_c_fasta {
+workflow from_representatives {
     // Standalone fasta-input Part C ([S48]): the user provides
     // --representatives_fasta (a representatives FASTA, header
     // `<amplicon>;size=<abundance>;`) and a reference whose format
@@ -86,7 +86,7 @@ workflow part_c_fasta {
 }
 
 
-workflow part_b {
+workflow from_fasta {
     // Standalone Part B ([S25]/[S26]/[S27]/[S56]): discover the
     // per-sample .fas files under params.fasta_folder and route them
     // to two parallel workflows:
@@ -203,7 +203,7 @@ workflow part_b {
 
 workflow fetch {
     // Standalone ENA/SRA fetch mode ([S97]/[S98]/[S99]/[S100]/[S101]).
-    // A named workflow — like `part_b` / `part_c` — selected by param
+    // A named workflow — like `from_fasta` / `from_table` — selected by param
     // dispatch from the anonymous entry workflow below (Nextflow's
     // strict parser drops `-entry`, so a named workflow is *called*, not
     // selected via `-entry`). Accessions are validated at startup by
@@ -215,7 +215,7 @@ workflow fetch {
 }
 
 
-workflow part_a {
+workflow from_fastq {
     // Part A end-to-end ([S18]/[S70]), chained to Part B ([S27]/[S56])
     // when --project_name is set and to Part C ([S47]) when the matching
     // reference is also set. The default mode: selected by the entry
@@ -411,30 +411,30 @@ workflow {
         if ( params.accession ) {
             // [S97]: --accession selects the standalone fetch mode. Dispatch by
             // param presence (Nextflow's strict parser drops -entry), calling the
-            // named `fetch` workflow above — the same shape as the part_b /
-            // part_c dispatch below. --accession is mutually exclusive with the
+            // named `fetch` workflow above — the same shape as the from_fasta /
+            // from_table dispatch below. --accession is mutually exclusive with the
             // other selectors ([S02], enforced in validate_params()).
             fetch()
         } else if ( params.occurrence_table ) {
             // [S47]/[S48]: --occurrence_table switches the pipeline into
             // Part C standalone mode (Parts A and B do not run). The
             // mode also requires --reference_dataset and --results_folder.
-            part_c()
+            from_table()
         } else if ( params.representatives_fasta ) {
             // [S48]: --representatives_fasta switches the pipeline into
             // fasta-input Part C mode (Parts A and B do not run; no
             // occurrence-table join). Requires the reference matching
             // --taxonomy_method; the deliverable is <basename>_taxonomy_<method>.tsv.
-            part_c_fasta()
+            from_representatives()
         } else if ( params.fasta_folder || samplesheet_profile() == 'fasta' ) {
             // [S27]/[S70]: --fasta_folder, or an --input samplesheet in the
             // fasta profile, switches the pipeline into Part B standalone mode.
             // Part A's --fastq_folder requirement is lifted in that mode (Part A
             // does not run). When --reference_dataset is also set, `workflow
-            // part_b` chains Part C onto Part B's regular output.
-            part_b()
+            // from_fasta` chains Part C onto Part B's regular output.
+            from_fasta()
         } else {
-            part_a()
+            from_fastq()
         }
     }
 }

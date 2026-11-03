@@ -1,7 +1,7 @@
 // ============================================================================
 // Part C — taxonomic assignment (stampa re-implementation)
 // ============================================================================
-// `part_C_assign` is the shared assignment core: given a representatives
+// `assign` is the shared assignment core: given a representatives
 // FASTA it runs the method selected by --taxonomy_method (stampa
 // scatter-gather or sintax) and publishes the standalone
 // <basename>_taxonomy_<method>.tsv. `part_C` wraps it with the
@@ -57,7 +57,7 @@ workflow checked_reference {
 }
 
 
-workflow part_C_assign {
+workflow assign {
     // Shared taxonomic-assignment core for the regular Part C paths:
     // given a representatives FASTA, run the method selected by
     // --taxonomy_method ([S61]) and publish the standalone
@@ -155,7 +155,7 @@ workflow part_C_assign {
 workflow part_C {
     // Table-input Part C ([S46]→[S51]): extract a representatives FASTA
     // from the occurrence table, assign taxonomy via the shared
-    // `part_C_assign` helper, then splice the assignment back onto the
+    // `assign` helper, then splice the assignment back onto the
     // table. Shared by the standalone Part C workflow and the
     // Part B → Part C end-to-end path.
 
@@ -167,14 +167,14 @@ workflow part_C {
     // [S48]: extract a representatives FASTA from the occurrence table.
     extract_fasta_sequences_from_occurrence_table(occurrence_table)
 
-    part_C_assign(
+    assign(
         extract_fasta_sequences_from_occurrence_table.out.fasta,
         basename,
     )
 
     // [S51] empty-input contract: when the occurrence table has no
     // rows, the extracted representatives fasta is empty, the stampa
-    // scatter emits zero chunks, and `part_C_assign` emits nothing —
+    // scatter emits zero chunks, and `assign` emits nothing —
     // which would leave update_occurrence_table dangling. Fall back to
     // an empty assignments file so update_occurrence_table still runs
     // and publishes a header-only <basename>_table_assigned.tsv. (The
@@ -184,7 +184,7 @@ workflow part_C {
 
     update_occurrence_table(
         occurrence_table,
-        part_C_assign.out.taxonomy.ifEmpty(empty_assignments),
+        assign.out.taxonomy.ifEmpty(empty_assignments),
         basename,
     )
 
@@ -222,10 +222,10 @@ workflow part_C_fasta {
     basename          // value channel: <basename>
 
     main:
-    part_C_assign(representatives, basename)
+    assign(representatives, basename)
 
     emit:
-    taxonomy = part_C_assign.out.taxonomy
+    taxonomy = assign.out.taxonomy
 }
 
 
