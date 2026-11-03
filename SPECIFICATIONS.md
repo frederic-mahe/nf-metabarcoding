@@ -434,7 +434,10 @@ the latter case.
     nextflow trace.
 - `[S14]` collision policy for same-named samples: **refuse**
   (sample IDs must be unique). Resolved per `D03` in
-  [`DECISIONS.md`](DECISIONS.md); implemented by `[S13]`.
+  [`DECISIONS.md`](DECISIONS.md); implemented by `[S13]`. The policy
+  covers sample IDs derived from file or folder names; repeated
+  single-end rows in an `--input` samplesheet are an explicit
+  pooling request instead (`[S132]`, `D03` amendment).
   - **Pass when:** `bin/discover_fastq.py` (Part A) and
     `bin/discover_fasta.py` (Part B) each expose a
     `check_unique_sample_ids()` helper that raises on duplicates,
@@ -495,6 +498,8 @@ the latter case.
     - data files (`<outdir>/per_sample/`): `<sampleId>.fas`,
       `<sampleId>.qual`, `<sampleId>.stats`
     - per-step log files (`<outdir>/logs/part_a/per_sample/`):
+        - pooling       → `<sampleId>_pooling.log` (only for a sample
+          built from several fastq files, see `[S129]`)
         - merging       → `<sampleId>_merging.log` (regular path
           only — the shadow path has no merging step, see `[S04]`)
         - trimming      → `<sampleId>_trimming_forward.log` and
@@ -585,6 +590,103 @@ the latter case.
     and one populated folder, the helper exits zero, lists the
     populated folder's samples, and warns about the empty folder
     only, and Part A succeeds and prints that warning.
+- `[S128]` `--pool_fastq_by_folder` (default `false`) switches the
+  `--fastq_folder` scan to the folder-per-sample layout of Nanopore
+  runs (`fastq_pass/barcode01/<prefix>_0.fastq.gz`, `_1`, `_2`, ...).
+  `bin/discover_fastq.py --pool-by-folder` then looks at the
+  first-level subfolders of each listed folder: each subfolder that
+  holds at least one fastq file becomes one single-end sample, named
+  after the subfolder, made of every fastq file directly inside it
+  (any `[S03]` compression; deeper levels are not scanned).
+  `unclassified/` is a subfolder like any other. The paired-end
+  pattern table and `--fastq_pattern` are not used, so
+  `merge_fastq_pairs` never runs. The sample-ID checks still apply:
+  charset (`[S93]`), reserved suffix (`[S23]`), and uniqueness
+  across the listed folders (`[S13]`). Fastq files sitting directly
+  in a listed folder are ignored, with a `warning:` naming the folder
+  and the number of ignored files; a subfolder holding no fastq file
+  is skipped, with a `warning:` naming it; both are relayed as
+  `WARNING:` lines (`[S126]`). When no subfolder of any listed folder
+  holds a fastq file, discovery stops with an error naming the
+  scanned folders. The helper writes one `sample\tfile\t` row per
+  file, in sorted path order; Part A groups the rows by sample
+  (`[S129]`).
+  - **Pass when:** the helper, run with `--pool-by-folder` on a folder
+    holding `barcode01/` (three files `x_0`, `x_1`, `x_2`),
+    `barcode02/` (one file), `unclassified/` (one file), `other/` (no
+    fastq file) and one loose fastq file, emits three rows for
+    `barcode01`, one for `barcode02` and one for `unclassified`,
+    exits zero, and warns about `other/` and the loose file; with no
+    fastq file in any subfolder it exits non-zero naming the folder;
+    a Part A run with `--pool_fastq_by_folder` on such a layout
+    publishes `barcode01.fas`, `barcode02.fas` and `unclassified.fas`
+    and never runs `merge_fastq_pairs`.
+- `[S129]` Part A runs `pool_fastq` on every sample made of more than
+  one fastq file (folder pooling, `[S128]`, or samplesheet pooling,
+  `[S132]`); a sample with a single file skips it. Once the samples
+  are known, Part A prints one line per pooled sample on stderr:
+  `pooling <N> fastq files into sample <sample>`. Part A sorts the
+  files by path and `bin/pool_fastq.py` concatenates them, in the
+  order given, into `<sample>.fastq.gz`: `.gz` files are copied byte for byte (a valid
+  multi-member gzip file), plain and `.bz2` files are recompressed
+  with gzip (no file name, timestamp `0`, so the output is
+  byte-identical across runs). It writes `<sample>_pooling.log`
+  (first line `<sample>: <N> files pooled`, then one line per file),
+  published with the other per-sample logs (`[S19]`). The pooled
+  file then follows the single-end path (`[S21]`).
+  - **Pass when:** pooling a `.gz`, a plain and a `.bz2` file yields a
+    gzip file whose decompressed content is the three inputs'
+    content in the order given, byte-identical across two runs,
+    and a log whose first line reads `<sample>: 3 files pooled`;
+    the `pool_fastq` process publishes `<sample>.fastq.gz` and
+    `<sample>_pooling.log`.
+- `[S130]` without `--pool_fastq_by_folder`, discovery warns when a
+  scanned folder holds a numbered file series typical of Nanopore
+  output: files named `<prefix>_<n>.<ext>` (`<n>` a decimal number)
+  sharing the same `<prefix>`, with `_0` present and at least three
+  distinct numbers. The `warning:` names the folder and the prefix
+  and suggests `--pool_fastq_by_folder`; it is relayed as a
+  `WARNING:` line (`[S126]`) and the run carries on with the usual
+  pairing. A plain `<prefix>_1` / `<prefix>_2` pair does not warn.
+  - **Pass when:** the helper on a folder holding `x_0`, `x_1`, `x_2`
+    exits zero and its stderr names the folder, `x` and
+    `--pool_fastq_by_folder`; on a folder holding only `s_1` / `s_2`
+    it prints no warning.
+- `[S131]` `--fastq_recursive` (default `false`) makes the
+  `--fastq_folder` scan descend into every subfolder of each listed
+  folder, at any depth (`bin/discover_fastq.py --recursive`; folder
+  symlinks are not followed). Pairing (`[S11]`) stays within one
+  folder, and sample IDs found in different folders must still be
+  unique (`[S13]`). The `[S126]` messages follow the flag: with
+  recursion, the no-fastq error says the search was recursive (and
+  lists no subfolders), and a listed folder warns as empty only when
+  its whole tree holds no fastq file.
+  - **Pass when:** the helper with `--recursive` on a folder whose
+    fastq pair sits two levels down emits that pair as one paired
+    sample; without the flag the same call fails per `[S126]`; with
+    the flag on a tree holding no fastq file it fails and its stderr
+    says "recursive" and does not say "not recursive".
+- `[S132]` an `--input` samplesheet (fastq profile, `[S70]`) may
+  repeat a `sample` value on several rows when every one of those
+  rows is single-end (empty `fastq_2`): the files are pooled into one
+  sample (`[S129]`), in sorted path order. `run` may differ between
+  the rows. Two paired rows, or a paired and a single-end row, with
+  the same `sample` still abort with the duplicate error naming the
+  rows. The normalized TSV keeps one row per file.
+  - **Pass when:** `bin/parse_samplesheet.py` accepts two single-end
+    rows named `A` and emits both; it rejects two paired rows named
+    `A`, and a paired plus a single-end row named `A`, naming both
+    rows; a Part A run on a samplesheet with two single-end rows for
+    one sample publishes a single `<sample>.fas` and a
+    `<sample>_pooling.log`.
+- `[S133]` `--fastq_recursive` and `--pool_fastq_by_folder` are
+  mutually exclusive: setting both stops at startup with a message
+  naming both flags. Both modify the `--fastq_folder` scan, so
+  setting either together with `--input` also stops at startup,
+  naming the flag.
+  - **Pass when:** a run with both flags fails before any process
+    runs and the error names both; a run with `--input` and
+    `--pool_fastq_by_folder` fails naming `--pool_fastq_by_folder`.
 - `[S23]` `notmerged` is a reserved sample-ID suffix used by the
   shadow pipeline (`[S04]`). A sample whose ID ends with the literal
   string `notmerged` (e.g. `X_notmerged`) is rejected at discovery
@@ -2145,7 +2247,8 @@ and `--reference_dataset_sintax`.
   and column** when: the header is missing a required column or carries
   an unknown one; the profile cannot be inferred (neither `fastq_1` nor
   `fasta` present); a required cell is empty; two rows share a `sample`
-  ([S13] / [S14]); or (fastq profile) a `sample` ends in the reserved
+  ([S13] / [S14]) — except single-end fastq rows, which are pooled
+  ([S132]); or (fastq profile) a `sample` ends in the reserved
   `notmerged` suffix ([S23]). Path cells are `~`-expanded ([S60]);
   relative paths resolve against the launch directory (Nextflow's
   default). The existence of each listed file is enforced downstream by

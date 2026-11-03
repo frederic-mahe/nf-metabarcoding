@@ -31,6 +31,7 @@ tests/data/**/*.fas
 tests/data/**/*.fas2
 tests/data/**/*.qual
 tests/data/**/*.stats
+tests/data/nanopore_layout/
 .nf-test.log
 
 # nextflow DAG renders (nextflow run -with-dag pipeline.<ext>)

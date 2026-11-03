@@ -764,6 +764,131 @@ nextflow_pipeline {
         }
     }
 
+    test("--pool_fastq_by_folder pools each subfolder into one sample") {
+        // COVERAGE: [S128], [S129]
+        // nanopore_layout/fastq_pass holds barcode01 (three gzipped
+        // chunks), barcode02 (one plain chunk), unclassified (one bzip2
+        // chunk), other/ (no fastq file) and one loose fastq file.
+        // --no_trimming keeps cutadapt out of the picture: the reads
+        // span the whole amplicon.
+        tag "ci"
+        when {
+            params {
+                fastq_folder         = "${projectDir}/tests/data/nanopore_layout/fastq_pass"
+                fastq_pattern        = ""
+                pool_fastq_by_folder = true
+                no_trimming          = true
+                outdir               = "${outputDir}/pooled"
+                threads              = 1
+            }
+        }
+        then {
+            assert workflow.success
+            ["barcode01", "barcode02", "unclassified"].each { id ->
+                assert file("${outputDir}/pooled/per_sample/${id}.fas").exists() :
+                    "missing per-sample fasta for ${id}"
+            }
+            assert !file("${outputDir}/pooled/per_sample/loose.fas").exists() :
+                "the loose fastq file should be ignored"
+            def tasks = workflow.trace.tasks()
+            assert !tasks.any { it.name.contains("merge_fastq_pairs") } :
+                "merge_fastq_pairs must not run under --pool_fastq_by_folder"
+            // only barcode01 is made of several files
+            assert tasks.count { it.name.contains("pool_fastq") } == 1 :
+                "expected one pool_fastq task, got: ${tasks*.name}"
+            assert file("${outputDir}/pooled/logs/part_a/per_sample/barcode01_pooling.log").exists() :
+                "missing barcode01_pooling.log"
+            def err = workflow.stderr.join("\n")
+            assert err.contains("pooling 3 fastq files into sample barcode01") :
+                "expected a pooling notice, got: ${err}"
+            def warnings = workflow.stderr.findAll { it.contains("WARNING:") }
+            assert warnings.any { it.contains("fastq_pass/other") } :
+                "expected a warning about other/, got: ${err}"
+            assert warnings.any { it.contains("ignored") } :
+                "expected a warning about the loose file, got: ${err}"
+        }
+    }
+
+    test("--input pools single-end rows sharing a sample") {
+        // COVERAGE: [S132], [S129]
+        tag "ci"
+        setup {
+            def top = "${projectDir}/tests/data/nanopore_layout/fastq_pass/barcode01"
+            def sheet = file("${outputDir}/pooled_input.csv")
+            sheet.text =
+                "sample,fastq_1,fastq_2,run\n" +
+                "mixA,${top}/FAX00000_pass_barcode01_0a1b2c3d_1.fastq.gz,,r1\n" +
+                "mixA,${top}/FAX00000_pass_barcode01_0a1b2c3d_0.fastq.gz,,r2\n"
+        }
+        when {
+            params {
+                input       = "${outputDir}/pooled_input.csv"
+                no_trimming = true
+                outdir      = "${outputDir}/pooled_input"
+                threads     = 1
+            }
+        }
+        then {
+            assert workflow.success
+            assert file("${outputDir}/pooled_input/per_sample/mixA.fas").exists() :
+                "missing pooled sample fasta"
+            assert file("${outputDir}/pooled_input/logs/part_a/per_sample/mixA_pooling.log").exists() :
+                "missing mixA_pooling.log"
+            def log = file("${outputDir}/pooled_input/logs/part_a/per_sample/mixA_pooling.log").readLines()
+            // sorted by path: chunk _0 before chunk _1
+            assert log[1].endsWith("_0.fastq.gz") && log[2].endsWith("_1.fastq.gz") :
+                "expected files in sorted path order, got: ${log}"
+        }
+    }
+
+    test("--fastq_recursive and --pool_fastq_by_folder abort together") {
+        // COVERAGE: [S133]
+        tag "ci"
+        when {
+            params {
+                fastq_folder         = "${projectDir}/tests/data/nanopore_layout/fastq_pass"
+                fastq_pattern        = ""
+                pool_fastq_by_folder = true
+                fastq_recursive      = true
+                no_trimming          = true
+                threads              = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
+            assert msg.contains("--fastq_recursive") && msg.contains("--pool_fastq_by_folder") :
+                "expected both flags named, got: ${msg}"
+            assert workflow.trace.tasks().isEmpty() :
+                "no process should run"
+        }
+    }
+
+    test("--pool_fastq_by_folder together with --input aborts at startup") {
+        // COVERAGE: [S133]
+        tag "ci"
+        setup {
+            def sheet = file("${outputDir}/pool_with_input.csv")
+            sheet.text = "sample,fastq_1,fastq_2\nS,${projectDir}/x.fq,\n"
+        }
+        when {
+            params {
+                input                = "${outputDir}/pool_with_input.csv"
+                pool_fastq_by_folder = true
+                no_trimming          = true
+                threads              = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
+            assert msg.contains("--pool_fastq_by_folder") :
+                "expected the flag named, got: ${msg}"
+            assert workflow.trace.tasks().isEmpty() :
+                "no process should run"
+        }
+    }
+
     test("aborts when a sample ID ends with the reserved 'notmerged' suffix") {
         // COVERAGE: [S23]
         tag "ci"

@@ -117,10 +117,12 @@ def test_empty_required_cell() -> None:
 
 
 def test_duplicate_sample_lists_both_rows() -> None:
-    fields = ["sample", "fastq_1"]
+    # [S132]: repeated single-end rows are pooled, so the duplicate
+    # error is exercised with paired rows.
+    fields = ["sample", "fastq_1", "fastq_2"]
     rows = _rows(
-        {"sample": "A", "fastq_1": "A_1.fq"},
-        {"sample": "A", "fastq_1": "A_2.fq"},
+        {"sample": "A", "fastq_1": "A_1.fq", "fastq_2": "A_2.fq"},
+        {"sample": "A", "fastq_1": "A1_1.fq", "fastq_2": "A1_2.fq"},
     )
     with pytest.raises(SamplesheetError) as excinfo:
         parse_rows(fields, rows)

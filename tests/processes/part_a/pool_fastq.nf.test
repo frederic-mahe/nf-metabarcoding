@@ -1,0 +1,42 @@
+nextflow_process {
+
+    name "pool_fastq"
+    script "modules/local/part_a/pool_fastq.nf"
+    process "pool_fastq"
+
+    test("pools gz, plain and bz2 chunks into one gzipped fastq") {
+        // COVERAGE: [S129]
+        // The nanopore_layout fixture (tests/data/generate.sh) holds
+        // gzipped, plain and bzip2 chunks; staging them from three
+        // folders also checks that same-named inputs cannot collide.
+        tag "ci"
+        when {
+            process {
+                """
+                def top = "\${projectDir}/tests/data/nanopore_layout/fastq_pass"
+                input[0] = tuple(
+                    "pooled",
+                    [
+                        file("\${top}/barcode01/FAX00000_pass_barcode01_0a1b2c3d_0.fastq.gz"),
+                        file("\${top}/barcode02/FAX00000_pass_barcode02_0a1b2c3d_0.fastq"),
+                        file("\${top}/unclassified/FAX00000_pass_unclassified_0a1b2c3d_0.fastq.bz2")
+                    ]
+                )
+                """
+            }
+        }
+        then {
+            assert process.success
+            def (id, pooled) = process.out.pooled.get(0)
+            assert id == "pooled"
+            assert pooled.toString().endsWith("pooled.fastq.gz")
+            // 1 + 3 + 1 records, 4 lines each
+            def lines = path(pooled).linesGzip
+            assert lines.size() == 20 :
+                "expected 5 pooled records (20 lines), got ${lines.size()}"
+            def log = path(process.out.log.get(0)).readLines()
+            assert log[0] == "pooled: 3 files pooled" :
+                "unexpected first log line: ${log[0]}"
+        }
+    }
+}

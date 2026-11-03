@@ -249,6 +249,43 @@ emit_fastq_in_subfolders_only() {
     printf 'not a fastq file\n' > "${dir}/demultiplexing.log"
 }
 
+emit_nanopore_layout() {
+    # [S128]/[S130] — a MinKNOW-like fastq_pass/ folder: one subfolder
+    # per barcode, each holding numbered chunks (<prefix>_<n>.<ext>).
+    # barcode01 has three gzipped chunks (one amplicon each), barcode02
+    # one plain chunk, unclassified one bzip2 chunk. other/ holds no
+    # fastq file and loose.fastq.gz sits directly in fastq_pass/: both
+    # must be skipped with a warning under --pool_fastq_by_folder.
+    # Single-end reads span the whole amplicon, primers included.
+    local -r dir="nanopore_layout/fastq_pass"
+    rm -rf "nanopore_layout"
+    mkdir -p "${dir}/barcode01" "${dir}/barcode02" "${dir}/unclassified" "${dir}/other"
+    local -r prefix="FAX00000_pass"
+    local n
+    local out
+    for n in 0 1 2; do
+        out="${dir}/barcode01/${prefix}_barcode01_0a1b2c3d_${n}.fastq"
+        : > "${out}"
+        write_record "${out}" "read_${n}" "${AMPLICONS_OK[${n}]}"
+        gzip --force "${out}"
+    done
+    out="${dir}/barcode02/${prefix}_barcode02_0a1b2c3d_0.fastq"
+    : > "${out}"
+    for n in 0 1 2; do
+        write_record "${out}" "read_${n}" "${AMPLICONS_OK[${n}]}"
+    done
+    out="${dir}/unclassified/${prefix}_unclassified_0a1b2c3d_0.fastq"
+    : > "${out}"
+    write_record "${out}" "read_0" "${AMPLICONS_OK[0]}"
+    bzip2 --force "${out}"
+    printf 'not a fastq file\n' > "${dir}/other/notes.txt"
+    out="${dir}/loose.fastq"
+    : > "${out}"
+    write_record "${out}" "read_0" "${AMPLICONS_OK[1]}"
+    gzip --force "${out}"
+}
+
+
 emit_part_b_fixtures() {
     # Hand-crafted per-sample Part A outputs for Part B's process
     # tests. Two samples (S1, S2) plus a shadow-pipeline artefact
@@ -497,6 +534,7 @@ emit_unpaired_only
 emit_miseq_pair
 emit_reserved_keyword
 emit_fastq_in_subfolders_only
+emit_nanopore_layout
 emit_duplicate_sample_ids
 emit_part_b_fixtures
 emit_e2e_part_b_fixture
