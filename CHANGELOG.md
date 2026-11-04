@@ -17,7 +17,11 @@ version here must match `manifest.version` in
   warnings (`[S117]`) now go through the Nextflow logger. They no
   longer garble the interactive progress display, and they are also
   recorded in `.nextflow.log`. Warnings now read `WARN:` instead of
-  `WARNING:`.
+  `WARNING:`. The pooling line carries no path, and the console shows
+  the fastq discovery warnings as one short line with their count
+  (`fastq discovery: 2 warnings, details in .nextflow.log`), the full
+  messages going to `.nextflow.log` only: lines wider than the
+  terminal wrap and garble the progress display.
 
 ## [0.8.0] - 2026-11-04
 

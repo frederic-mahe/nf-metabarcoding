@@ -578,10 +578,15 @@ the latter case.
   the user can pass them instead. A folder that holds only
   non-fastq files (`.fas`, `.log`, ...) counts as empty. When only
   some of the listed folders are empty, the run goes on with the
-  fastq files found elsewhere, and Part A logs a warning through the
-  Nextflow logger (`log.warn`, printed as `WARN:`) for each empty
-  folder, naming it. Every `warning:` line that
-  `bin/discover_fastq.py` writes on stderr is relayed this way.
+  fastq files found elsewhere, and Part A records a warning naming
+  each empty folder. Every `warning:` line that
+  `bin/discover_fastq.py` writes on stderr is relayed this way: the
+  full text goes to the Nextflow log file only (`log.debug`, prefixed
+  `fastq discovery warning: `), and the console gets a single short
+  warning (`log.warn`, printed as `WARN:`), `fastq discovery: <N>
+  warning(s), details in .nextflow.log`. The warnings name folders,
+  and a line wider than the terminal wraps and garbles the
+  interactive progress display; the short line never wraps.
   - **Pass when:** running `bin/discover_fastq.py` on a folder with
     no fastq file exits non-zero, prints nothing on stdout, and its
     stderr names the folder and says "not recursive"; when that
@@ -590,7 +595,9 @@ the latter case.
     `merge_fastq_pairs` with the same message; and with one empty
     and one populated folder, the helper exits zero, lists the
     populated folder's samples, and warns about the empty folder
-    only, and Part A succeeds and prints that warning.
+    only, and Part A succeeds, logs that warning in full to the
+    Nextflow log file, and logs one short `fastq discovery: 1
+    warning, details in .nextflow.log` warning.
 - `[S128]` `--pool_fastq_by_folder` (default `false`) switches the
   `--fastq_folder` scan to the folder-per-sample layout of Nanopore
   runs (`fastq_pass/barcode01/<prefix>_0.fastq.gz`, `_1`, `_2`, ...).

@@ -41,12 +41,19 @@ workflow part_A {
     } else {
         discover_inputs()
         // [S126]: relay the discovery warnings (e.g. a --fastq_folder
-        // entry holding no fastq file) through log.warn, which keeps the
-        // interactive progress display intact.
+        // entry holding no fastq file). They name folders, so they can be
+        // wider than the terminal, and a wrapped line garbles the
+        // interactive progress display: the full text goes to the log
+        // file only, and the console gets one short line.
         discover_inputs.out.warnings.subscribe { stderr_file ->
-            stderr_file.readLines()
+            def warnings = stderr_file.readLines()
                 .findAll { it.startsWith('warning: ') }
-                .each { log.warn(it.substring('warning: '.length())) }
+                .collect { it.substring('warning: '.length()) }
+            warnings.each { log.debug("fastq discovery warning: ${it}") }
+            if ( warnings ) {
+                def plural = ( warnings.size() == 1 ) ? '' : 's'
+                log.warn("fastq discovery: ${warnings.size()} warning${plural}, details in .nextflow.log")
+            }
         }
         samples = discover_inputs.out.samples
             .splitCsv(sep: '\t')

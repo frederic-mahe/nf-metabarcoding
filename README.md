@@ -269,6 +269,10 @@ Fastq files sitting directly in `fastq_pass/`, and subfolders holding
 no fastq file, are skipped with a warning. This flag cannot be
 combined with `--fastq_recursive` or `--input` (`[S133]`).
 
+Discovery warnings show on screen as one short line with their count
+(`fastq discovery: 2 warnings, details in .nextflow.log`); the full
+messages, naming the folders, are in `.nextflow.log` (`[S126]`).
+
 To give barcodes real sample names, or to pool barcodes from several
 runs, use an `--input` samplesheet instead: single-end rows that share
 a `sample` value are pooled the same way (`[S132]`).

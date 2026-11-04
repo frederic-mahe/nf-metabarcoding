@@ -752,13 +752,18 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            // [S126]: relayed warnings go through log.warn; nf-test runs
-            // nextflow -quiet, so they reach nextflow.log, not the console
+            // [S126]: the full warning goes to nextflow.log only
+            // (log.debug); the console gets one short log.warn line.
+            // nf-test runs nextflow -quiet, so both are read from the log.
             def lines = file("${metaDir}/nextflow.log").readLines()
             def err = lines.join("\n")
-            def warnings = lines.findAll { it.contains("WARN") && it.contains("nextflow.Nextflow - ") }
+            def short_warnings = lines.findAll { it.contains("WARN") && it.contains("nextflow.Nextflow - ") }
+            assert short_warnings.size() == 1 &&
+                   short_warnings[0].endsWith("nextflow.Nextflow - fastq discovery: 1 warning, details in .nextflow.log") :
+                "expected one short discovery warning, got: ${err}"
+            def warnings = lines.findAll { it.contains("fastq discovery warning: ") }
             assert warnings.size() == 1 :
-                "expected one discovery warning, got: ${err}"
+                "expected one discovery warning in the log, got: ${err}"
             assert warnings[0].contains("fastq_in_subfolders_only") &&
                    !warnings[0].contains("fastq_in_subfolders_only/PNA") :
                 "expected the warning to name the empty top folder only, got: ${err}"
@@ -817,7 +822,10 @@ nextflow_pipeline {
             def err = lines.join("\n")
             assert lines.any { it.endsWith("nextflow.Nextflow - pooling 3 fastq files into sample barcode01") } :
                 "expected a pooling summary, got: ${err}"
-            def warnings = lines.findAll { it.contains("WARN") && it.contains("nextflow.Nextflow - ") }
+            // [S126]: two discovery warnings, in full in the log only
+            assert lines.any { it.endsWith("nextflow.Nextflow - fastq discovery: 2 warnings, details in .nextflow.log") } :
+                "expected one short discovery warning, got: ${err}"
+            def warnings = lines.findAll { it.contains("fastq discovery warning: ") }
             assert warnings.any { it.contains("fastq_pass/other") } :
                 "expected a warning about other/, got: ${err}"
             assert warnings.any { it.contains("ignored") } :
