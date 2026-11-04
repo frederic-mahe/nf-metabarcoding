@@ -788,6 +788,15 @@ nextflow_pipeline {
                 assert file("${outputDir}/pooled/per_sample/${id}.fas").exists() :
                     "missing per-sample fasta for ${id}"
             }
+            // no read lost or duplicated by pooling: the dereplicated
+            // abundances (;size=N) sum to the reads in the sample's chunks
+            [barcode01: 3, barcode02: 3, unclassified: 1].each { id, expected ->
+                def reads = file("${outputDir}/pooled/per_sample/${id}.fas").readLines()
+                    .findAll { it.startsWith(">") }
+                    .sum(0) { (it =~ /;size=(\d+)/)[0][1] as int }
+                assert reads == expected :
+                    "expected ${expected} reads in ${id}, got: ${reads}"
+            }
             assert !file("${outputDir}/pooled/per_sample/loose.fas").exists() :
                 "the loose fastq file should be ignored"
             def tasks = workflow.trace.tasks()
