@@ -24,6 +24,10 @@ version here must match `manifest.version` in
   terminal wrap and garble the progress display. The reference-check
   warning gets the same treatment (`stampa reference check: 1
   warning, details in .nextflow.log`).
+- All warnings now share Nextflow's `WARN:` prefix: the startup
+  warnings (unset slurm size hints, deprecated `--results_folder`,
+  bzip2 reference) also go through `log.warn` and were shortened.
+  Every console warning fits in 80 columns (`[S134]`).
 
 ## [0.8.0] - 2026-11-04
 

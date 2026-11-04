@@ -1427,6 +1427,46 @@ nextflow_pipeline {
         }
     }
 
+    test("startup warnings go through log.warn and fit 80 columns") {
+        // COVERAGE: [S134], [S71]
+        // A Part C run with the deprecated --results_folder alias and a
+        // bzip2-compressed reference logs two startup warnings.
+        tag "ci"
+        setup {
+            def ref = file("${outputDir}/short_warn_ref.fas")
+            ref.parentFile.mkdirs()
+            ref.text = ">refA Kingdom|Phylum|Class\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+            assert ["bzip2", "--force", ref.toString()].execute().waitFor() == 0
+            file("${outputDir}/short_warn_reps.fas").text =
+                ">amp1;size=10;\nACGTACGTACGTACGTACGTACGTACGTACGT\n"
+        }
+        when {
+            params {
+                threads               = 1
+                results_folder        = "${outputDir}/short_warn"
+                reference_dataset     = "${outputDir}/short_warn_ref.fas.bz2"
+                representatives_fasta = "${outputDir}/short_warn_reps.fas"
+            }
+        }
+        then {
+            assert workflow.success
+            // nf-test runs nextflow -quiet: log.warn lines reach
+            // nextflow.log only, as "WARN  nextflow.Nextflow - <message>"
+            def lines = file("${metaDir}/nextflow.log").readLines()
+            def marker = "WARN  nextflow.Nextflow - "
+            def warnings = lines.findAll { it.contains(marker) }
+                .collect { it.substring(it.indexOf(marker) + marker.size()) }
+            assert warnings.any { it.contains("--results_folder") } :
+                "expected a --results_folder warning, got: ${warnings}"
+            assert warnings.any { it.contains("--reference_dataset") && it.contains("bzip2") } :
+                "expected a bzip2 reference warning, got: ${warnings}"
+            warnings.each { message ->
+                assert message.size() <= 73 :
+                    "warning longer than 73 characters (${message.size()}): ${message}"
+            }
+        }
+    }
+
     test("Part B aborts when two input fastas resolve to the same sample ID") {
         // COVERAGE: [S27], [S13], [S14]
         tag "ci"

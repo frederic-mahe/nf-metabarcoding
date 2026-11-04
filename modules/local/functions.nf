@@ -341,9 +341,8 @@ def check_reference_format(value, String expected) {
         return value
     }
     if ( path_str.endsWith('.bz2') ) {
-        System.err.println(
-            "WARNING: --${flag} is bzip2-compressed; skipping the startup " +
-            "format check (vsearch reads it at runtime).")
+        // [S134]: at most 73 characters (80 columns with "WARN: ")
+        log.warn("--${flag}: bzip2 file, startup format check skipped")
         return value
     }
     def header
@@ -481,11 +480,8 @@ def validate_params() {
     // [S71]: --results_folder is a deprecated alias for --outdir. Warn
     // once at startup when it is the active output root.
     if ( !params.outdir && params.results_folder ) {
-        System.err.println(
-            "WARNING: --results_folder is deprecated; use --outdir. " +
-            "Outputs now follow the " +
-            "<outdir>/{per_sample,occurrence_table,pipeline_info}/ layout."
-        )
+        // [S134]: at most 73 characters (80 columns with "WARN: ")
+        log.warn("--results_folder is deprecated, use --outdir")
     }
 
     // [S58]/[S61]/[S65]/[S63]/[S72]: the per-value type / enum / range
@@ -564,19 +560,11 @@ def resource_size_warnings(profile, dataset_size_gb, reference_size_gb, boolean 
         return warnings
     }
     if ( !dataset_size_gb ) {
-        warnings << ("--dataset_size_gb is unset: the memory-bound steps " +
-            "(global_clustering, global_dereplication, chimera detection, " +
-            "the all-vs-all search, mumu, occurrence-table assembly) fall " +
-            "back to fixed memory that may be too small for a large dataset " +
-            "and OOM mid-run. Set --dataset_size_gb to the approximate " +
-            "input size in GB (or override the step's memory in a " +
-            "-c site.config).")
+        // [S134]: at most 73 characters (80 columns with "WARN: ")
+        warnings << "--dataset_size_gb unset: big datasets may run out of memory"
     }
     if ( reference_in_use && !reference_size_gb ) {
-        warnings << ("--reference_size_gb is unset: the taxonomic-assignment " +
-            "steps fall back to fixed memory that may be too small for a " +
-            "large reference database. Set --reference_size_gb to the " +
-            "approximate reference size in GB.")
+        warnings << "--reference_size_gb unset: big references may run out of memory"
     }
     return warnings
 }

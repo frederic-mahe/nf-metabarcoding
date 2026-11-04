@@ -2793,3 +2793,22 @@ with itself. A pattern with equal sides is rejected (`[S67]`).
     read in `main.nf`, `modules/` and `subworkflows/` declared in the
     `params { }` block; a standalone Part C run logs no `Access to
     undefined parameter` warning.
+- `[S134]` every warning the workflow itself prints on the console
+  goes through the Nextflow logger (`log.warn`, printed as `WARN:`,
+  the same prefix as Nextflow's own warnings) and is at most 73
+  characters long, so that with its `WARN: ` prefix it fits in an
+  80-column terminal. A longer line wraps, and a wrapped line
+  garbles the interactive progress display. When more detail is
+  useful, it goes to the Nextflow log file only (`log.debug`), and
+  the console line points to `.nextflow.log` (`[S117]`, `[S126]`).
+  The pooling summary (`[S129]`), logged with `log.info`, obeys the
+  same limit. Covered warnings: the unset slurm size hints
+  (`[S79]`), the deprecated `--results_folder` alias (`[S71]`), the
+  skipped startup format check on a bzip2 reference, the fastq
+  discovery warnings (`[S126]`) and the reference-check warnings
+  (`[S117]`).
+  - **Pass when:** every message `resource_size_warnings` returns is
+    at most 73 characters long; a run with `--results_folder` and a
+    bzip2-compressed `--reference_dataset` logs both warnings with
+    `log.warn`, each at most 73 characters long, and every warning
+    the workflow logs in that run fits the same limit.

@@ -393,7 +393,7 @@ workflow {
             params.dataset_size_gb,
             params.reference_size_gb,
             (params.reference_dataset || params.reference_dataset_sintax) as boolean
-        ).each { System.err.println("WARNING: ${it}") }
+        ).each { log.warn(it) }
 
         // [S68]/[S71]: record tool versions under <outdir>/pipeline_info/ on
         // every entry point — including a Part A-only run. --outdir always

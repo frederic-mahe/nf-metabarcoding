@@ -13,6 +13,25 @@ nextflow_function {
     // returns. Inputs: (profile, dataset_size_gb, reference_size_gb,
     // reference_in_use).
 
+    test("every warning fits an 80-column terminal with its WARN: prefix") {
+        // COVERAGE: [S134]
+        tag "ci"
+        when { function { """
+            input[0] = 'slurm'
+            input[1] = null
+            input[2] = null
+            input[3] = true
+        """ } }
+        then {
+            assert function.success
+            assert function.result.size() == 2
+            function.result.each { message ->
+                assert message.size() <= 73 :
+                    "warning longer than 73 characters (${message.size()}): ${message}"
+            }
+        }
+    }
+
     test("slurm + dataset_size_gb unset warns, naming the parameter") {
         // COVERAGE: [S79]
         tag "ci"
