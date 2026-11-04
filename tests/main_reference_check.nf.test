@@ -122,7 +122,9 @@ nextflow_pipeline {
                 "line\taccession\tissue",
                 "3\trefB\tempty_rank",
             ]
-            def msg = (workflow.stdout + workflow.stderr).toString()
+            // the warning goes through log.warn; nf-test runs nextflow
+            // -quiet, so it reaches nextflow.log, not the console
+            def msg = file("${metaDir}/nextflow.log").text
             assert msg.contains("empty_rank: 1") &&
                 msg.contains("refcheck_warn_reps_reference_check.tsv") :
                 "expected a warning naming the counts and the report, got: ${msg}"

@@ -752,10 +752,13 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            def err = workflow.stderr.join("\n")
-            def warnings = workflow.stderr.findAll { it.contains("WARNING:") }
+            // [S126]: relayed warnings go through log.warn; nf-test runs
+            // nextflow -quiet, so they reach nextflow.log, not the console
+            def lines = file("${metaDir}/nextflow.log").readLines()
+            def err = lines.join("\n")
+            def warnings = lines.findAll { it.contains("WARN") && it.contains("nextflow.Nextflow - ") }
             assert warnings.size() == 1 :
-                "expected one WARNING line, got: ${err}"
+                "expected one discovery warning, got: ${err}"
             assert warnings[0].contains("fastq_in_subfolders_only") &&
                    !warnings[0].contains("fastq_in_subfolders_only/PNA") :
                 "expected the warning to name the empty top folder only, got: ${err}"
@@ -807,10 +810,15 @@ nextflow_pipeline {
                 "expected one pool_fastq task, got: ${tasks*.name}"
             assert file("${outputDir}/pooled/logs/part_a/per_sample/barcode01_pooling.log").exists() :
                 "missing barcode01_pooling.log"
-            def err = workflow.stderr.join("\n")
-            assert err.contains("pooling 3 fastq files into sample barcode01") :
-                "expected a pooling notice, got: ${err}"
-            def warnings = workflow.stderr.findAll { it.contains("WARNING:") }
+            // [S129]/[S126]: the pooling summary (log.info) and the
+            // relayed warnings (log.warn) go through the Nextflow logger;
+            // nf-test runs nextflow -quiet, so they reach nextflow.log
+            def lines = file("${metaDir}/nextflow.log").readLines()
+            def err = lines.join("\n")
+            assert err.contains("pooling 3 fastq files into sample barcode01; details in ") &&
+                   err.contains("logs/part_a/per_sample/<sample>_pooling.log") :
+                "expected a pooling summary, got: ${err}"
+            def warnings = lines.findAll { it.contains("WARN") && it.contains("nextflow.Nextflow - ") }
             assert warnings.any { it.contains("fastq_pass/other") } :
                 "expected a warning about other/, got: ${err}"
             assert warnings.any { it.contains("ignored") } :

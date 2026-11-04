@@ -10,7 +10,7 @@ include { dereplicate_fasta }               from '../../modules/local/part_a/der
 include { list_local_clusters }             from '../../modules/local/part_a/list_local_clusters.nf'
 include { summarize_read_counts }           from '../../modules/local/part_a/summarize_read_counts.nf'
 include { validate_samplesheet }            from '../../modules/local/validate_samplesheet.nf'
-include { normalize_path; hash_relabel_flag; hash_id_length; coerce_bool } from '../../modules/local/functions.nf'
+include { normalize_path; hash_relabel_flag; hash_id_length; coerce_bool; log_dir; pooling_summary } from '../../modules/local/functions.nf'
 
 
 workflow part_A {
@@ -41,11 +41,12 @@ workflow part_A {
     } else {
         discover_inputs()
         // [S126]: relay the discovery warnings (e.g. a --fastq_folder
-        // entry holding no fastq file) like the startup warnings.
+        // entry holding no fastq file) through log.warn, which keeps the
+        // interactive progress display intact.
         discover_inputs.out.warnings.subscribe { stderr_file ->
             stderr_file.readLines()
                 .findAll { it.startsWith('warning: ') }
-                .each { System.err.println("WARNING: ${it.substring('warning: '.length())}") }
+                .each { log.warn(it.substring('warning: '.length())) }
         }
         samples = discover_inputs.out.samples
             .splitCsv(sep: '\t')
@@ -76,9 +77,14 @@ workflow part_A {
             pooled: files.size() > 1
             single: true
         }
-    single_end.pooled.subscribe { sample, files ->
-        System.err.println("pooling ${files.size()} fastq files into sample ${sample}")
-    }
+    single_end.pooled
+        .toList()
+        .subscribe { pooled ->
+            if ( pooled ) {
+                def counts = pooled.collectEntries { sample, files -> [(sample): files.size()] }
+                log.info(pooling_summary(counts, log_dir('part_a/per_sample')))
+            }
+        }
     pool_fastq(single_end.pooled)
     def unpaired_ch = single_end.single
         .map { sample, files -> tuple(sample, files[0]) }

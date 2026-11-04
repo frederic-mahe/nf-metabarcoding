@@ -578,8 +578,9 @@ the latter case.
   the user can pass them instead. A folder that holds only
   non-fastq files (`.fas`, `.log`, ...) counts as empty. When only
   some of the listed folders are empty, the run goes on with the
-  fastq files found elsewhere, and Part A prints a `WARNING:` line on
-  stderr for each empty folder, naming it. Every `warning:` line that
+  fastq files found elsewhere, and Part A logs a warning through the
+  Nextflow logger (`log.warn`, printed as `WARN:`) for each empty
+  folder, naming it. Every `warning:` line that
   `bin/discover_fastq.py` writes on stderr is relayed this way.
   - **Pass when:** running `bin/discover_fastq.py` on a folder with
     no fastq file exits non-zero, prints nothing on stdout, and its
@@ -606,7 +607,7 @@ the latter case.
   in a listed folder are ignored, with a `warning:` naming the folder
   and the number of ignored files; a subfolder holding no fastq file
   is skipped, with a `warning:` naming it; both are relayed as
-  `WARNING:` lines (`[S126]`). When no subfolder of any listed folder
+  logged warnings (`[S126]`). When no subfolder of any listed folder
   holds a fastq file, discovery stops with an error naming the
   scanned folders. The helper writes one `sample\tfile\t` row per
   file, in sorted path order; Part A groups the rows by sample
@@ -624,8 +625,13 @@ the latter case.
 - `[S129]` Part A runs `pool_fastq` on every sample made of more than
   one fastq file (folder pooling, `[S128]`, or samplesheet pooling,
   `[S132]`); a sample with a single file skips it. Once the samples
-  are known, Part A prints one line per pooled sample on stderr:
-  `pooling <N> fastq files into sample <sample>`. Part A sorts the
+  are known, Part A logs a single summary line through the Nextflow
+  logger (`log.info`, which keeps the interactive progress display
+  intact): `pooling <N> fastq files into sample <sample>` when one
+  sample is pooled, `pooling fastq files into <K> samples (<min> to
+  <max> files per sample)` when several are (`(<N> files per
+  sample)` when they all have the same count), followed by `; details
+  in <outdir>/logs/part_a/per_sample/<sample>_pooling.log`. Part A sorts the
   files by path and `bin/pool_fastq.py` concatenates them, in the
   order given, into `<sample>.fastq.gz`: `.gz` files are copied byte for byte (a valid
   multi-member gzip file), plain and `.bz2` files are recompressed
@@ -639,14 +645,16 @@ the latter case.
     content in the order given, byte-identical across two runs,
     and a log whose first line reads `<sample>: 3 files pooled`;
     the `pool_fastq` process publishes `<sample>.fastq.gz` and
-    `<sample>_pooling.log`.
+    `<sample>_pooling.log`; the summary line names the sample when
+    one is pooled, and gives the sample count and the file-count
+    range (or the shared count) when several are.
 - `[S130]` without `--pool_fastq_by_folder`, discovery warns when a
   scanned folder holds a numbered file series typical of Nanopore
   output: files named `<prefix>_<n>.<ext>` (`<n>` a decimal number)
   sharing the same `<prefix>`, with `_0` present and at least three
   distinct numbers. The `warning:` names the folder and the prefix
   and suggests `--pool_fastq_by_folder`; it is relayed as a
-  `WARNING:` line (`[S126]`) and the run carries on with the usual
+  logged warning (`[S126]`) and the run carries on with the usual
   pairing. A plain `<prefix>_1` / `<prefix>_2` pair does not warn.
   - **Pass when:** the helper on a folder holding `x_0`, `x_1`, `x_2`
     exits zero and its stderr names the folder, `x` and

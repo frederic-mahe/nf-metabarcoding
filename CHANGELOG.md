@@ -7,6 +7,18 @@ version here must match `manifest.version` in
 [`nextflow.config`](nextflow.config) and `version` in
 [`CITATION.cff`](CITATION.cff) (enforced by `[S77]` / `[S80]`).
 
+## [Unreleased]
+
+### Changed
+
+- Part A prints a single summary line for fastq pooling instead of
+  one line per pooled sample (`[S129]`), and the pooling notice,
+  the fastq discovery warnings (`[S126]`) and the reference-check
+  warnings (`[S117]`) now go through the Nextflow logger. They no
+  longer garble the interactive progress display, and they are also
+  recorded in `.nextflow.log`. Warnings now read `WARN:` instead of
+  `WARNING:`.
+
 ## [0.8.0] - 2026-11-04
 
 ### Added

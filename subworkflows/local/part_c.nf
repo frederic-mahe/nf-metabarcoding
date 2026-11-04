@@ -46,7 +46,7 @@ workflow checked_reference {
                 error(gate[1])
             }
             if ( gate[0] == 'warning' ) {
-                System.err.println("WARNING: ${gate[1]}")
+                log.warn(gate[1])
             }
             reference_path
         }

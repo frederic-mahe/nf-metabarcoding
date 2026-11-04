@@ -1,0 +1,56 @@
+nextflow_function {
+
+    name "pooling_summary"
+    script "modules/local/functions.nf"
+    function "pooling_summary"
+
+    // [S129]: Part A logs one summary line for all pooled samples,
+    // rather than one line per sample, so the interactive progress
+    // display is not flooded. Workflow-level wiring is covered in
+    // tests/main.nf.test.
+
+    test("one pooled sample is named") {
+        // COVERAGE: [S129]
+        tag "ci"
+        when { function { """
+            input[0] = [barcode01: 3]
+            input[1] = '/out/logs/part_a/per_sample'
+        """ } }
+        then {
+            assert function.success
+            assert function.result ==
+                "pooling 3 fastq files into sample barcode01; " +
+                "details in /out/logs/part_a/per_sample/<sample>_pooling.log"
+        }
+    }
+
+    test("several pooled samples give the count and the file-count range") {
+        // COVERAGE: [S129]
+        tag "ci"
+        when { function { """
+            input[0] = [barcode01: 3, barcode02: 47, barcode03: 2]
+            input[1] = '/out/logs/part_a/per_sample'
+        """ } }
+        then {
+            assert function.success
+            assert function.result ==
+                "pooling fastq files into 3 samples (2 to 47 files per sample); " +
+                "details in /out/logs/part_a/per_sample/<sample>_pooling.log"
+        }
+    }
+
+    test("several pooled samples with the same count give that count") {
+        // COVERAGE: [S129]
+        tag "ci"
+        when { function { """
+            input[0] = [barcode01: 4, barcode02: 4]
+            input[1] = '/out/logs/part_a/per_sample'
+        """ } }
+        then {
+            assert function.success
+            assert function.result ==
+                "pooling fastq files into 2 samples (4 files per sample); " +
+                "details in /out/logs/part_a/per_sample/<sample>_pooling.log"
+        }
+    }
+}
