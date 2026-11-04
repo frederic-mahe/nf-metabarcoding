@@ -575,7 +575,9 @@ def discover_pooled(folders: list[Path]) -> list[PooledSample]:
     Prints a warning for fastq files sitting directly in a listed
     folder (they are ignored) and for each subfolder holding no fastq
     file (it is skipped). Raises :class:`NoFastqFoundError` when no
-    subfolder of any listed folder holds a fastq file.
+    subfolder of any listed folder holds a fastq file; when a listed
+    folder holds fastq files directly, the message ends with a hint
+    to point ``--fastq_folder`` at the parent folder.
     """
     samples: list[PooledSample] = []
     any_loose = False
