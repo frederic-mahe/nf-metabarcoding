@@ -578,9 +578,11 @@ def discover_pooled(folders: list[Path]) -> list[PooledSample]:
     subfolder of any listed folder holds a fastq file.
     """
     samples: list[PooledSample] = []
+    any_loose = False
     for folder in folders:
         loose = _fastq_in(folder)
         if loose:
+            any_loose = True
             print(
                 f"warning: {len(loose)} fastq file(s) directly in "
                 f"--fastq_folder entry {folder} ignored "
@@ -609,6 +611,12 @@ def discover_pooled(folders: list[Path]) -> list[PooledSample]:
             "(--pool_fastq_by_folder); scanned folders:"
         ]
         lines.extend(f"  {folder}" for folder in folders)
+        if any_loose:
+            lines.extend([
+                "hint: fastq files sit directly in a scanned folder; point",
+                "  --fastq_folder at its parent folder (e.g. fastq_pass/),",
+                "  not at a barcode folder",
+            ])
         raise NoFastqFoundError("\n".join(lines))
     return samples
 

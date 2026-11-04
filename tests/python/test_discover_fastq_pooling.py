@@ -108,6 +108,33 @@ def test_pool_by_folder_without_fastq_subfolders_fails(
 
 
 # COVERAGE: [S128]
+def test_pool_by_folder_on_a_barcode_folder_hints_at_parent(
+    tmp_path: Path,
+) -> None:
+    # --fastq_folder pointed at fastq_pass/barcode09 instead of fastq_pass/
+    barcode = tmp_path / "fastq_pass" / "barcode09"
+    _touch(barcode / "run_barcode09_0.fastq.gz")
+
+    proc = _run("--pool-by-folder", str(barcode))
+
+    assert proc.returncode != 0, proc.stdout
+    assert "hint:" in proc.stderr, proc.stderr
+    assert "parent folder" in proc.stderr, proc.stderr
+
+
+# COVERAGE: [S128]
+def test_pool_by_folder_without_any_fastq_gives_no_hint(
+    tmp_path: Path,
+) -> None:
+    _touch(tmp_path / "other" / "notes.txt")
+
+    proc = _run("--pool-by-folder", str(tmp_path))
+
+    assert proc.returncode != 0, proc.stdout
+    assert "hint:" not in proc.stderr, proc.stderr
+
+
+# COVERAGE: [S128]
 def test_pool_by_folder_duplicate_folder_names_fail(tmp_path: Path) -> None:
     for run in ("run1", "run2"):
         _touch(tmp_path / run / "barcode01" / "x_0.fastq.gz")

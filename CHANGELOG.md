@@ -9,6 +9,14 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+### Changed
+
+- With `--pool_fastq_by_folder`, when no subfolder holds fastq files
+  but a scanned folder holds some directly (`--fastq_folder` pointed
+  at `fastq_pass/barcode09` instead of `fastq_pass/`), the discovery
+  error now ends with a hint to point `--fastq_folder` at the parent
+  folder (`[S128]`).
+
 ## [0.8.0] - 2026-11-04
 
 ### Added

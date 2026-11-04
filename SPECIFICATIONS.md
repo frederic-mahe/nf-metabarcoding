@@ -616,16 +616,21 @@ the latter case.
   is skipped, with a `warning:` naming it; both are relayed as
   logged warnings (`[S126]`). When no subfolder of any listed folder
   holds a fastq file, discovery stops with an error naming the
-  scanned folders. The helper writes one `sample\tfile\t` row per
-  file, in sorted path order; Part A groups the rows by sample
-  (`[S129]`).
+  scanned folders; when at least one of them holds fastq files
+  directly (typically `--fastq_folder` pointed at a barcode folder
+  instead of `fastq_pass/`), the error ends with a `hint:` telling
+  to point `--fastq_folder` at the parent folder. The helper writes
+  one `sample\tfile\t` row per file, in sorted path order; Part A
+  groups the rows by sample (`[S129]`).
   - **Pass when:** the helper, run with `--pool-by-folder` on a folder
     holding `barcode01/` (three files `x_0`, `x_1`, `x_2`),
     `barcode02/` (one file), `unclassified/` (one file), `other/` (no
     fastq file) and one loose fastq file, emits three rows for
     `barcode01`, one for `barcode02` and one for `unclassified`,
     exits zero, and warns about `other/` and the loose file; with no
-    fastq file in any subfolder it exits non-zero naming the folder;
+    fastq file in any subfolder it exits non-zero naming the folder,
+    with the `hint:` when the folder holds fastq files directly and
+    without it otherwise;
     a Part A run with `--pool_fastq_by_folder` on such a layout
     publishes `barcode01.fas`, `barcode02.fas` and `unclassified.fas`
     and never runs `merge_fastq_pairs`.
