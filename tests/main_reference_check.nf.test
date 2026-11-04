@@ -122,10 +122,17 @@ nextflow_pipeline {
                 "line\taccession\tissue",
                 "3\trefB\tempty_rank",
             ]
-            // the warning goes through log.warn; nf-test runs nextflow
-            // -quiet, so it reaches nextflow.log, not the console
+            // [S117]: the full summary goes to nextflow.log only
+            // (log.debug); the console gets one short log.warn line.
+            // nf-test runs nextflow -quiet, so both are read from the log.
+            def lines = file("${metaDir}/nextflow.log").readLines()
+            def short_warnings = lines.findAll { it.contains("WARN") && it.contains("nextflow.Nextflow - ") }
+            assert short_warnings.size() == 1 &&
+                   short_warnings[0].endsWith("nextflow.Nextflow - stampa reference check: 1 warning, details in .nextflow.log") :
+                "expected one short reference-check warning, got: ${short_warnings}"
             def msg = file("${metaDir}/nextflow.log").text
-            assert msg.contains("empty_rank: 1") &&
+            assert msg.contains("reference check warning: ") &&
+                msg.contains("empty_rank: 1") &&
                 msg.contains("refcheck_warn_reps_reference_check.tsv") :
                 "expected a warning naming the counts and the report, got: ${msg}"
         }

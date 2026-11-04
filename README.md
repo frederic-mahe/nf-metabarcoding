@@ -383,7 +383,9 @@ Every finding is listed in `<outdir>/logs/part_c/<basename>_reference_check.tsv`
 (columns `line`, `accession`, `issue`; `<basename>_notmerged_reference_check.tsv`
 for the shadow path), published even when the run stops (`[S117]`). The
 error or warning message gives the counts per issue, the first five
-offending headers and the report's path. The check cannot be turned
+offending headers and the report's path. A warning shows on screen as
+one short line (`stampa reference check: 1 warning, details in
+.nextflow.log`); the full message is in `.nextflow.log`. The check cannot be turned
 off: fix the reference (the report gives each line number) and rerun.
 Header bytes that are not valid UTF-8 never crash the taxonomy helpers
 themselves (`[S112]`), but the check rejects them so they are fixed at

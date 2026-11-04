@@ -1981,12 +1981,20 @@ from placeholder values to real taxonomic assignments.
   parameter (`reference_dataset` or `reference_dataset_sintax`), gives
   the count per issue code and the first five offending headers (line
   number and accession), and points to the report. When only warnings
-  are found, a warning with the same summary is logged and the run
-  continues.
+  are found, the run continues: the same summary goes to the Nextflow
+  log file only (`log.debug`, prefixed `reference check warning: `),
+  and the console gets a single short warning (`log.warn`, printed as
+  `WARN:`), `<grammar> reference check: <N> warning(s), details in
+  .nextflow.log` (`<grammar>` is `stampa` or `sintax`, `<N>` the
+  number of findings). The summary is several lines long and names
+  the report path, and lines wider than the terminal garble the
+  interactive progress display; the short line never wraps.
   - **Pass when:** a reference with errors leaves a published report
     listing each finding with its line and accession, and the abort
     message names the parameter, the counts and the report path; a
-    reference with only warnings logs a warning naming the report; a
+    reference with only warnings logs the summary, naming the counts
+    and the report, to the Nextflow log file, and one short `stampa
+    reference check: 1 warning, details in .nextflow.log` warning; a
     clean reference publishes a header-only report.
 
 ## Reference preparation — SILVA (standalone tool)

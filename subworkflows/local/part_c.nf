@@ -46,7 +46,14 @@ workflow checked_reference {
                 error(gate[1])
             }
             if ( gate[0] == 'warning' ) {
-                log.warn(gate[1])
+                // [S117]: the summary is several lines long and names the
+                // report path; a line wider than the terminal garbles the
+                // interactive progress display, so the full text goes to
+                // the log file only and the console gets one short line.
+                log.debug("reference check warning: ${gate[1]}")
+                def count = report.readLines().size() - 1
+                def plural = ( count == 1 ) ? '' : 's'
+                log.warn("${grammar} reference check: ${count} warning${plural}, details in .nextflow.log")
             }
             reference_path
         }

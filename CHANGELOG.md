@@ -21,7 +21,9 @@ version here must match `manifest.version` in
   the fastq discovery warnings as one short line with their count
   (`fastq discovery: 2 warnings, details in .nextflow.log`), the full
   messages going to `.nextflow.log` only: lines wider than the
-  terminal wrap and garble the progress display.
+  terminal wrap and garble the progress display. The reference-check
+  warning gets the same treatment (`stampa reference check: 1
+  warning, details in .nextflow.log`).
 
 ## [0.8.0] - 2026-11-04
 
