@@ -630,8 +630,10 @@ the latter case.
   intact): `pooling <N> fastq files into sample <sample>` when one
   sample is pooled, `pooling fastq files into <K> samples (<min> to
   <max> files per sample)` when several are (`(<N> files per
-  sample)` when they all have the same count), followed by `; details
-  in <outdir>/logs/part_a/per_sample/<sample>_pooling.log`. Part A sorts the
+  sample)` when they all have the same count). The line carries no
+  path, so it stays short enough not to wrap in the terminal (a
+  wrapped line garbles the interactive progress display); the
+  per-sample detail is in `<sample>_pooling.log`. Part A sorts the
   files by path and `bin/pool_fastq.py` concatenates them, in the
   order given, into `<sample>.fastq.gz`: `.gz` files are copied byte for byte (a valid
   multi-member gzip file), plain and `.bz2` files are recompressed

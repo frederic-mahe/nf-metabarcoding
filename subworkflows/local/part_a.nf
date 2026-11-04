@@ -10,7 +10,7 @@ include { dereplicate_fasta }               from '../../modules/local/part_a/der
 include { list_local_clusters }             from '../../modules/local/part_a/list_local_clusters.nf'
 include { summarize_read_counts }           from '../../modules/local/part_a/summarize_read_counts.nf'
 include { validate_samplesheet }            from '../../modules/local/validate_samplesheet.nf'
-include { normalize_path; hash_relabel_flag; hash_id_length; coerce_bool; log_dir; pooling_summary } from '../../modules/local/functions.nf'
+include { normalize_path; hash_relabel_flag; hash_id_length; coerce_bool; pooling_summary } from '../../modules/local/functions.nf'
 
 
 workflow part_A {
@@ -82,7 +82,7 @@ workflow part_A {
         .subscribe { pooled ->
             if ( pooled ) {
                 def counts = pooled.collectEntries { sample, files -> [(sample): files.size()] }
-                log.info(pooling_summary(counts, log_dir('part_a/per_sample')))
+                log.info(pooling_summary(counts))
             }
         }
     pool_fastq(single_end.pooled)

@@ -815,8 +815,7 @@ nextflow_pipeline {
             // nf-test runs nextflow -quiet, so they reach nextflow.log
             def lines = file("${metaDir}/nextflow.log").readLines()
             def err = lines.join("\n")
-            assert err.contains("pooling 3 fastq files into sample barcode01; details in ") &&
-                   err.contains("logs/part_a/per_sample/<sample>_pooling.log") :
+            assert lines.any { it.endsWith("nextflow.Nextflow - pooling 3 fastq files into sample barcode01") } :
                 "expected a pooling summary, got: ${err}"
             def warnings = lines.findAll { it.contains("WARN") && it.contains("nextflow.Nextflow - ") }
             assert warnings.any { it.contains("fastq_pass/other") } :

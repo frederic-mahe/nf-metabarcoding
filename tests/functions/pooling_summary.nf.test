@@ -6,7 +6,8 @@ nextflow_function {
 
     // [S129]: Part A logs one summary line for all pooled samples,
     // rather than one line per sample, so the interactive progress
-    // display is not flooded. Workflow-level wiring is covered in
+    // display is not flooded. The line carries no path, so it does not
+    // wrap in the terminal. Workflow-level wiring is covered in
     // tests/main.nf.test.
 
     test("one pooled sample is named") {
@@ -14,13 +15,11 @@ nextflow_function {
         tag "ci"
         when { function { """
             input[0] = [barcode01: 3]
-            input[1] = '/out/logs/part_a/per_sample'
         """ } }
         then {
             assert function.success
             assert function.result ==
-                "pooling 3 fastq files into sample barcode01; " +
-                "details in /out/logs/part_a/per_sample/<sample>_pooling.log"
+                "pooling 3 fastq files into sample barcode01"
         }
     }
 
@@ -29,13 +28,24 @@ nextflow_function {
         tag "ci"
         when { function { """
             input[0] = [barcode01: 3, barcode02: 47, barcode03: 2]
-            input[1] = '/out/logs/part_a/per_sample'
         """ } }
         then {
             assert function.success
             assert function.result ==
-                "pooling fastq files into 3 samples (2 to 47 files per sample); " +
-                "details in /out/logs/part_a/per_sample/<sample>_pooling.log"
+                "pooling fastq files into 3 samples (2 to 47 files per sample)"
+        }
+    }
+
+    test("the line stays short for a large run") {
+        // COVERAGE: [S129]
+        tag "ci"
+        when { function { """
+            input[0] = (1..9999).collectEntries { [("barcode\${it}".toString()): it % 99999 + 2] }
+        """ } }
+        then {
+            assert function.success
+            assert function.result.size() < 80 :
+                "the summary line should fit an 80-column terminal, got: \${function.result}"
         }
     }
 
@@ -44,13 +54,11 @@ nextflow_function {
         tag "ci"
         when { function { """
             input[0] = [barcode01: 4, barcode02: 4]
-            input[1] = '/out/logs/part_a/per_sample'
         """ } }
         then {
             assert function.success
             assert function.result ==
-                "pooling fastq files into 2 samples (4 files per sample); " +
-                "details in /out/logs/part_a/per_sample/<sample>_pooling.log"
+                "pooling fastq files into 2 samples (4 files per sample)"
         }
     }
 }

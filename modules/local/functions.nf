@@ -138,18 +138,19 @@ def publish_dir(part) {
 }
 
 
-def pooling_summary(counts, log_path) {
+def pooling_summary(counts) {
     // [S129]: one line for all pooled samples (sample -> file count),
     // logged once so the interactive progress display is not flooded.
-    def details = "details in ${log_path}/<sample>_pooling.log"
+    // No path in the line: a line wider than the terminal wraps, and
+    // the wrapped part garbles the progress display.
     if ( counts.size() == 1 ) {
         def entry = counts.entrySet().first()
-        return "pooling ${entry.value} fastq files into sample ${entry.key}; ${details}"
+        return "pooling ${entry.value} fastq files into sample ${entry.key}"
     }
     def low = counts.values().min()
     def high = counts.values().max()
     def range = ( low == high ) ? "${low}" : "${low} to ${high}"
-    return "pooling fastq files into ${counts.size()} samples (${range} files per sample); ${details}"
+    return "pooling fastq files into ${counts.size()} samples (${range} files per sample)"
 }
 
 def log_dir(part) {
