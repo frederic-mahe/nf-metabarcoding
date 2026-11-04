@@ -9,26 +9,6 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
-### Changed
-
-- Part A prints a single summary line for fastq pooling instead of
-  one line per pooled sample (`[S129]`), and the pooling notice,
-  the fastq discovery warnings (`[S126]`) and the reference-check
-  warnings (`[S117]`) now go through the Nextflow logger. They no
-  longer garble the interactive progress display, and they are also
-  recorded in `.nextflow.log`. Warnings now read `WARN:` instead of
-  `WARNING:`. The pooling line carries no path, and the console shows
-  the fastq discovery warnings as one short line with their count
-  (`fastq discovery: 2 warnings, details in .nextflow.log`), the full
-  messages going to `.nextflow.log` only: lines wider than the
-  terminal wrap and garble the progress display. The reference-check
-  warning gets the same treatment (`stampa reference check: 1
-  warning, details in .nextflow.log`).
-- All warnings now share Nextflow's `WARN:` prefix: the startup
-  warnings (unset slurm size hints, deprecated `--results_folder`,
-  bzip2 reference) also go through `log.warn` and were shortened.
-  Every console warning fits in 80 columns (`[S134]`).
-
 ## [0.8.0] - 2026-11-04
 
 ### Added
@@ -66,6 +46,24 @@ version here must match `manifest.version` in
   as `from_fastq:part_C:assign:assign_taxonomy_stampa`. Outputs are
   unchanged; site configs with `withName:` selectors on full task
   names need the new names (bare process names are unaffected).
+
+- Part A prints a single summary line for fastq pooling instead of
+  one line per pooled sample (`[S129]`), and the pooling notice,
+  the fastq discovery warnings (`[S126]`) and the reference-check
+  warnings (`[S117]`) now go through the Nextflow logger. They no
+  longer garble the interactive progress display, and they are also
+  recorded in `.nextflow.log`. Warnings now read `WARN:` instead of
+  `WARNING:`. The pooling line carries no path, and the console shows
+  the fastq discovery warnings as one short line with their count
+  (`fastq discovery: 2 warnings, details in .nextflow.log`), the full
+  messages going to `.nextflow.log` only: lines wider than the
+  terminal wrap and garble the progress display. The reference-check
+  warning gets the same treatment (`stampa reference check: 1
+  warning, details in .nextflow.log`).
+- All warnings now share Nextflow's `WARN:` prefix: the startup
+  warnings (unset slurm size hints, deprecated `--results_folder`,
+  bzip2 reference) also go through `log.warn` and were shortened.
+  Every console warning fits in 80 columns (`[S134]`).
 
 ### Removed
 
