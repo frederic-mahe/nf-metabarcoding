@@ -71,7 +71,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S33]`| **Retired** (was: Part B `fake_taxonomic_assignment` placeholder taxonomy TSV; replaced by the builder's own placeholders — see `[S127]`) | — | retired | — |
 | `[S34]`| Part B `chimera_detection` — vsearch uchime_denovo on representatives     | `tests/processes/part_b/chimera_detection.nf.test` | done | — |
 | `[S35]`| Part B `build_occurrence_table` — merge swarm/uchime/quality/stampa/distribution into the filtered occurrence table | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test` | done | — |
-| `[S135]`| an occurrence table emptied by the `[S35]` filter is reported: `FILTER:` summary line on stderr (per-arm counts), internal `<basename>_occurrence_filter.log`, `empty_table_warning()` → one short `log.warn` + detail in `.nextflow.log`; run continues | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test`, `tests/functions/empty_table_warning.nf.test`, `tests/main.nf.test` | red | — |
+| `[S135]`| an occurrence table emptied by the `[S35]` filter is reported: `FILTER:` summary line on stderr (per-arm counts), internal `<basename>_occurrence_filter.log`, `empty_table_warning()` → one short `log.warn` + detail in `.nextflow.log`; run continues | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test`, `tests/functions/empty_table_warning.nf.test`, `tests/main.nf.test` | done | — |
 | `[S127]`| `build_filtered_contingency_table.py --assignments` is optional; without it every row carries `0.0`/`NA`/`NA`; `build_occurrence_table` omits it | `tests/python/test_build_filtered_contingency_table.py`, `tests/processes/part_b/build_occurrence_table.nf.test` | done | — |
 | `[S36]`| **Retired** (was: Part B `fake_taxonomic_assignment2` placeholder taxonomy TSV for cleaved representatives; see `[S127]`) | — | retired | — |
 | `[S37]`| Part B `chimera_detection_post_cleave` — uchime_denovo on pre-cleave + cleaved reps with dynamic --minsize | `tests/processes/part_b/chimera_detection_post_cleave.nf.test` | done | — |
@@ -123,7 +123,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `[S96]`| cap `--fastq_pattern` at 3 `*` wildcards (ReDoS guard); each `*` is a greedy `.*`, an unbounded count enables catastrophic backtracking on scanned filenames | `tests/python/test_fastq_pattern_redos.py` | done | — |
 | `[S68]`| every run records external-tool + Python versions into `pipeline_info/software_versions.yml` (missing tool → `n/a`); published on every entry point, incl. Part A-only | `tests/python/test_collect_versions.py`, `tests/processes/dump_software_versions.nf.test`, `tests/main.nf.test` | done | — |
 | `[S69]`| exact, agreeing version pins in `environment.yml` and CI, incl. `bioconda::mumu` | `tests/python/test_reproducible_pins.py` | done | — |
-| `[S136]`| vsearch >= 2.32.0 required: `check_vsearch_version` process (every mode but fetch) + `vsearch_version_error()` (numeric comparison); older, missing or unreadable → run stops naming the version and the conda/container profiles | `tests/functions/vsearch_version_error.nf.test`, `tests/processes/check_vsearch_version.nf.test`, `tests/main.nf.test` | red | — |
+| `[S136]`| vsearch >= 2.32.0 required: `check_vsearch_version` process (every mode but fetch) + `vsearch_version_error()` (numeric comparison); older, missing or unreadable → run stops naming the version and the conda/container profiles | `tests/functions/vsearch_version_error.nf.test`, `tests/processes/check_vsearch_version.nf.test`, `tests/main.nf.test` | done | — |
 | `[S77]`| `manifest.version` (`nextflow.config`) and `version` (`CITATION.cff`) must agree | `tests/python/test_version_sync.py` | done | — |
 | `[S80]`| repo metadata consistent: `manifest.homePage` ↔ `CITATION.cff` url same `owner/repo`; `manifest.defaultBranch` set and schema `$id` points at it; `CHANGELOG.md` documents `manifest.version` | `tests/python/test_metadata_consistency.py` | done | — |
 | `[S81]`| every piped process script runs under `set -euo pipefail` (left-pipe failure fails the task); documented empty-result pipes (`grep` no-match) stay `\|\| true`-guarded; SIGPIPE-safe min in post-cleave | `tests/processes/part_b/chimera_detection.nf.test`, `tests/processes/part_b/chimera_detection_post_cleave.nf.test` | done | — |
@@ -197,7 +197,7 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `global_clustering`             | `tests/processes/part_b/global_clustering.nf.test`            | S32, S45     | done   |
 | `chimera_detection`             | `tests/processes/part_b/chimera_detection.nf.test`            | S34          | done   |
 | `cleaving`                      | `tests/processes/part_b/cleaving.nf.test`                     | S22          | done   |
-| `build_occurrence_table`        | `tests/processes/part_b/build_occurrence_table.nf.test`       | S35, S127, S135 | red    |
+| `build_occurrence_table`        | `tests/processes/part_b/build_occurrence_table.nf.test`       | S35, S127, S135 | done   |
 | `chimera_detection_post_cleave`            | `tests/processes/part_b/chimera_detection_post_cleave.nf.test`           | S37          | done   |
 | `search_for_terminal_gaps`      | `tests/processes/part_b/search_for_terminal_gaps.nf.test`     | S38          | done   |
 | `merge_substring_otus`          | `tests/processes/part_b/merge_substring_otus.nf.test`         | S39          | done   |
@@ -218,6 +218,6 @@ coverage gate (`bash tests/coverage-gate.sh`) checks that every
 | `compute_majority_assignment`   | `tests/processes/part_c/compute_majority_assignment.nf.test`  | S66          | done   |
 | `check_reference`               | `tests/processes/part_c/check_reference.nf.test`              | S114, S117   | done   |
 | `dump_software_versions`        | `tests/processes/dump_software_versions.nf.test`              | S68          | done   |
-| `check_vsearch_version`         | `tests/processes/check_vsearch_version.nf.test`               | S136         | red    |
+| `check_vsearch_version`         | `tests/processes/check_vsearch_version.nf.test`               | S136         | done   |
 | `resolve_runs`                  | `tests/processes/fetch/resolve_runs.nf.test`                 | S99          | done   |
 | `download_run`                  | `tests/processes/fetch/download_run.nf.test`                 | S100, S101   | done   |

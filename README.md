@@ -52,7 +52,8 @@ Required to run the workflow:
 
 - `nextflow >= 25.04.0`
 - `bash >= 4`
-- `vsearch`, `cutadapt`, `swarm`, `mumu` available on `PATH` — or
+- `vsearch` (2.32.0 or newer; the run stops otherwise, `[S136]`),
+  `cutadapt`, `swarm`, `mumu` available on `PATH` — or
   resolved automatically with `-profile conda` (bioconda),
   `-profile modules`, or a container engine
   (`-profile docker`/`podman`/`singularity`/`apptainer`; see "Running
@@ -289,7 +290,9 @@ carry more errors, so most clusters will probably fail the default
 occurrence-table quality filter (`--max_ee`, expected errors per base,
 default `0.0002`). Swarm's clustering assumes few differences between
 reads too. Treat Nanopore support as experimental and expect to adjust
-these settings.
+these settings. When the filter keeps no cluster at all, Part B prints
+`occurrence table is empty, details in .nextflow.log`, and the log
+file says how many clusters each filter rejected (`[S135]`).
 
 ### Adding a custom pattern (`--fastq_pattern`)
 

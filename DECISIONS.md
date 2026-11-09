@@ -1375,7 +1375,8 @@ to let users experiment with Nanopore data, not to tune for it.
 
 **Blocks:** `[S135]`. Related: `[S35]`, `[S34]`, `[S126]`, `[S134]`,
 `D23`.
-**Status:** `resolved` — confirmed by the developer (2026-11-09).
+**Status:** `resolved` — confirmed by the developer (2026-11-09);
+implemented, spec and tests reflect it.
 
 Raised 2026-11-09 from a user report: Nanopore 16S/18S amplicons
 (515F/926R, about 550 bp), basecalled with a fast model because the
@@ -1421,7 +1422,8 @@ Specified as `[S135]`.
 ## D25 — Minimum vsearch version
 
 **Blocks:** `[S136]`. Related: `[S68]`, `[S69]`, `[S106]`.
-**Status:** `resolved` — confirmed by the developer (2026-11-09).
+**Status:** `resolved` — confirmed by the developer (2026-11-09);
+implemented, spec and tests reflect it.
 
 Raised 2026-11-09 from the same user report. The user ran the
 workflow with a vsearch older than 2.32.0 (the `[S69]` pin) taken

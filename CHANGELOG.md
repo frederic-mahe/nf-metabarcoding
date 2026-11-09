@@ -9,6 +9,19 @@ version here must match `manifest.version` in
 
 ## [Unreleased]
 
+### Added
+
+- Part B now warns when the occurrence-table filter keeps no cluster
+  (`occurrence table is empty, details in .nextflow.log`). The log
+  file gives how many clusters each filter rejected (chimera status,
+  `--max_ee`, `--min_abundance` / `--min_spread`). Until now, such a
+  run ended without any error and with no taxonomic assignment, which
+  happens with noisy reads such as Nanopore (`D24`, `[S135]`).
+- The run stops right after start when vsearch is older than 2.32.0,
+  missing, or reports no readable version, and suggests a conda or
+  container profile. Older versions abort on quality scores above 41,
+  common in Nanopore and PacBio HiFi reads (`D25`, `[S136]`).
+
 ### Changed
 
 - With `--pool_fastq_by_folder`, when no subfolder holds fastq files
