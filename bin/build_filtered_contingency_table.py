@@ -53,6 +53,11 @@ MIN_SPREAD: int = 2
 # assignment is available (the legacy fake_taxonomic_assignment values).
 PLACEHOLDER_ASSIGNMENT: tuple[str, str, str] = ("0.0", "NA", "NA")
 
+# [S135]: keys of the FILTER: summary line printed on stderr, in order.
+FILTER_KEYS: tuple[str, ...] = (
+    "clusters", "kept", "chimera", "max_ee", "abundance_spread",
+)
+
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     """Parse arguments from the command line."""
@@ -303,6 +308,7 @@ def iter_rows(
     max_ee: float = MAX_EE,
     min_abundance: int = MIN_ABUNDANCE,
     min_spread: int = MIN_SPREAD,
+    counts: Optional[dict[str, int]] = None,
 ) -> Iterator[tuple[object, ...]]:
     """Yield one output row per cluster that passes the filter.
 
@@ -312,7 +318,17 @@ def iter_rows(
     zero-abundance row) mirrors the legacy script's
     ``except KeyError: continue`` branch — the rewritten cluster is
     already represented by the new seed.
+
+    ``[S135]``: when ``counts`` is given, it is updated in place with
+    the number of clusters reaching the filter (``clusters``), kept
+    (``kept``), and rejected by each arm (``chimera``, ``max_ee``,
+    ``abundance_spread``; not exclusive). A cluster without a quality
+    value counts as a ``max_ee`` rejection.
     """
+    if counts is None:
+        counts = {}
+    for key in FILTER_KEYS:
+        counts.setdefault(key, 0)
     i = 1
     for seed, mass in sorted_stats:
         sequence = representatives[seed]
@@ -329,11 +345,18 @@ def iter_rows(
             seed, PLACEHOLDER_ASSIGNMENT,
         )
 
-        if (
-            chimera_status == "N"
-            and high_quality <= max_ee
-            and (mass >= min_abundance or spread >= min_spread)
-        ):
+        counts["clusters"] += 1
+        fails_chimera = chimera_status != "N"
+        fails_max_ee = high_quality == "NA" or high_quality > max_ee
+        fails_abundance_spread = not (
+            mass >= min_abundance or spread >= min_spread
+        )
+        counts["chimera"] += fails_chimera
+        counts["max_ee"] += fails_max_ee
+        counts["abundance_spread"] += fails_abundance_spread
+
+        if not (fails_chimera or fails_max_ee or fails_abundance_spread):
+            counts["kept"] += 1
             yield (
                 i, mass, cloud,
                 seed, len(sequence), sequence_abundance,
@@ -342,6 +365,12 @@ def iter_rows(
                 "\t".join(str(occurrences[sample]) for sample in samples),
             )
             i += 1
+
+
+def filter_summary(counts: dict[str, int]) -> str:
+    """Format the ``[S135]`` ``FILTER:`` line from ``iter_rows`` counts."""
+    fields = " ".join(f"{key}={counts.get(key, 0)}" for key in FILTER_KEYS)
+    return f"FILTER: {fields}"
 
 
 def write_table(
@@ -382,6 +411,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         args.distribution, valid_otus, extra_samples=extra_samples,
     )
 
+    counts: dict[str, int] = {}
     write_table(
         samples,
         iter_rows(
@@ -390,8 +420,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             max_ee=args.max_ee,
             min_abundance=args.min_abundance,
             min_spread=args.min_spread,
+            counts=counts,
         ),
     )
+    print(filter_summary(counts), file=sys.stderr)
     return 0
 
 

@@ -39,8 +39,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 
 SCRIPT = (
     Path(__file__).resolve().parents[2]
@@ -200,7 +198,6 @@ def _filter_lines(stderr: str) -> list[str]:
 
 
 # COVERAGE: [S135]
-@pytest.mark.xfail(strict=True, reason="pending: [S135] not implemented yet")
 def test_filter_summary_counts_each_arm() -> None:
     """[S135]: the script prints one ``FILTER:`` line on stderr.
 
@@ -217,7 +214,6 @@ def test_filter_summary_counts_each_arm() -> None:
 
 
 # COVERAGE: [S135]
-@pytest.mark.xfail(strict=True, reason="pending: [S135] not implemented yet")
 def test_filter_summary_counts_are_not_exclusive() -> None:
     """[S135]: a cluster failing several arms counts under each.
 
