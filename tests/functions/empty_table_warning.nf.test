@@ -12,7 +12,7 @@ nextflow_function {
 
     test("no warning when clusters are kept") {
         // COVERAGE: [S135]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "occurrence table"
             input[1] = "PROGRESS: filtering and writing OTUs\\nFILTER: clusters=7 kept=3 chimera=2 max_ee=1 abundance_spread=1\\n"
@@ -26,7 +26,7 @@ nextflow_function {
 
     test("no warning when the text holds no FILTER line") {
         // COVERAGE: [S135]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "occurrence table"
             input[1] = "PROGRESS: filtering and writing OTUs\\n"
@@ -40,7 +40,7 @@ nextflow_function {
 
     test("an empty table gives a console line and per-filter counts") {
         // COVERAGE: [S135]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "occurrence table"
             input[1] = "PROGRESS: filtering and writing OTUs\\nFILTER: clusters=7 kept=0 chimera=2 max_ee=7 abundance_spread=1\\n"
@@ -62,7 +62,7 @@ nextflow_function {
 
     test("the shadow label is carried into both lines") {
         // COVERAGE: [S135]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "shadow occurrence table"
             input[1] = "FILTER: clusters=4 kept=0 chimera=4 max_ee=0 abundance_spread=3"
@@ -84,7 +84,7 @@ nextflow_function {
 
     test("no cluster reaching the filter gets its own detail line") {
         // COVERAGE: [S135]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "occurrence table"
             input[1] = "FILTER: clusters=0 kept=0 chimera=0 max_ee=0 abundance_spread=0\\n"
@@ -101,7 +101,7 @@ nextflow_function {
 
     test("the console line fits 80 columns for both labels") {
         // COVERAGE: [S135], [S134]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "shadow occurrence table"
             input[1] = "FILTER: clusters=999999999 kept=0 chimera=999999999 max_ee=999999999 abundance_spread=999999999"

@@ -590,3 +590,70 @@ def slurm_account_requirement_error(require_account, slurm_account) {
         "sets require_slurm_account): pass your project, e.g. " +
         "--slurm_account jedi_meta."
 }
+
+
+def empty_table_warning(label, summary, thresholds) {
+    // [S135] (D24): turn the FILTER: line that
+    // bin/build_filtered_contingency_table.py prints on stderr into a
+    // short console warning ([S134], at most 73 characters) and a detail
+    // line for .nextflow.log. Returns [] when clusters were kept (or no
+    // FILTER: line is found), otherwise [console line, detail line].
+    // Pure (no params access) so it is unit-testable; part_B and
+    // part_B_shadow pass the run's thresholds.
+    def line
+    line = summary.toString().readLines().find { it.startsWith('FILTER:') }
+    if ( !line ) {
+        return []
+    }
+    def counts
+    counts = line.substring('FILTER:'.size()).tokenize(' ').collectEntries { field ->
+        def parts = field.split('=', 2)
+        [(parts[0]): parts[1] as long]
+    }
+    if ( counts.kept > 0 ) {
+        return []
+    }
+    def console_line
+    console_line = "${label} is empty, details in .nextflow.log".toString()
+    if ( counts.clusters == 0 ) {
+        return [console_line, "${label} is empty: no cluster reached the filter".toString()]
+    }
+    def detail
+    detail = "${label} is empty: 0 of ${counts.clusters} clusters kept; " +
+        "rejected by chimera status (not N): ${counts.chimera}, " +
+        "by --max_ee ${thresholds.max_ee}: ${counts.max_ee}, " +
+        "by --min_abundance ${thresholds.min_abundance} and " +
+        "--min_spread ${thresholds.min_spread}: ${counts.abundance_spread} " +
+        "(a cluster can fail several filters); " +
+        "noisy reads (e.g. Nanopore) may need relaxed thresholds"
+    return [console_line, detail.toString()]
+}
+
+
+def vsearch_version_error(raw) {
+    // [S136] (D25): vsearch older than 2.32.0 defaults --fastq_qmax to
+    // 41 and aborts on higher quality scores ([S106]). Read the first
+    // MAJOR.MINOR[.PATCH] token of `vsearch --version`'s first line and
+    // compare it, number by number, to the minimum. Returns null when
+    // the version is recent enough, an error message otherwise. The
+    // minimum is the oldest version the workflow works with; it does
+    // not follow the [S69] pin.
+    def minimum = [2, 32, 0]
+    def advice = "Use -profile conda or a container profile (e.g. -profile apptainer)."
+    def matcher
+    matcher = ( raw ?: '' ).toString() =~ /(\d+)\.(\d+)(?:\.(\d+))?/
+    if ( !matcher.find() ) {
+        return "vsearch version could not be read (is vsearch installed?); " +
+            "nf-metabarcoding needs vsearch ${minimum.join('.')} or newer. ${advice}".toString()
+    }
+    def found
+    found = [matcher.group(1), matcher.group(2), matcher.group(3) ?: '0'].collect { it as int }
+    def comparison
+    comparison = [found, minimum].transpose().collect { pair -> pair[0] <=> pair[1] }.find { it != 0 } ?: 0
+    if ( comparison >= 0 ) {
+        return null
+    }
+    return ("vsearch ${matcher.group(0)} found, but nf-metabarcoding needs vsearch " +
+        "${minimum.join('.')} or newer (older versions reject quality scores " +
+        "above 41). ${advice}").toString()
+}

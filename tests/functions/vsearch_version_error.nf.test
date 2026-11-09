@@ -12,7 +12,7 @@ nextflow_function {
 
     test("the minimum version passes") {
         // COVERAGE: [S136]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "vsearch v2.32.0_linux_x86_64, 123.0GB RAM, 24 cores"
         """ } }
@@ -24,7 +24,7 @@ nextflow_function {
 
     test("newer versions pass, compared as numbers") {
         // COVERAGE: [S136]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "vsearch v2.32.1_linux_x86_64"
         """ } }
@@ -36,7 +36,7 @@ nextflow_function {
 
     test("a two-digit minor version is newer") {
         // COVERAGE: [S136]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "vsearch v2.100.0_linux_aarch64, 8.0GB RAM, 4 cores"
         """ } }
@@ -48,7 +48,7 @@ nextflow_function {
 
     test("a missing patch number counts as zero") {
         // COVERAGE: [S136]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "vsearch v3.0_macos_x86_64"
         """ } }
@@ -60,7 +60,7 @@ nextflow_function {
 
     test("an older version is rejected with the version found") {
         // COVERAGE: [S136]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "vsearch v2.31.0_linux_x86_64, 64.0GB RAM, 16 cores"
         """ } }
@@ -77,7 +77,7 @@ nextflow_function {
     test("a one-digit minor version is older, not newer") {
         // COVERAGE: [S136]
         // A string comparison would rank "2.9.1" above "2.32.0".
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "vsearch v2.9.1_linux_x86_64"
         """ } }
@@ -93,7 +93,7 @@ nextflow_function {
 
     test("an empty version line is reported as unreadable") {
         // COVERAGE: [S136]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = ""
         """ } }
@@ -108,7 +108,7 @@ nextflow_function {
 
     test("a missing vsearch is reported as unreadable") {
         // COVERAGE: [S136]
-        tag "pending"
+        tag "ci"
         when { function { """
             input[0] = "bash: line 1: vsearch: command not found"
         """ } }
