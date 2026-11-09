@@ -63,4 +63,42 @@ nextflow_process {
             }
         }
     }
+
+    test("captures the filter summary in an unpublished filter log") {
+        // COVERAGE: [S135]
+        // The script's stderr ends with one FILTER: line (per-arm
+        // counts); the process keeps it in <basename>_occurrence_filter.log,
+        // emitted as filter_log, so Part B can warn about an empty table.
+        tag "pending"
+        when {
+            process {
+                """
+                def empty = workDir.resolve("empty")
+                empty.text = ""
+                def fixture = "\${projectDir}/tests/data/build_filtered_contingency_table"
+                input[0]  = file("\${fixture}/representatives")
+                input[1]  = file(empty.toString())
+                input[2]  = file("\${fixture}/stats")
+                input[3]  = file(empty.toString())
+                input[4]  = file("\${fixture}/swarms")
+                input[5]  = file(empty.toString())
+                input[6]  = file("\${fixture}/uchime")
+                input[7]  = file(empty.toString())
+                input[8]  = file("\${fixture}/quality")
+                input[9]  = file("\${fixture}/distribution")
+                input[10] = "proj"
+                input[11] = "s1,s2,s3,s4,s5"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def logPath = process.out.filter_log.get(0)
+            assert logPath.endsWith("proj_occurrence_filter.log") :
+                "unexpected filter log name: ${logPath}"
+            def summary = path(logPath).readLines().findAll { it.startsWith("FILTER:") }
+            assert summary == ["FILTER: clusters=7 kept=3 chimera=2 max_ee=1 abundance_spread=1"] :
+                "unexpected filter summary: ${path(logPath).text}"
+        }
+    }
 }

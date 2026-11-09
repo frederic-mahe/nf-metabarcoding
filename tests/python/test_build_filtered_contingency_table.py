@@ -39,6 +39,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 SCRIPT = (
     Path(__file__).resolve().parents[2]
@@ -190,3 +192,40 @@ def test_no_assignments_fills_placeholders() -> None:
         assert obs_cols[:10] + obs_cols[13:] == (
             exp_cols[:10] + exp_cols[13:]
         ), f"non-taxonomy columns changed: {obs_row}"
+
+
+def _filter_lines(stderr: str) -> list[str]:
+    """Return the ``FILTER:`` summary lines of the script's stderr."""
+    return [line for line in stderr.splitlines() if line.startswith("FILTER:")]
+
+
+# COVERAGE: [S135]
+@pytest.mark.xfail(strict=True, reason="pending: [S135] not implemented yet")
+def test_filter_summary_counts_each_arm() -> None:
+    """[S135]: the script prints one ``FILTER:`` line on stderr.
+
+    In the golden fixture, 7 clusters reach the filter and 3 are kept;
+    bb01 (``Y``) and 1101 (``NA``) fail the chimera arm, cc01 the
+    ee arm, dd01 the abundance / spread arm.
+    """
+    result = _run()
+    assert _filter_lines(result.stderr) == [
+        "FILTER: clusters=7 kept=3 chimera=2 max_ee=1 abundance_spread=1"
+    ], f"unexpected stderr: {result.stderr}"
+    expected = (FIXTURE / "expected_table.tsv").read_text()
+    assert result.stdout == expected, "the table must not change"
+
+
+# COVERAGE: [S135]
+@pytest.mark.xfail(strict=True, reason="pending: [S135] not implemented yet")
+def test_filter_summary_counts_are_not_exclusive() -> None:
+    """[S135]: a cluster failing several arms counts under each.
+
+    Under ``--max-ee 0`` every cluster fails the ee arm (7), while the
+    chimera (2) and abundance / spread (1) counts stay the same, and
+    nothing is kept.
+    """
+    result = _run(["--max-ee", "0"])
+    assert _filter_lines(result.stderr) == [
+        "FILTER: clusters=7 kept=0 chimera=2 max_ee=7 abundance_spread=1"
+    ], f"unexpected stderr: {result.stderr}"

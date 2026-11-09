@@ -3216,4 +3216,83 @@ nextflow_pipeline {
                 "expected the missing --fastq_folder abort once the requirement is OFF, got: ${msg}"
         }
     }
+
+
+    test("Part B warns once when the filter empties the occurrence table") {
+        // COVERAGE: [S135], [S134]
+        // --max_ee 0 rejects every cluster of the part_b fixture (each
+        // has ee/length > 0). The run still succeeds; the console gets
+        // one short warning, .nextflow.log the per-filter counts.
+        tag "pending"
+        when {
+            params {
+                project_name = "emptyproj"
+                outdir       = "${outputDir}/empty_table"
+                fasta_folder = "${projectDir}/tests/data/part_b"
+                max_ee       = 0
+                threads      = 1
+            }
+        }
+        then {
+            assert workflow.success
+            // nf-test runs nextflow -quiet: log.warn lines reach
+            // nextflow.log only, as "WARN  nextflow.Nextflow - <message>"
+            def lines = file("${metaDir}/nextflow.log").readLines()
+            def marker = "WARN  nextflow.Nextflow - "
+            def warnings = lines.findAll { it.contains(marker) }
+                .collect { it.substring(it.indexOf(marker) + marker.size()) }
+            def empty = warnings.findAll { it == "occurrence table is empty, details in .nextflow.log" }
+            assert empty.size() == 1 :
+                "expected one empty-table warning, got: ${warnings}"
+            def details = lines.findAll { it.contains("occurrence table is empty: 0 of ") }
+            assert details.size() == 1 :
+                "expected one detail line in nextflow.log, got: ${details}"
+            assert details[0].contains("by --max_ee 0") :
+                "the detail line should name --max_ee, got: ${details[0]}"
+            def table = file("${outputDir}/empty_table/occurrence_table/emptyproj_3_samples_table.tsv")
+            assert table.exists() : "the (empty) final table is still published"
+            assert table.readLines().size() == 1 :
+                "expected a header-only table, got: ${table.readLines()}"
+        }
+    }
+
+    test("a vsearch older than 2.32.0 stops the run") {
+        // COVERAGE: [S136]
+        // The config puts a fake vsearch first on the task PATH. It
+        // reports 2.31.0 for --version; any other call waits, then
+        // fails, so the version check is the first error to surface.
+        tag "pending"
+        config "tests/config/old_vsearch.config"
+        setup {
+            def fake = file("${projectDir}/.nf-test/fake_old_vsearch/vsearch")
+            fake.parentFile.mkdirs()
+            fake.text = """\
+                #!/bin/sh
+                case " \$* " in
+                    *" --version "*)
+                        echo "vsearch v2.31.0_linux_x86_64, 8.0GB RAM, 4 cores" >&2
+                        echo "https://github.com/torognes/vsearch" >&2
+                        exit 0 ;;
+                esac
+                sleep 60
+                echo "fake vsearch: not a real vsearch" >&2
+                exit 1
+                """.stripIndent()
+            fake.setExecutable(true)
+        }
+        when {
+            params {
+                project_name = "oldvsearch"
+                outdir       = "${outputDir}/old_vsearch"
+                fasta_folder = "${projectDir}/tests/data/part_b"
+                threads      = 1
+            }
+        }
+        then {
+            assert workflow.failed
+            def msg = (workflow.stdout + workflow.stderr + workflow.errorReport).toString()
+            assert msg.contains("vsearch 2.31.0 found") && msg.contains("2.32.0") :
+                "expected the minimum-version abort, got: ${msg}"
+        }
+    }
 }

@@ -1,0 +1,116 @@
+nextflow_function {
+
+    name "empty_table_warning"
+    script "modules/local/functions.nf"
+    function "empty_table_warning"
+
+    // [S135] (D24): Part B warns when the [S35] filter kept no cluster.
+    // The function turns the FILTER: summary line printed by
+    // bin/build_filtered_contingency_table.py into a short console line
+    // ([S134]) and a detail line for .nextflow.log. Workflow-level
+    // wiring is covered in tests/main.nf.test.
+
+    test("no warning when clusters are kept") {
+        // COVERAGE: [S135]
+        tag "pending"
+        when { function { """
+            input[0] = "occurrence table"
+            input[1] = "PROGRESS: filtering and writing OTUs\\nFILTER: clusters=7 kept=3 chimera=2 max_ee=1 abundance_spread=1\\n"
+            input[2] = [max_ee: 0.03, min_abundance: 3, min_spread: 2]
+        """ } }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("no warning when the text holds no FILTER line") {
+        // COVERAGE: [S135]
+        tag "pending"
+        when { function { """
+            input[0] = "occurrence table"
+            input[1] = "PROGRESS: filtering and writing OTUs\\n"
+            input[2] = [max_ee: 0.03, min_abundance: 3, min_spread: 2]
+        """ } }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("an empty table gives a console line and per-filter counts") {
+        // COVERAGE: [S135]
+        tag "pending"
+        when { function { """
+            input[0] = "occurrence table"
+            input[1] = "PROGRESS: filtering and writing OTUs\\nFILTER: clusters=7 kept=0 chimera=2 max_ee=7 abundance_spread=1\\n"
+            input[2] = [max_ee: 0.03, min_abundance: 3, min_spread: 2]
+        """ } }
+        then {
+            assert function.success
+            assert function.result == [
+                "occurrence table is empty, details in .nextflow.log",
+                "occurrence table is empty: 0 of 7 clusters kept; " +
+                    "rejected by chimera status (not N): 2, " +
+                    "by --max_ee 0.03: 7, " +
+                    "by --min_abundance 3 and --min_spread 2: 1 " +
+                    "(a cluster can fail several filters); " +
+                    "noisy reads (e.g. Nanopore) may need relaxed thresholds",
+            ]
+        }
+    }
+
+    test("the shadow label is carried into both lines") {
+        // COVERAGE: [S135]
+        tag "pending"
+        when { function { """
+            input[0] = "shadow occurrence table"
+            input[1] = "FILTER: clusters=4 kept=0 chimera=4 max_ee=0 abundance_spread=3"
+            input[2] = [max_ee: 0.5, min_abundance: 5, min_spread: 4]
+        """ } }
+        then {
+            assert function.success
+            assert function.result == [
+                "shadow occurrence table is empty, details in .nextflow.log",
+                "shadow occurrence table is empty: 0 of 4 clusters kept; " +
+                    "rejected by chimera status (not N): 4, " +
+                    "by --max_ee 0.5: 0, " +
+                    "by --min_abundance 5 and --min_spread 4: 3 " +
+                    "(a cluster can fail several filters); " +
+                    "noisy reads (e.g. Nanopore) may need relaxed thresholds",
+            ]
+        }
+    }
+
+    test("no cluster reaching the filter gets its own detail line") {
+        // COVERAGE: [S135]
+        tag "pending"
+        when { function { """
+            input[0] = "occurrence table"
+            input[1] = "FILTER: clusters=0 kept=0 chimera=0 max_ee=0 abundance_spread=0\\n"
+            input[2] = [max_ee: 0.03, min_abundance: 3, min_spread: 2]
+        """ } }
+        then {
+            assert function.success
+            assert function.result == [
+                "occurrence table is empty, details in .nextflow.log",
+                "occurrence table is empty: no cluster reached the filter",
+            ]
+        }
+    }
+
+    test("the console line fits 80 columns for both labels") {
+        // COVERAGE: [S135], [S134]
+        tag "pending"
+        when { function { """
+            input[0] = "shadow occurrence table"
+            input[1] = "FILTER: clusters=999999999 kept=0 chimera=999999999 max_ee=999999999 abundance_spread=999999999"
+            input[2] = [max_ee: 0.0002, min_abundance: 3, min_spread: 2]
+        """ } }
+        then {
+            assert function.success
+            assert function.result[0].size() <= 73 :
+                "console line longer than 73 characters: \${function.result[0]}"
+        }
+    }
+}

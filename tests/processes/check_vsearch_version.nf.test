@@ -1,0 +1,26 @@
+nextflow_process {
+
+    name "check_vsearch_version"
+    script "modules/local/check_vsearch_version.nf"
+    process "check_vsearch_version"
+
+    test("emits the first line of vsearch --version") {
+        // COVERAGE: [S136]
+        // vsearch prints its version on stderr; the process merges
+        // stdout and stderr and keeps the first line. The comparison
+        // itself is pinned by tests/functions/vsearch_version_error.nf.test.
+        tag "pending"
+        when {
+            process {
+                """
+                """
+            }
+        }
+        then {
+            assert process.success
+            def line = process.out.version.get(0).toString().trim()
+            assert line.startsWith("vsearch v") :
+                "expected a vsearch version line, got: '${line}'"
+        }
+    }
+}
