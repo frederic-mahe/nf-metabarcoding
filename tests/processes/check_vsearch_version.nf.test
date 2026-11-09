@@ -9,7 +9,7 @@ nextflow_process {
         // vsearch prints its version on stderr; the process merges
         // stdout and stderr and keeps the first line. The comparison
         // itself is pinned by tests/functions/vsearch_version_error.nf.test.
-        tag "pending"
+        tag "ci"
         when {
             process {
                 """

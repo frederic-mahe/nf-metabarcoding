@@ -3261,7 +3261,7 @@ nextflow_pipeline {
         // The config puts a fake vsearch first on the task PATH. It
         // reports 2.31.0 for --version; any other call waits, then
         // fails, so the version check is the first error to surface.
-        tag "pending"
+        tag "ci"
         config "tests/config/old_vsearch.config"
         setup {
             def fake = file("${projectDir}/.nf-test/fake_old_vsearch/vsearch")

@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-include { normalize_path; validate_params; samplesheet_profile; check_primer_format; parse_accessions; resource_size_warnings; slurm_account_requirement_error; coerce_bool } from './modules/local/functions.nf'
+include { normalize_path; validate_params; samplesheet_profile; check_primer_format; parse_accessions; resource_size_warnings; slurm_account_requirement_error; coerce_bool; vsearch_version_error } from './modules/local/functions.nf'
 include { fetch_accessions } from './subworkflows/local/fetch.nf'
 include { part_A } from './subworkflows/local/part_a.nf'
 include { part_B; part_B_shadow } from './subworkflows/local/part_b.nf'
@@ -8,6 +8,7 @@ include { discover_part_b_fasta } from './modules/local/part_b/discover_part_b_f
 include { validate_samplesheet } from './modules/local/validate_samplesheet.nf'
 include { part_C; part_C_fasta; part_C_shadow } from './subworkflows/local/part_c.nf'
 include { dump_software_versions } from './modules/local/dump_software_versions.nf'
+include { check_vsearch_version } from './modules/local/check_vsearch_version.nf'
 include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 
 
@@ -401,6 +402,21 @@ workflow {
         // of the selected mode. Invoked once here (not per router/branch) so
         // the single-host process is never scheduled twice in one run.
         dump_software_versions()
+
+        // [S136] (D25): stop the run when vsearch is older than 2.32.0,
+        // missing, or reports no readable version. Every mode but the
+        // standalone fetch mode runs vsearch. The check does not gate
+        // the other processes; it completes seconds after start.
+        if ( !params.accession ) {
+            check_vsearch_version()
+            check_vsearch_version.out.version.map { raw ->
+                def message = vsearch_version_error(raw)
+                if ( message ) {
+                    error(message)
+                }
+                raw
+            }
+        }
 
         // [S60]: every path-typed param is read through `normalize_path()`
         // at its use site (file(), publishDir, etc.) — see the helper at the
