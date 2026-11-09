@@ -3223,7 +3223,7 @@ nextflow_pipeline {
         // --max_ee 0 rejects every cluster of the part_b fixture (each
         // has ee/length > 0). The run still succeeds; the console gets
         // one short warning, .nextflow.log the per-filter counts.
-        tag "pending"
+        tag "ci"
         when {
             params {
                 project_name = "emptyproj"

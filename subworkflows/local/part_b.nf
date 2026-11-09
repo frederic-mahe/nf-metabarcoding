@@ -28,7 +28,24 @@ include { recluster_search }                               from '../../modules/l
 include { recluster_merge }                                from '../../modules/local/part_b/recluster_merge.nf'
 include { extract_recluster_fasta }                        from '../../modules/local/part_b/extract_recluster_fasta.nf'
 include { summarize_part_b_read_counts }                   from '../../modules/local/part_b/summarize_part_b_read_counts.nf'
-include { hash_id_length }                                 from '../../modules/local/functions.nf'
+include { hash_id_length; empty_table_warning }            from '../../modules/local/functions.nf'
+
+
+def report_empty_table(filter_log, label) {
+    // [S135] (D24): warn when the [S35] filter kept no cluster. The
+    // console gets one short line ([S134]); the per-filter counts go to
+    // the log file only. The run continues.
+    def lines
+    lines = empty_table_warning(label, filter_log.text, [
+        max_ee:        params.max_ee,
+        min_abundance: params.min_abundance,
+        min_spread:    params.min_spread,
+    ])
+    if ( lines ) {
+        log.warn(lines[0])
+        log.debug(lines[1])
+    }
+}
 
 
 workflow part_B {
@@ -98,6 +115,9 @@ workflow part_B {
         basename,
         sample_ids,                          // [S09]
     )
+    build_occurrence_table.out.filter_log.subscribe { filter_log ->
+        report_empty_table(filter_log, 'occurrence table')
+    }
 
     // [S38]/[S39]: collapse sub- and super-string OTUs. The combined
     // vsearch + python step emits <basename>_superstring_clustering.log
@@ -228,6 +248,9 @@ workflow part_B_shadow {
         basename,
         sample_ids,                          // [S09]
     )
+    build_occurrence_table.out.filter_log.subscribe { filter_log ->
+        report_empty_table(filter_log, 'shadow occurrence table')
+    }
 
     search_for_terminal_gaps(build_occurrence_table.out.table)
     merge_substring_otus(
