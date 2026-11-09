@@ -69,7 +69,7 @@ nextflow_process {
         // The script's stderr ends with one FILTER: line (per-arm
         // counts); the process keeps it in <basename>_occurrence_filter.log,
         // emitted as filter_log, so Part B can warn about an empty table.
-        tag "pending"
+        tag "ci"
         when {
             process {
                 """

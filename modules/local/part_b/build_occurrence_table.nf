@@ -13,6 +13,13 @@ process build_occurrence_table {
     // [S46]: this is an intermediate OTU table — it is **not**
     // published; only the final <basename>_table.tsv reaches the
     // results folder.
+    //
+    // [S135]: the script's stderr (progress lines and the final
+    // FILTER: summary) is kept in <basename>_occurrence_filter.log,
+    // emitted as filter_log and not published (the [S45] logs/part_b/
+    // file list stays as is). Part B reads it to warn about an empty
+    // table. On failure the log is copied to stderr, so the error
+    // still shows in Nextflow's report.
 
     input:
     path representatives,   stageAs: 'reps_global.fas'
@@ -32,9 +39,12 @@ process build_occurrence_table {
 
     output:
     path "${basename}.OTU.filtered.cleaved.table", emit: table
+    path "${basename}_occurrence_filter.log",      emit: filter_log
 
     shell:
     '''
+    readonly FILTER_LOG="!{basename}_occurrence_filter.log"
+
     build_filtered_contingency_table.py \
         --representatives <(cat !{representatives} !{representatives_2}) \
         --stats           <(cat !{stats} !{stats_2}) \
@@ -46,11 +56,16 @@ process build_occurrence_table {
         --max-ee          !{params.max_ee} \
         --min-abundance   !{params.min_abundance} \
         --min-spread      !{params.min_spread} \
-        > !{basename}.OTU.filtered.cleaved.table
+        > !{basename}.OTU.filtered.cleaved.table \
+        2> "${FILTER_LOG}" || {
+        status=$?
+        cat "${FILTER_LOG}" >&2
+        exit "${status}"
+    }
     '''
 
     stub:
     """
-    touch ${basename}.OTU.filtered.cleaved.table
+    touch ${basename}.OTU.filtered.cleaved.table ${basename}_occurrence_filter.log
     """
 }
