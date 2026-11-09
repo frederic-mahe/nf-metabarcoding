@@ -1369,3 +1369,91 @@ to let users experiment with Nanopore data, not to tune for it.
    `work/` subfolders and nested folders into samples. Both are
    folder-scan options, so setting either with `--input` also stops
    at startup.
+
+
+## D24 — Silent empty occurrence table
+
+**Blocks:** `[S135]`. Related: `[S35]`, `[S34]`, `[S126]`, `[S134]`,
+`D23`.
+**Status:** `resolved` — confirmed by the developer (2026-11-09).
+
+Raised 2026-11-09 from a user report: Nanopore 16S/18S amplicons
+(515F/926R, about 550 bp), basecalled with a fast model because the
+on-board GPU is limited. Part A and Part B finished without any
+error, but Part C produced no assignment. The only hint was buried
+in `<basename>_superstring_clustering.log`: vsearch reported
+`0 clusters, 0 singletons`, because the occurrence table it reads was
+already empty.
+
+The `[S35]` filter (`chimera == "N" && ee/length <= --max_ee &&
+(abundance >= --min_abundance || spread >= --min_spread)`) rejected
+every cluster: with a few percent of errors per base, nearly every
+read is a unique sequence, swarm (`d = 1`) builds tiny clusters,
+representatives below `--chimera_minsize` get no uchime status
+(`NA`), and the abundance / spread arm fails. Nothing tells the user
+which filter emptied the table, or that it is empty at all.
+
+**Open questions:**
+
+1. Warn and continue, abort, or warn without details?
+2. Where do the per-filter counts live?
+
+**Resolution (2026-11-09, confirmed by the developer):**
+
+1. **Warn and continue.** The run goes on (Part C on an empty
+   table, as today), but Part B logs one short console warning
+   (`[S134]`) and writes the details to `.nextflow.log` (`[S126]`
+   pattern). Aborting was rejected: a Part B-only run with an empty
+   table is still a legitimate (if disappointing) result, and the
+   published logs are useful for diagnosis.
+2. **Per-filter counts.** `bin/build_filtered_contingency_table.py`
+   prints one summary line on stderr: clusters reaching the filter,
+   clusters kept, and clusters rejected by each arm (not exclusive:
+   a cluster failing several arms counts under each). The line is
+   captured by `build_occurrence_table` in an internal (unpublished)
+   log, so `logs/part_b/` keeps its current file list (`[S45]`), and
+   the warning's detail text in `.nextflow.log` carries the counts
+   and names the flags to relax.
+
+Specified as `[S135]`.
+
+
+## D25 — Minimum vsearch version
+
+**Blocks:** `[S136]`. Related: `[S68]`, `[S69]`, `[S106]`.
+**Status:** `resolved` — confirmed by the developer (2026-11-09).
+
+Raised 2026-11-09 from the same user report. The user ran the
+workflow with a vsearch older than 2.32.0 (the `[S69]` pin) taken
+from their own PATH. Before 2.32.0, `--fastq_qmax` defaults to 41
+and vsearch aborts on any higher score; Nanopore (and PacBio HiFi)
+reads exceed it, so `filter_and_convert_to_fasta` crashed. The user
+patched the module (`--fastq_qmax 90`) instead of switching to the
+pinned environment. `[S68]` records the versions but checks nothing.
+
+**Open questions:**
+
+1. Abort, warn, or warn on any difference from the exact pins?
+2. Which tools are checked?
+
+**Resolution (2026-11-09, confirmed by the developer):**
+
+1. **Abort** when vsearch is older than **2.32.0** (or missing, or
+   its version is unreadable), with a message naming the version
+   found, the minimum, and the conda / container profiles. A
+   warning was rejected: the run would crash later anyway, with a
+   cryptic vsearch error. An exact-pin comparison was rejected: a
+   newer vsearch is fine, and users on HPC module systems rarely get
+   the exact pinned build.
+2. **Only vsearch.** It is the only tool with a known
+   version-dependent failure (`[S106]`). The other tools stay
+   recorded only (`[S68]`).
+3. The check is a process (tools may only be visible on compute
+   nodes, through conda, modules or containers), run once per run
+   in every mode that uses vsearch (not the standalone fetch mode).
+   It does not gate the other processes: the run stops as soon as
+   the check completes, which is seconds after start. The minimum
+   stays 2.32.0 when the `[S69]` pin moves forward: it records the
+   oldest version the workflow works with, not the pinned one.
+
+Specified as `[S136]`.

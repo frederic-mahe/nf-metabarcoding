@@ -966,6 +966,52 @@ the latter case.
     (same rows, same order, same columns) with columns 11–13 set to
     `0.0` / `NA` / `NA`; `build_occurrence_table` on the same fixture
     emits those placeholder values in every data row.
+- `[S135]` an occurrence table emptied by the `[S35]` filter is
+  reported, and the run continues (`D24`).
+  `bin/build_filtered_contingency_table.py` prints, on stderr after
+  the table is written, one summary line:
+  `FILTER: clusters=<C> kept=<K> chimera=<a> max_ee=<b> abundance_spread=<c>`.
+  `C` counts the clusters reaching the filter (the cleaved-away seeds
+  the script skips are not counted), `K` the rows written, `a` the
+  clusters whose chimera status is not `N` (`NA` included), `b` the
+  clusters whose `ee/length` exceeds `--max-ee` or that have no
+  quality value, and `c` the clusters with `abundance <
+  --min-abundance` and `spread < --min-spread`. The counts are not
+  exclusive: a cluster failing several arms counts under each. The
+  table on stdout does not change. `build_occurrence_table` writes the
+  script's stderr to `<basename>_occurrence_filter.log`, emitted as
+  `filter_log` and **not** published (the `[S45]` file list stays
+  as is). The function `empty_table_warning(label, summary,
+  thresholds)` in `modules/local/functions.nf` takes a label, the
+  text of that log and a `[max_ee:, min_abundance:, min_spread:]`
+  map. It returns `[]` when `K > 0` or when the text holds no
+  `FILTER:` line; otherwise a two-element list:
+    - the console line `<label> is empty, details in .nextflow.log`;
+    - the detail line, when `C > 0`:
+      `<label> is empty: 0 of <C> clusters kept; rejected by chimera
+      status (not N): <a>, by --max_ee <max_ee>: <b>, by
+      --min_abundance <min_abundance> and --min_spread <min_spread>:
+      <c> (a cluster can fail several filters); noisy reads (e.g.
+      Nanopore) may need relaxed thresholds` (one line), and, when
+      `C = 0`: `<label> is empty: no cluster reached the filter`.
+  `part_B` passes the label `occurrence table`, `part_B_shadow` the
+  label `shadow occurrence table`, both with the run's `--max_ee` /
+  `--min_abundance` / `--min_spread`; a non-empty result is logged
+  with `log.warn` (console line, `[S134]`) and `log.debug` (detail
+  line).
+  - **Pass when:** on the `[S35]` fixture, the script prints
+    `FILTER: clusters=7 kept=3 chimera=2 max_ee=1 abundance_spread=1`
+    on stderr, and with `--max-ee 0`
+    `FILTER: clusters=7 kept=0 chimera=2 max_ee=7 abundance_spread=1`;
+    `build_occurrence_table` on the same fixture emits a `filter_log`
+    holding the `FILTER:` line; `empty_table_warning` returns `[]`
+    for `kept=3` and for a text without `FILTER:` line, the two
+    exact lines for `kept=0` (both labels, `C > 0` and `C = 0`), and
+    a console line of at most 73 characters for both labels; a Part B
+    run on the `tests/data/part_b` fixture with `--max_ee 0` succeeds,
+    logs `occurrence table is empty, details in .nextflow.log` exactly
+    once as a warning, and logs the detail line with the counts in
+    `.nextflow.log`.
 
 
 - `[S38]` Part B's `search_for_terminal_gaps` extracts the
@@ -2229,6 +2275,37 @@ and `--reference_dataset_sintax`.
     declares a `bioconda::mumu` package, and that the `vsearch` /
     `swarm` / `cutadapt` / `mumu` pins in `environment.yml` and the CI
     workflow are identical.
+- `[S136]` the workflow needs vsearch **2.32.0 or newer** (`D25`,
+  `[S106]`). The process `check_vsearch_version`
+  (`modules/local/check_vsearch_version.nf`) runs once per run, in
+  every mode except the standalone fetch mode (`--accession`), and
+  emits on its `version` channel the first line of `vsearch
+  --version`'s combined stdout and stderr (an empty string when
+  vsearch is missing). Its stub emits a passing version line. The
+  function `vsearch_version_error(raw)` in
+  `modules/local/functions.nf` extracts the first
+  `MAJOR.MINOR[.PATCH]` token (a missing patch counts as `0`),
+  compares it to `2.32.0` component by component, as numbers (so
+  `2.9.1` is older and `2.100.0` newer), and returns `null` when the
+  version is at least `2.32.0`. Otherwise it returns one of:
+    - `vsearch <found> found, but nf-metabarcoding needs vsearch
+      2.32.0 or newer (older versions reject quality scores above
+      41). Use -profile conda or a container profile (e.g. -profile
+      apptainer).`
+    - when no version token is found: `vsearch version could not be
+      read (is vsearch installed?); nf-metabarcoding needs vsearch
+      2.32.0 or newer. Use -profile conda or a container profile
+      (e.g. -profile apptainer).`
+  The workflow stops the run with `error()` on a non-`null` message.
+  The minimum is a constant (it does not follow the `[S69]` pin).
+  - **Pass when:** `vsearch_version_error` returns `null` for the
+    first line of vsearch 2.32.0, 2.32.1, 2.100.0 and 3.0 output, the
+    first message (naming the version found) for 2.31.0 and 2.9.1,
+    and the second message for an empty string and for `command not
+    found`; `check_vsearch_version` emits a line starting with
+    `vsearch v` on the pinned environment; a Part B run whose task
+    PATH starts with a fake vsearch reporting 2.31.0 fails, and its
+    error output names `vsearch 2.31.0 found` and `2.32.0`.
 - `[S77]` the release version is declared in exactly two places —
   `manifest.version` in `nextflow.config` and `version` in
   `CITATION.cff` — and the two must agree, so a release can never ship a
